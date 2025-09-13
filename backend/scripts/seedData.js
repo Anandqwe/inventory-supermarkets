@@ -205,10 +205,9 @@ const seedDatabase = async () => {
     
     // Create admin user
     console.log('👤 Creating admin user...');
-    const adminPassword = await bcrypt.hash('Admin@123456', 12);
     const adminUser = new User({
       email: 'admin@supermarket.com',
-      passwordHash: adminPassword,
+      password: 'Admin@123456', // The pre-save hook will hash this
       firstName: 'System',
       lastName: 'Administrator',
       role: 'admin',
@@ -221,10 +220,9 @@ const seedDatabase = async () => {
     
     // Create manager user
     console.log('👤 Creating manager user...');
-    const managerPassword = await bcrypt.hash('Manager@123456', 12);
     const managerUser = new User({
       email: 'manager@supermarket.com',
-      passwordHash: managerPassword,
+      password: 'Manager@123456', // The pre-save hook will hash this
       firstName: 'Store',
       lastName: 'Manager',
       role: 'manager',
@@ -238,10 +236,9 @@ const seedDatabase = async () => {
     
     // Create cashier user
     console.log('👤 Creating cashier user...');
-    const cashierPassword = await bcrypt.hash('Cashier@123456', 12);
     const cashierUser = new User({
       email: 'cashier@supermarket.com',
-      passwordHash: cashierPassword,
+      password: 'Cashier@123456', // The pre-save hook will hash this
       firstName: 'Store',
       lastName: 'Cashier',
       role: 'cashier',

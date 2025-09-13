@@ -10,10 +10,11 @@ const userSchema = new mongoose.Schema({
     trim: true,
     match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
   },
-  passwordHash: {
+  password: {
     type: String,
     required: [true, 'Password is required'],
-    minlength: [6, 'Password must be at least 6 characters']
+    minlength: [6, 'Password must be at least 6 characters'],
+    select: false
   },
   firstName: {
     type: String,
@@ -39,30 +40,39 @@ const userSchema = new mongoose.Schema({
   },
   lastLogin: {
     type: Date
+  },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  phone: {
+    type: String,
+    trim: true
   }
 }, {
-  timestamps: true, // Adds createdAt and updatedAt
+  timestamps: true,
   toJSON: {
+    virtuals: true,
     transform: function(doc, ret) {
-      delete ret.passwordHash;
+      delete ret.password;
       delete ret.__v;
       return ret;
     }
   }
 });
 
-// Indexes for performance
-userSchema.index({ email: 1 }, { unique: true });
+// Index for faster queries
+userSchema.index({ email: 1 });
 userSchema.index({ role: 1 });
 userSchema.index({ isActive: 1 });
 
-// Pre-save middleware to hash password
+// Hash password before saving
 userSchema.pre('save', async function(next) {
-  if (!this.isModified('passwordHash')) return next();
+  if (!this.isModified('password')) return next();
   
   try {
     const salt = await bcrypt.genSalt(12);
-    this.passwordHash = await bcrypt.hash(this.passwordHash, salt);
+    this.password = await bcrypt.hash(this.password, salt);
     next();
   } catch (error) {
     next(error);
@@ -71,7 +81,7 @@ userSchema.pre('save', async function(next) {
 
 // Instance method to check password
 userSchema.methods.comparePassword = async function(candidatePassword) {
-  return bcrypt.compare(candidatePassword, this.passwordHash);
+  return bcrypt.compare(candidatePassword, this.password);
 };
 
 // Instance method to update last login
@@ -90,4 +100,6 @@ userSchema.virtual('fullName').get(function() {
   return `${this.firstName} ${this.lastName}`;
 });
 
-module.exports = mongoose.model('User', userSchema);
+const User = mongoose.model('User', userSchema);
+
+module.exports = User;
