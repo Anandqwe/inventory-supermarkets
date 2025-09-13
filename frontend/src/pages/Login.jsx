@@ -3,7 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from '../contexts/AuthContext';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { ShoppingCart, Store } from 'lucide-react';
+import { ShoppingCartIcon, BuildingStorefrontIcon } from '@heroicons/react/24/outline';
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -72,7 +72,7 @@ const Login = () => {
       <div className="max-w-md w-full space-y-8">
         <div>
           <div className="mx-auto h-16 w-16 flex items-center justify-center rounded-full bg-orange-600">
-            <Store className="h-8 w-8 text-white" />
+            <BuildingStorefrontIcon className="h-8 w-8 text-white" />
           </div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
             Supermarket Inventory System
@@ -129,7 +129,7 @@ const Login = () => {
               {loading ? (
                 <LoadingSpinner size="sm" className="mr-2" />
               ) : (
-                <ShoppingCart className="h-5 w-5 mr-2" />
+                <ShoppingCartIcon className="h-5 w-5 mr-2" />
               )}
               {loading ? 'Signing in...' : 'Sign in'}
             </button>

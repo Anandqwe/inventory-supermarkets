@@ -23,6 +23,7 @@ const authRoutes = require('./src/routes/authRoutes');
 const productRoutes = require('./src/routes/productRoutes');
 const salesRoutes = require('./src/routes/salesRoutes');
 const dashboardRoutes = require('./src/routes/dashboardRoutes');
+const reportsRoutes = require('./src/routes/reportsRoutes');
 
 // Import database connection
 const mongoose = require('mongoose');
@@ -111,6 +112,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/reports', reportsRoutes);
 
 // Welcome route
 app.get('/', (req, res) => {
@@ -122,7 +124,8 @@ app.get('/', (req, res) => {
       auth: '/api/auth',
       products: '/api/products',
       sales: '/api/sales',
-      dashboard: '/api/dashboard'
+      dashboard: '/api/dashboard',
+      reports: '/api/reports'
     },
     docs: 'https://documenter.getpostman.com/view/your-docs',
     timestamp: new Date().toISOString()

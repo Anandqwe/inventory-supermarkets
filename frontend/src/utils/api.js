@@ -72,9 +72,33 @@ export const productsAPI = {
     return response.data;
   },
   
-  getLowStock: async () => {
-    const response = await api.get('/products/low-stock');
+  getLowStock: async (params = {}) => {
+    const response = await api.get('/products/low-stock', { params });
     return response.data;
+  },
+  
+  getInventoryStatus: async (params = {}) => {
+    // Get both low stock items and normal products to identify overstock items
+    const [lowStockResponse, allProductsResponse] = await Promise.all([
+      api.get('/products/low-stock', { params: { ...params, limit: 100 } }),
+      api.get('/products', { params: { ...params, limit: 100 } })
+    ]);
+    
+    // Filter for overstock items (quantity > maxStockLevel)
+    const overstockItems = allProductsResponse.data.data.filter(
+      product => product.maxStockLevel && product.quantity > product.maxStockLevel
+    );
+    
+    // Filter for out of stock items (quantity === 0)
+    const outOfStockItems = allProductsResponse.data.data.filter(
+      product => product.quantity === 0
+    );
+    
+    return {
+      lowStock: lowStockResponse.data.data,
+      overstock: overstockItems,
+      outOfStock: outOfStockItems
+    };
   }
 };
 
@@ -116,9 +140,27 @@ export const reportsAPI = {
     return response.data;
   },
   
-  getSalesReport: async (startDate, endDate) => {
-    const response = await api.get(`/reports/sales?startDate=${startDate}&endDate=${endDate}`);
+  getDateRangeReport: async (startDate, endDate, category = '') => {
+    const url = `/reports/daterange?startDate=${startDate}&endDate=${endDate}${category ? `&category=${category}` : ''}`;
+    const response = await api.get(url);
     return response.data;
+  },
+  
+  getProductReport: async (startDate, endDate, category = '') => {
+    const url = `/reports/products?startDate=${startDate}&endDate=${endDate}${category ? `&category=${category}` : ''}`;
+    const response = await api.get(url);
+    return response.data;
+  },
+  
+  getAllCategories: async () => {
+    // Fetch all products to extract unique categories
+    const response = await api.get('/products?fields=category');
+    if (response.data && response.data.data) {
+      // Extract unique categories
+      const categories = [...new Set(response.data.data.map(product => product.category))];
+      return categories.filter(Boolean); // Filter out any null/undefined categories
+    }
+    return [];
   }
 };
 
