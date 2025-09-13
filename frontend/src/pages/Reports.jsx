@@ -123,7 +123,7 @@ function Reports() {
           <div className="space-y-4">
             <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
               <span className="text-sm font-medium text-gray-700">Total Revenue</span>
-              <span className="text-lg font-bold text-green-600">$9,847.32</span>
+              <span className="text-lg font-bold text-green-600">₹8,15,450</span>
             </div>
             <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
               <span className="text-sm font-medium text-gray-700">Total Transactions</span>
@@ -131,7 +131,7 @@ function Reports() {
             </div>
             <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
               <span className="text-sm font-medium text-gray-700">Average Sale</span>
-              <span className="text-lg font-bold text-purple-600">$28.39</span>
+              <span className="text-lg font-bold text-purple-600">₹2,350</span>
             </div>
             <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
               <span className="text-sm font-medium text-gray-700">Items Sold</span>
@@ -163,21 +163,21 @@ function Reports() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 <tr>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Bread - White</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Rice - Basmati 1kg</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">156</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">$466.44</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹18,720</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600">+12%</td>
                 </tr>
                 <tr>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Milk - 1L</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Cooking Oil - Fortune 1L</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">98</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">$342.02</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹18,130</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600">+8%</td>
                 </tr>
                 <tr>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Apples - Red</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Onions 1kg</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">67</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">$334.33</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹3,015</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600">-3%</td>
                 </tr>
               </tbody>

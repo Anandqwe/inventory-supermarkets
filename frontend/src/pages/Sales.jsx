@@ -4,13 +4,15 @@ import { Plus, Search, Calendar } from 'lucide-react'
 function Sales() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
 
-  // Mock data - will be replaced with API calls
+  // Mock data with Indian pricing - will be replaced with API calls
   const sales = [
-    { id: 1, timestamp: '2024-01-15T10:30:00', customer: 'John Doe', items: 5, total: 24.95, paymentMethod: 'Card' },
-    { id: 2, timestamp: '2024-01-15T11:15:00', customer: 'Jane Smith', items: 3, total: 18.47, paymentMethod: 'Cash' },
-    { id: 3, timestamp: '2024-01-15T11:45:00', customer: 'Bob Johnson', items: 8, total: 45.32, paymentMethod: 'Card' },
-    { id: 4, timestamp: '2024-01-15T12:20:00', customer: 'Alice Brown', items: 2, total: 12.99, paymentMethod: 'Cash' },
-    { id: 5, timestamp: '2024-01-15T13:10:00', customer: 'Charlie Wilson', items: 6, total: 38.76, paymentMethod: 'Card' },
+    { id: 1, timestamp: '2025-09-13T10:30:00', customer: 'Rajesh Kumar', items: 5, total: 485, paymentMethod: 'UPI' },
+    { id: 2, timestamp: '2025-09-13T11:15:00', customer: 'Priya Sharma', items: 3, total: 320, paymentMethod: 'Cash' },
+    { id: 3, timestamp: '2025-09-13T11:45:00', customer: 'Amit Singh', items: 8, total: 750, paymentMethod: 'Card' },
+    { id: 4, timestamp: '2025-09-13T12:20:00', customer: 'Sunita Patel', items: 2, total: 180, paymentMethod: 'Cash' },
+    { id: 5, timestamp: '2025-09-13T13:10:00', customer: 'Vikram Gupta', items: 6, total: 620, paymentMethod: 'UPI' },
+    { id: 6, timestamp: '2025-09-13T14:20:00', customer: 'Meera Joshi', items: 4, total: 425, paymentMethod: 'Card' },
+    { id: 7, timestamp: '2025-09-13T15:45:00', customer: 'Rohit Verma', items: 7, total: 890, paymentMethod: 'UPI' },
   ]
 
   const todayTotal = sales.reduce((sum, sale) => sum + sale.total, 0)
@@ -37,12 +39,12 @@ function Sales() {
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                  <span className="text-green-600 font-semibold">$</span>
+                  <span className="text-green-600 font-semibold">₹</span>
                 </div>
               </div>
               <div className="ml-4">
                 <div className="text-sm font-medium text-gray-500">Today's Total</div>
-                <div className="text-2xl font-bold text-gray-900">${todayTotal.toFixed(2)}</div>
+                <div className="text-2xl font-bold text-gray-900">₹{todayTotal.toLocaleString('en-IN')}</div>
               </div>
             </div>
           </div>
@@ -116,11 +118,13 @@ function Sales() {
                     <div className="text-sm text-gray-500">{sale.items} items</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">${sale.total.toFixed(2)}</div>
+                    <div className="text-sm font-medium text-gray-900">₹{sale.total.toLocaleString('en-IN')}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      sale.paymentMethod === 'Card' 
+                      sale.paymentMethod === 'UPI' 
+                        ? 'bg-purple-100 text-purple-800' 
+                        : sale.paymentMethod === 'Card'
                         ? 'bg-blue-100 text-blue-800' 
                         : 'bg-green-100 text-green-800'
                     }`}>

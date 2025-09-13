@@ -4,13 +4,18 @@ import { Plus, Search, Edit, Trash2 } from 'lucide-react'
 function Products() {
   const [searchTerm, setSearchTerm] = useState('')
 
-  // Mock data - will be replaced with API calls
+  // Mock data with Indian pricing (₹ INR) - will be replaced with API calls
   const products = [
-    { id: 1, name: 'Bread - White', category: 'Bakery', price: 2.99, stock: 25, lowStockThreshold: 10 },
-    { id: 2, name: 'Milk - 1L', category: 'Dairy', price: 3.49, stock: 12, lowStockThreshold: 15 },
-    { id: 3, name: 'Apples - Red', category: 'Produce', price: 4.99, stock: 45, lowStockThreshold: 20 },
-    { id: 4, name: 'Rice - Basmati 2kg', category: 'Grains', price: 8.99, stock: 33, lowStockThreshold: 10 },
-    { id: 5, name: 'Chicken Breast', category: 'Meat', price: 12.99, stock: 8, lowStockThreshold: 15 },
+    { id: 1, name: 'Bread - White (400g)', category: 'Bakery', price: 35, stock: 25, lowStockThreshold: 10 },
+    { id: 2, name: 'Milk - Full Cream 1L', category: 'Dairy', price: 65, stock: 12, lowStockThreshold: 15 },
+    { id: 3, name: 'Apples - Kashmir Red (1kg)', category: 'Produce', price: 180, stock: 45, lowStockThreshold: 20 },
+    { id: 4, name: 'Rice - Basmati 1kg', category: 'Grains', price: 120, stock: 33, lowStockThreshold: 10 },
+    { id: 5, name: 'Chicken Breast (1kg)', category: 'Meat', price: 280, stock: 8, lowStockThreshold: 15 },
+    { id: 6, name: 'Onions (1kg)', category: 'Produce', price: 45, stock: 60, lowStockThreshold: 25 },
+    { id: 7, name: 'Potato (1kg)', category: 'Produce', price: 30, stock: 40, lowStockThreshold: 20 },
+    { id: 8, name: 'Tomato (1kg)', category: 'Produce', price: 55, stock: 35, lowStockThreshold: 15 },
+    { id: 9, name: 'Tata Salt (1kg)', category: 'Pantry', price: 25, stock: 50, lowStockThreshold: 20 },
+    { id: 10, name: 'Cooking Oil - Fortune (1L)', category: 'Pantry', price: 185, stock: 28, lowStockThreshold: 12 },
   ]
 
   const filteredProducts = products.filter(product =>
@@ -101,7 +106,7 @@ function Products() {
                       <div className="text-sm text-gray-500">{product.category}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">${product.price}</div>
+                      <div className="text-sm text-gray-900">₹{product.price}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">{product.stock} units</div>

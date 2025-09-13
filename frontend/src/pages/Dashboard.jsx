@@ -4,8 +4,8 @@ function Dashboard() {
   const stats = [
     { name: 'Total Products', value: '2,651', icon: Package, change: '+4.75%', changeType: 'positive' },
     { name: 'Low Stock Items', value: '23', icon: AlertTriangle, change: '+2', changeType: 'negative' },
-    { name: 'Today\'s Sales', value: '$12,426', icon: ShoppingCart, change: '+12.02%', changeType: 'positive' },
-    { name: 'Monthly Revenue', value: '$245,988', icon: BarChart3, change: '+8.4%', changeType: 'positive' },
+    { name: 'Today\'s Sales', value: '₹1,02,450', icon: ShoppingCart, change: '+12.02%', changeType: 'positive' },
+    { name: 'Monthly Revenue', value: '₹20,35,400', icon: BarChart3, change: '+8.4%', changeType: 'positive' },
   ]
 
   return (
