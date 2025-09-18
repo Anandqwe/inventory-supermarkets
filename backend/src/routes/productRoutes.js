@@ -3,7 +3,7 @@
  */
 const express = require('express');
 const ProductController = require('../controllers/productController');
-const { authenticateToken, requireManager } = require('../middleware/auth');
+const { authenticateToken, requireManager, requirePermission } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -11,17 +11,23 @@ const router = express.Router();
 router.use(authenticateToken);
 
 // Product CRUD routes
-router.post('/', requireManager, ProductController.createProduct);
-router.get('/', ProductController.getAllProducts);
-router.get('/search/:query', ProductController.searchProduct);
-router.get('/categories', ProductController.getCategories);
-router.get('/categories/:category/subcategories', ProductController.getSubcategories);
-router.get('/low-stock', ProductController.getLowStockProducts);
-router.get('/:id', ProductController.getProductById);
-router.put('/:id', requireManager, ProductController.updateProduct);
-router.delete('/:id', requireManager, ProductController.deleteProduct);
+router.post('/', requirePermission('products.create'), ProductController.createProduct);
+router.get('/', requirePermission('products.read'), ProductController.getAllProducts);
+router.get('/search/:query', requirePermission('products.read'), ProductController.searchProduct);
+router.get('/categories', requirePermission('products.read'), ProductController.getCategories);
+router.get('/categories/:category/subcategories', requirePermission('products.read'), ProductController.getSubcategories);
+router.get('/low-stock', requirePermission('products.read'), ProductController.getLowStockProducts);
+
+// CSV Import/Export routes
+router.get('/export', requirePermission('products.export'), ProductController.exportProducts);
+router.post('/import', requirePermission('products.create'), ProductController.importProducts);
+
+// Individual product routes
+router.get('/:id', requirePermission('products.read'), ProductController.getProductById);
+router.put('/:id', requirePermission('products.update'), ProductController.updateProduct);
+router.delete('/:id', requirePermission('products.delete'), ProductController.deleteProduct);
 
 // Stock management routes
-router.patch('/:id/stock', requireManager, ProductController.updateStock);
+router.patch('/:id/stock', requirePermission('inventory.update'), ProductController.updateStock);
 
 module.exports = router;

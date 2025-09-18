@@ -14,7 +14,6 @@ router.use(authenticateToken);
 router.get('/overview', DashboardController.getDashboardOverview);
 router.get('/sales-chart', DashboardController.getSalesChartData);
 router.get('/inventory-analytics', DashboardController.getInventoryAnalytics);
-router.get('/user-performance', DashboardController.getUserPerformance);
 router.get('/alerts', DashboardController.getAlerts);
 
 module.exports = router;

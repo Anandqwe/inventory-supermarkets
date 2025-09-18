@@ -3,7 +3,7 @@
  */
 const express = require('express');
 const SalesController = require('../controllers/salesController');
-const { authenticateToken, requireAdmin, requireManager } = require('../middleware/auth');
+const { authenticateToken, requireAdmin, requireManager, requirePermission } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -11,14 +11,15 @@ const router = express.Router();
 router.use(authenticateToken);
 
 // Sales routes
-router.post('/', SalesController.createSale);
-router.get('/', SalesController.getAllSales);
-router.get('/summary', SalesController.getSalesSummary);
-router.get('/daily-report', SalesController.getDailySalesReport);
-router.get('/:id', SalesController.getSaleById);
+router.post('/', requirePermission('sales.create'), SalesController.createSale);
+router.get('/', requirePermission('sales.read'), SalesController.getAllSales);
+router.get('/stats', requirePermission('sales.read'), SalesController.getSalesStats);
+router.get('/date-range', requirePermission('sales.read'), SalesController.getSalesByDateRange);
+router.get('/:id', requirePermission('sales.read'), SalesController.getSaleById);
 
-// Admin/Manager only routes
-router.put('/:id', requireManager, SalesController.updateSale);
-router.post('/:id/cancel', requireAdmin, SalesController.cancelSale);
+// Update and management routes
+router.put('/:id', requirePermission('sales.update'), SalesController.updateSale);
+router.delete('/:id', requirePermission('sales.delete'), SalesController.deleteSale);
+router.post('/:id/refund', requirePermission('sales.refund'), SalesController.refundSale);
 
 module.exports = router;

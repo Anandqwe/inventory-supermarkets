@@ -1,13 +1,12 @@
 const mongoose = require('mongoose');
 
 const saleItemSchema = new mongoose.Schema({
-  productId: {
+  product: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Product',
     required: true
   },
-  // Denormalized product data for historical accuracy
-  name: {
+  productName: {
     type: String,
     required: true
   },
@@ -15,356 +14,434 @@ const saleItemSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  category: {
-    type: String,
-    required: true
-  },
-  unit: {
-    type: String,
-    required: true
-  },
-  qty: {
-    type: Number,
-    required: [true, 'Quantity is required'],
-    min: [0.01, 'Quantity must be greater than 0'],
-    validate: {
-      validator: function(v) {
-        return v > 0;
-      },
-      message: 'Quantity must be a positive number'
-    }
-  },
-  price: {
-    type: Number,
-    required: [true, 'Price is required'],
-    min: [0.01, 'Price must be greater than 0'],
-    validate: {
-      validator: function(v) {
-        return Number.isFinite(v) && v > 0;
-      },
-      message: 'Price must be a valid positive number'
-    }
-  },
-  // Calculated fields
-  lineTotal: {
+  quantity: {
     type: Number,
     required: true,
-    validate: {
-      validator: function(v) {
-        return Number.isFinite(v) && v > 0;
-      },
-      message: 'Line total must be a valid positive number'
-    }
+    min: [0.001, 'Quantity must be positive']
+  },
+  costPrice: {
+    type: Number,
+    required: true,
+    min: [0, 'Cost price cannot be negative']
+  },
+  sellingPrice: {
+    type: Number,
+    required: true,
+    min: [0, 'Selling price cannot be negative']
+  },
+  unitPrice: {
+    type: Number,
+    required: true,
+    min: [0, 'Unit price cannot be negative']
+  },
+  total: {
+    type: Number,
+    required: true
   },
   discount: {
-    amount: {
-      type: Number,
-      default: 0,
-      min: [0, 'Discount cannot be negative']
-    },
-    percentage: {
-      type: Number,
-      default: 0,
-      min: [0, 'Discount percentage cannot be negative'],
-      max: [100, 'Discount percentage cannot exceed 100%']
-    }
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  tax: {
+    type: Number,
+    default: 0,
+    min: 0
   }
-}, {
-  _id: true
-});
+}, { _id: false });
 
-// Calculate line total before saving
-saleItemSchema.pre('save', function(next) {
-  const baseAmount = this.qty * this.price;
-  const discountAmount = this.discount.amount || 0;
-  const discountPercentage = this.discount.percentage || 0;
-  
-  let total = baseAmount - discountAmount;
-  if (discountPercentage > 0) {
-    total = total * (1 - discountPercentage / 100);
+const paymentSchema = new mongoose.Schema({
+  method: {
+    type: String,
+    enum: ['cash', 'card', 'upi', 'netbanking', 'mobile', 'bank_transfer', 'check', 'credit'],
+    required: true
+  },
+  amount: {
+    type: Number,
+    required: true,
+    min: [0, 'Payment amount cannot be negative']
+  },
+  reference: {
+    type: String
+  },
+  receivedAt: {
+    type: Date,
+    default: Date.now
   }
-  
-  this.lineTotal = Math.round(total * 100) / 100; // Round to 2 decimal places
-  next();
-});
+}, { _id: false });
 
 const saleSchema = new mongoose.Schema({
   saleNumber: {
     type: String,
+    required: true,
     unique: true,
-    required: true
+    index: true
   },
-  date: {
-    type: Date,
-    default: Date.now,
-    required: true
+  invoiceNumber: {
+    type: String,
+    unique: true,
+    sparse: true
   },
-  items: {
-    type: [saleItemSchema],
-    required: [true, 'Sale must have at least one item'],
-    validate: {
-      validator: function(items) {
-        return items && items.length > 0;
-      },
-      message: 'Sale must contain at least one item'
-    }
+  branch: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Branch',
+    required: true,
+    index: true
   },
-  totals: {
-    subtotal: {
-      type: Number,
-      required: true,
-      min: [0.01, 'Subtotal must be greater than 0']
-    },
-    tax: {
-      rate: {
-        type: Number,
-        default: 0,
-        min: [0, 'Tax rate cannot be negative'],
-        max: [100, 'Tax rate cannot exceed 100%']
-      },
-      amount: {
-        type: Number,
-        default: 0,
-        min: [0, 'Tax amount cannot be negative']
-      }
-    },
-    discount: {
-      amount: {
-        type: Number,
-        default: 0,
-        min: [0, 'Discount amount cannot be negative']
-      },
-      reason: String
-    },
-    grandTotal: {
-      type: Number,
-      required: true,
-      min: [0.01, 'Grand total must be greater than 0']
-    }
-  },
+  items: [saleItemSchema],
+  
+  // Customer Information
   customer: {
-    name: String,
-    email: String,
-    phone: String,
-    loyaltyNumber: String
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Customer'
   },
-  payment: {
-    method: {
-      type: String,
-      required: true,
-      enum: ['cash', 'card', 'upi', 'netbanking', 'wallet'],
-      default: 'cash'
-    },
-    status: {
-      type: String,
-      enum: ['pending', 'completed', 'failed', 'refunded'],
-      default: 'completed'
-    },
-    transactionId: String,
-    amountPaid: {
-      type: Number,
-      required: true,
-      min: [0, 'Amount paid cannot be negative']
-    },
-    change: {
-      type: Number,
-      default: 0,
-      min: [0, 'Change cannot be negative']
-    }
+  customerName: {
+    type: String
   },
-  cashier: {
-    id: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true
-    },
-    name: {
-      type: String,
-      required: true
-    },
-    email: String
+  customerPhone: {
+    type: String
   },
+  customerEmail: {
+    type: String
+  },
+  customerAddress: {
+    type: String
+  },
+  
+  // Financial Details
+  subtotal: {
+    type: Number,
+    required: true,
+    min: [0, 'Subtotal cannot be negative']
+  },
+  discountPercentage: {
+    type: Number,
+    default: 0,
+    min: [0, 'Discount percentage cannot be negative'],
+    max: [100, 'Discount cannot exceed 100%']
+  },
+  discountAmount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  taxPercentage: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 100
+  },
+  taxAmount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  shippingAmount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  total: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  
+  // Payment Information
+  paymentMethod: {
+    type: String,
+    enum: ['cash', 'card', 'upi', 'netbanking', 'credit', 'multiple'],
+    default: 'cash'
+  },
+  payments: [paymentSchema],
+  amountPaid: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  amountDue: {
+    type: Number,
+    default: 0
+  },
+  changeAmount: {
+    type: Number,
+    default: 0
+  },
+  
+  // Status and Tracking
   status: {
     type: String,
-    enum: ['completed', 'voided', 'returned', 'partially-returned'],
-    default: 'completed'
+    enum: ['draft', 'pending', 'completed', 'cancelled', 'refunded', 'partially_refunded'],
+    default: 'completed',
+    index: true
   },
-  notes: String,
-  voidReason: String,
-  returnDetails: {
-    returnDate: Date,
-    returnedBy: {
+  saleType: {
+    type: String,
+    enum: ['retail', 'wholesale', 'online', 'return'],
+    default: 'retail'
+  },
+  
+  // Refund Information
+  refundedAmount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  refundReason: {
+    type: String
+  },
+  refundedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  refundedAt: {
+    type: Date
+  },
+  
+  // Notes and References
+  notes: {
+    type: String,
+    maxlength: [500, 'Notes cannot exceed 500 characters']
+  },
+  internalNotes: {
+    type: String,
+    maxlength: [500, 'Internal notes cannot exceed 500 characters']
+  },
+  
+  // Delivery Information
+  deliveryInfo: {
+    type: {
+      type: String,
+      enum: ['pickup', 'delivery', 'shipping']
+    },
+    address: String,
+    scheduledDate: Date,
+    deliveredDate: Date,
+    trackingNumber: String
+  },
+  
+  // Staff Information
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    index: true
+  },
+  updatedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  
+  // Audit Trail
+  auditLog: [{
+    action: String,
+    performedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User'
     },
-    returnedItems: [{
-      productId: mongoose.Schema.Types.ObjectId,
-      qty: Number,
-      reason: String
-    }],
-    refundAmount: Number
-  },
-  // Metadata
-  source: {
-    type: String,
-    enum: ['pos', 'online', 'mobile', 'manual'],
-    default: 'pos'
-  },
-  deviceInfo: {
-    deviceId: String,
-    location: String,
-    ipAddress: String
-  }
+    timestamp: {
+      type: Date,
+      default: Date.now
+    },
+    details: mongoose.Schema.Types.Mixed
+  }]
 }, {
   timestamps: true,
   toJSON: { virtuals: true },
   toObject: { virtuals: true }
 });
 
-// Indexes for performance
-saleSchema.index({ saleNumber: 1 }, { unique: true });
-saleSchema.index({ date: -1 }); // Most recent first
-saleSchema.index({ 'cashier.id': 1 });
-saleSchema.index({ 'payment.method': 1 });
-saleSchema.index({ status: 1 });
+// Indexes for better performance
 saleSchema.index({ createdAt: -1 });
+saleSchema.index({ branch: 1, createdAt: -1 });
+saleSchema.index({ createdBy: 1, createdAt: -1 });
+saleSchema.index({ customer: 1 });
+saleSchema.index({ customerPhone: 1 });
+saleSchema.index({ invoiceNumber: 1 });
+saleSchema.index({ 'items.product': 1 });
 
-// Compound indexes for common queries
-saleSchema.index({ date: -1, status: 1 });
-saleSchema.index({ 'cashier.id': 1, date: -1 });
-
-// Virtual for total items count
-saleSchema.virtual('totalItems').get(function() {
-  return this.items.reduce((sum, item) => sum + item.qty, 0);
+// Virtuals
+saleSchema.virtual('profit').get(function() {
+  return this.items.reduce((profit, item) => {
+    return profit + ((item.sellingPrice - item.costPrice) * item.quantity);
+  }, 0);
 });
 
-// Virtual for formatted sale number
-saleSchema.virtual('formattedSaleNumber').get(function() {
-  return `INV-${this.saleNumber}`;
+saleSchema.virtual('profitMargin').get(function() {
+  if (this.subtotal > 0) {
+    return (this.profit / this.subtotal) * 100;
+  }
+  return 0;
 });
 
-// Pre-save middleware to auto-generate sale number
+saleSchema.virtual('isPaid').get(function() {
+  return this.amountPaid >= this.total;
+});
+
+saleSchema.virtual('isPartiallyPaid').get(function() {
+  return this.amountPaid > 0 && this.amountPaid < this.total;
+});
+
+// Generate sale number before saving
 saleSchema.pre('save', async function(next) {
-  if (!this.saleNumber) {
-    const date = new Date();
-    const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
-    
-    // Find the last sale of the day
-    const lastSale = await this.constructor.findOne({
-      saleNumber: new RegExp(`^${dateStr}`)
-    }).sort({ saleNumber: -1 });
-    
-    let sequence = 1;
-    if (lastSale) {
-      const lastSequence = parseInt(lastSale.saleNumber.slice(-4));
-      sequence = lastSequence + 1;
-    }
-    
-    this.saleNumber = `${dateStr}${sequence.toString().padStart(4, '0')}`;
-  }
-  next();
-});
-
-// Pre-save middleware to calculate totals
-saleSchema.pre('save', function(next) {
-  // Calculate subtotal from items
-  this.totals.subtotal = this.items.reduce((sum, item) => sum + item.lineTotal, 0);
-  
-  // Calculate tax
-  if (this.totals.tax.rate > 0) {
-    this.totals.tax.amount = (this.totals.subtotal * this.totals.tax.rate) / 100;
+  if (this.isNew && !this.saleNumber) {
+    const count = await this.constructor.countDocuments();
+    this.saleNumber = `SALE-${String(count + 1).padStart(6, '0')}`;
   }
   
-  // Calculate grand total
-  this.totals.grandTotal = this.totals.subtotal + this.totals.tax.amount - (this.totals.discount.amount || 0);
+  // Calculate amount due
+  this.amountDue = Math.max(0, this.total - this.amountPaid);
   
-  // Round to 2 decimal places
-  this.totals.subtotal = Math.round(this.totals.subtotal * 100) / 100;
-  this.totals.tax.amount = Math.round(this.totals.tax.amount * 100) / 100;
-  this.totals.grandTotal = Math.round(this.totals.grandTotal * 100) / 100;
-  
-  // Calculate change
-  if (this.payment.amountPaid) {
-    this.payment.change = Math.max(0, this.payment.amountPaid - this.totals.grandTotal);
-    this.payment.change = Math.round(this.payment.change * 100) / 100;
+  // Update updatedBy
+  if (!this.isNew && this.isModified() && this.updatedBy) {
+    this.updatedBy = this.updatedBy;
   }
   
   next();
 });
 
-// Static method to get sales summary for a date range
-saleSchema.statics.getSalesSummary = function(startDate, endDate) {
-  return this.aggregate([
-    {
-      $match: {
-        date: {
-          $gte: new Date(startDate),
-          $lte: new Date(endDate)
-        },
-        status: { $in: ['completed', 'partially-returned'] }
-      }
-    },
-    {
-      $group: {
-        _id: null,
-        totalSales: { $sum: 1 },
-        totalRevenue: { $sum: '$totals.grandTotal' },
-        totalItems: { $sum: { $sum: '$items.qty' } },
-        averageOrderValue: { $avg: '$totals.grandTotal' },
-        paymentMethods: {
-          $push: '$payment.method'
-        }
-      }
-    },
-    {
-      $project: {
-        _id: 0,
-        totalSales: 1,
-        totalRevenue: { $round: ['$totalRevenue', 2] },
-        totalItems: 1,
-        averageOrderValue: { $round: ['$averageOrderValue', 2] },
-        paymentMethods: 1
-      }
-    }
-  ]);
+// Methods
+saleSchema.methods.addPayment = function(paymentData) {
+  this.payments.push(paymentData);
+  this.amountPaid = this.payments.reduce((sum, payment) => sum + payment.amount, 0);
+  
+  if (this.amountPaid >= this.total) {
+    this.status = 'completed';
+    this.changeAmount = this.amountPaid - this.total;
+  }
+  
+  return this.save();
 };
 
-// Static method to get daily sales for charts
-saleSchema.statics.getDailySales = function(days = 7) {
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - days);
+saleSchema.methods.processRefund = function(amount, reason, refundedBy) {
+  if (amount > (this.total - this.refundedAmount)) {
+    throw new Error('Refund amount cannot exceed sale total');
+  }
   
-  return this.aggregate([
-    {
-      $match: {
-        date: { $gte: startDate },
-        status: { $in: ['completed', 'partially-returned'] }
-      }
-    },
-    {
-      $group: {
-        _id: {
-          $dateToString: {
-            format: '%Y-%m-%d',
-            date: '$date'
-          }
-        },
-        total: { $sum: '$totals.grandTotal' },
-        count: { $sum: 1 }
-      }
-    },
-    {
-      $sort: { '_id': 1 }
-    },
-    {
-      $project: {
-        date: '$_id',
-        total: { $round: ['$total', 2] },
-        count: 1,
-        _id: 0
-      }
+  this.refundedAmount += amount;
+  this.refundReason = reason;
+  this.refundedBy = refundedBy;
+  this.refundedAt = new Date();
+  
+  if (this.refundedAmount >= this.total) {
+    this.status = 'refunded';
+  } else if (this.refundedAmount > 0) {
+    this.status = 'partially_refunded';
+  }
+  
+  // Add to audit log
+  this.auditLog.push({
+    action: 'refund_processed',
+    performedBy: refundedBy,
+    details: {
+      amount,
+      reason,
+      previousStatus: this.status
     }
-  ]);
+  });
+  
+  return this.save();
+};
+
+saleSchema.methods.cancel = function(cancelledBy, reason) {
+  if (this.status === 'completed') {
+    throw new Error('Cannot cancel a completed sale. Process a refund instead.');
+  }
+  
+  this.status = 'cancelled';
+  this.auditLog.push({
+    action: 'sale_cancelled',
+    performedBy: cancelledBy,
+    details: { reason }
+  });
+  
+  return this.save();
+};
+
+// Static methods
+saleSchema.statics.getSalesReport = function(filters) {
+  const pipeline = [];
+  
+  // Match stage
+  const matchStage = { $match: {} };
+  
+  if (filters.startDate && filters.endDate) {
+    matchStage.$match.createdAt = {
+      $gte: new Date(filters.startDate),
+      $lte: new Date(filters.endDate)
+    };
+  }
+  
+  if (filters.branch) {
+    matchStage.$match.branch = mongoose.Types.ObjectId(filters.branch);
+  }
+  
+  if (filters.status) {
+    matchStage.$match.status = filters.status;
+  }
+  
+  if (filters.paymentMethod) {
+    matchStage.$match.paymentMethod = filters.paymentMethod;
+  }
+  
+  pipeline.push(matchStage);
+  
+  // Group stage for aggregation
+  pipeline.push({
+    $group: {
+      _id: null,
+      totalSales: { $sum: 1 },
+      totalRevenue: { $sum: '$total' },
+      totalDiscounts: { $sum: '$discountAmount' },
+      totalTax: { $sum: '$taxAmount' },
+      averageOrderValue: { $avg: '$total' }
+    }
+  });
+  
+  return this.aggregate(pipeline);
+};
+
+saleSchema.statics.getTopProducts = function(filters = {}) {
+  const pipeline = [];
+  
+  // Match stage
+  const matchStage = { $match: { status: { $in: ['completed', 'partially_refunded'] } } };
+  
+  if (filters.startDate && filters.endDate) {
+    matchStage.$match.createdAt = {
+      $gte: new Date(filters.startDate),
+      $lte: new Date(filters.endDate)
+    };
+  }
+  
+  if (filters.branch) {
+    matchStage.$match.branch = mongoose.Types.ObjectId(filters.branch);
+  }
+  
+  pipeline.push(matchStage);
+  
+  // Unwind items
+  pipeline.push({ $unwind: '$items' });
+  
+  // Group by product
+  pipeline.push({
+    $group: {
+      _id: '$items.product',
+      productName: { $first: '$items.productName' },
+      sku: { $first: '$items.sku' },
+      totalQuantity: { $sum: '$items.quantity' },
+      totalRevenue: { $sum: '$items.total' },
+      salesCount: { $sum: 1 }
+    }
+  });
+  
+  // Sort by revenue
+  pipeline.push({ $sort: { totalRevenue: -1 } });
+  
+  // Limit results
+  pipeline.push({ $limit: filters.limit || 10 });
+  
+  return this.aggregate(pipeline);
 };
 
 module.exports = mongoose.model('Sale', saleSchema);
