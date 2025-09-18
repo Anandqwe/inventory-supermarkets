@@ -2,21 +2,29 @@ import React, { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from '../contexts/AuthContext';
-import LoadingSpinner from '../components/LoadingSpinner';
-import { ShoppingCartIcon, BuildingStorefrontIcon } from '@heroicons/react/24/outline';
+import { useTheme } from '../contexts/ThemeContext';
+import { Button, Input, Card } from '../components/ui';
+import { ThemeToggle } from '../components/ui/ThemeToggle';
+import { CubeIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 
 const Login = () => {
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   });
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { login, isAuthenticated, loading: authLoading } = useAuth();
+  const { theme } = useTheme();
   const navigate = useNavigate();
 
   // Show loading spinner while checking authentication
   if (authLoading) {
-    return <LoadingSpinner />;
+    return (
+      <div className="min-h-screen bg-surface-50 dark:bg-black flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    );
   }
 
   // Redirect if already authenticated
@@ -68,76 +76,101 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-amber-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <div className="mx-auto h-16 w-16 flex items-center justify-center rounded-full bg-orange-600">
-            <BuildingStorefrontIcon className="h-8 w-8 text-white" />
+    <div className="min-h-screen bg-surface-50 dark:bg-black flex flex-col">
+      {/* Header with theme toggle */}
+      <header className="flex justify-between items-center p-4 sm:p-6">
+        <div className="flex items-center">
+          <div className="flex-shrink-0 h-8 w-8 bg-primary-600 rounded-lg flex items-center justify-center">
+            <CubeIcon className="h-5 w-5 text-white" />
           </div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Supermarket Inventory System
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Sign in to your account
-          </p>
+          <div className="ml-3">
+            <h1 className="text-lg font-semibold text-surface-900 dark:text-surface-100">
+              Inventory System
+            </h1>
+          </div>
         </div>
-        
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm -space-y-px">
-            <div>
-              <label htmlFor="email" className="sr-only">
-                Email address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm"
-                placeholder="Email address"
-                value={formData.email}
-                onChange={handleChange}
-                disabled={loading}
-              />
+        <ThemeToggle />
+      </header>
+
+      {/* Main content */}
+      <div className="flex-1 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8">
+          {/* Logo and title */}
+          <div className="text-center">
+            <div className="mx-auto h-16 w-16 flex items-center justify-center rounded-full bg-primary-600">
+              <CubeIcon className="h-8 w-8 text-white" />
             </div>
-            <div>
-              <label htmlFor="password" className="sr-only">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm"
-                placeholder="Password"
-                value={formData.password}
-                onChange={handleChange}
-                disabled={loading}
-              />
-            </div>
+            <h2 className="mt-6 text-center text-3xl font-bold text-surface-900 dark:text-surface-100">
+              Welcome back
+            </h2>
+            <p className="mt-2 text-center text-sm text-surface-600 dark:text-surface-400">
+              Sign in to your supermarket inventory account
+            </p>
           </div>
 
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? (
-                <LoadingSpinner size="sm" className="mr-2" />
-              ) : (
-                <ShoppingCartIcon className="h-5 w-5 mr-2" />
-              )}
-              {loading ? 'Signing in...' : 'Sign in'}
-            </button>
-          </div>
+          {/* Login form */}
+          <Card className="p-8">
+            <form className="space-y-6" onSubmit={handleSubmit}>
+              <div className="space-y-4">
+                <Input
+                  label="Email address"
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  placeholder="Enter your email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  disabled={loading}
+                />
 
-          <div className="mt-6">
-            <p className="text-center text-sm text-gray-600 mb-4">
-              Demo Credentials (Click to fill):
+                <div className="relative">
+                  <Input
+                    label="Password"
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    required
+                    placeholder="Enter your password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    disabled={loading}
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 top-6 pr-3 flex items-center"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeSlashIcon className="h-5 w-5 text-surface-400" />
+                    ) : (
+                      <EyeIcon className="h-5 w-5 text-surface-400" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                loading={loading}
+                disabled={loading}
+                className="w-full"
+                size="lg"
+              >
+                {loading ? 'Signing in...' : 'Sign in'}
+              </Button>
+            </form>
+          </Card>
+
+          {/* Demo credentials */}
+          <Card className="p-6">
+            <h3 className="text-sm font-medium text-surface-900 dark:text-surface-100 mb-4 text-center">
+              Demo Credentials
+            </h3>
+            <p className="text-xs text-surface-600 dark:text-surface-400 mb-4 text-center">
+              Click any credential below to automatically fill the form:
             </p>
             <div className="space-y-2">
               {demoCredentials.map((cred, index) => (
@@ -145,16 +178,34 @@ const Login = () => {
                   key={index}
                   type="button"
                   onClick={() => fillDemo(cred.email, cred.password)}
-                  className="w-full text-left px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
                   disabled={loading}
+                  className="w-full text-left px-4 py-3 text-sm bg-surface-50 dark:bg-surface-800 hover:bg-surface-100 dark:hover:bg-surface-700 rounded-lg transition-colors border border-surface-200 dark:border-surface-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <span className="font-medium text-orange-600">{cred.role}:</span>{' '}
-                  <span className="text-gray-700">{cred.email}</span>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <span className="font-medium text-primary-600 dark:text-primary-400">
+                        {cred.role}
+                      </span>
+                      <div className="text-xs text-surface-600 dark:text-surface-400 mt-1">
+                        {cred.email}
+                      </div>
+                    </div>
+                    <div className="text-xs text-surface-500 dark:text-surface-500">
+                      Click to fill
+                    </div>
+                  </div>
                 </button>
               ))}
             </div>
+          </Card>
+
+          {/* Footer */}
+          <div className="text-center">
+            <p className="text-xs text-surface-500 dark:text-surface-400">
+              Supermarket Inventory & Sales Management System
+            </p>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );
