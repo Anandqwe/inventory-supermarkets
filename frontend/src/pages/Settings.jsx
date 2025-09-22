@@ -1,11 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
-  User, SettingsIcon, Building2, Calculator, Shield, Bell, Palette, 
-  Globe, Save, Upload, X, Plus, Edit, Trash2, Eye, EyeOff,
-  Key, Mail, Phone, MapPin, CreditCard, Percent, Check,
-  Monitor, Moon, Sun, RefreshCw, Download, Archive
-} from 'lucide-react';
+  UserIcon, 
+  Cog6ToothIcon as SettingsIcon, 
+  BuildingOfficeIcon as Building2, 
+  CalculatorIcon as Calculator, 
+  ShieldCheckIcon as Shield, 
+  BellIcon as Bell, 
+  SwatchIcon as Palette, 
+  GlobeAltIcon as Globe, 
+  BookmarkIcon as Save, 
+  ArrowUpTrayIcon as Upload, 
+  XMarkIcon as X, 
+  PlusIcon as Plus, 
+  PencilIcon as Edit, 
+  TrashIcon as Trash2, 
+  EyeIcon as Eye, 
+  EyeSlashIcon as EyeOff,
+  KeyIcon as Key, 
+  EnvelopeIcon as Mail, 
+  PhoneIcon as Phone, 
+  MapPinIcon as MapPin, 
+  CreditCardIcon as CreditCard, 
+  PercentBadgeIcon as Percent, 
+  CheckIcon as Check,
+  ComputerDesktopIcon as Monitor, 
+  MoonIcon as Moon, 
+  SunIcon as Sun, 
+  ArrowPathIcon as RefreshCw, 
+  ArrowDownTrayIcon as Download, 
+  ArchiveBoxIcon as Archive
+} from '@heroicons/react/24/outline';
 
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
@@ -240,7 +265,7 @@ function Settings() {
 
   // Tab configuration
   const tabs = [
-    { id: 'profile', label: 'Profile', icon: User },
+    { id: 'profile', label: 'Profile', icon: UserIcon },
     { id: 'system', label: 'System', icon: SettingsIcon },
     { id: 'branches', label: 'Branches', icon: Building2 },
     { id: 'tax', label: 'Tax Config', icon: Calculator },

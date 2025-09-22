@@ -31,7 +31,8 @@ const DataTable = ({
   totalRows,
   loading = false,
   className,
-  ...props
+  searchKey, // Extract searchKey to prevent it from being passed to DOM
+  ...domProps // Rename props to domProps for clarity
 }) => {
   const table = useReactTable({
     data,
@@ -67,7 +68,7 @@ const DataTable = ({
   };
 
   return (
-    <div className={cn("space-y-4", className)} {...props}>
+    <div className={cn("space-y-4", className)} {...domProps}>
       {/* Table */}
       <div className="rounded-md border border-surface-200 dark:border-surface-700 overflow-hidden">
         <div className="overflow-x-auto">
