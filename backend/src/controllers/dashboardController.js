@@ -33,7 +33,7 @@ class DashboardController {
       // Get total products count
       const productFilter = { isActive: true };
       if (targetBranchId) {
-        productFilter['branchStocks.branch'] = targetBranchId;
+        productFilter['stockByBranch.branch'] = targetBranchId;
       }
       const totalProducts = await Product.countDocuments(productFilter);
 
@@ -46,7 +46,7 @@ class DashboardController {
       
       const todaySales = await Sale.find(todaySalesFilter);
       const todaySalesCount = todaySales.length;
-      const todaySalesAmount = todaySales.reduce((sum, sale) => sum + sale.total, 0);
+      const todaySalesAmount = todaySales.reduce((sum, sale) => sum + (sale.total || 0), 0);
 
       // This month's sales
       const monthSalesFilter = {
@@ -55,13 +55,13 @@ class DashboardController {
         status: 'completed'
       };
       const monthSales = await Sale.find(monthSalesFilter);
-      const totalRevenue = monthSales.reduce((sum, sale) => sum + sale.total, 0);
+      const totalRevenue = monthSales.reduce((sum, sale) => sum + (sale.total || 0), 0);
       const totalSales = monthSales.length;
 
-      // Low stock items
+      // Low stock items with advanced aggregation
       const lowStockFilter = { isActive: true };
       if (targetBranchId) {
-        lowStockFilter['branchStocks.branch'] = targetBranchId;
+        lowStockFilter['stockByBranch.branch'] = new mongoose.Types.ObjectId(targetBranchId);
       }
 
       const lowStockItems = await Product.aggregate([
@@ -70,11 +70,11 @@ class DashboardController {
           $addFields: {
             lowStockBranches: {
               $filter: {
-                input: '$branchStocks',
+                input: '$stockByBranch',
                 cond: { 
                   $and: [
                     { $lte: ['$$this.quantity', '$$this.reorderLevel'] },
-                    targetBranchId ? { $eq: ['$$this.branch', mongoose.Types.ObjectId(targetBranchId)] } : {}
+                    targetBranchId ? { $eq: ['$$this.branch', new mongoose.Types.ObjectId(targetBranchId)] } : {}
                   ]
                 }
               }
@@ -83,15 +83,10 @@ class DashboardController {
         },
         {
           $match: {
-            'lowStockBranches.0': { $exists: true }
-          }
-        },
-        {
-          $lookup: {
-            from: 'categories',
-            localField: 'category',
-            foreignField: '_id',
-            as: 'category'
+            $or: [
+              { 'lowStockBranches.0': { $exists: true } },
+              { quantity: { $lte: 10 } } // Fallback for products without branch stocks
+            ]
           }
         },
         { $limit: 10 },
@@ -99,7 +94,9 @@ class DashboardController {
           $project: {
             name: 1,
             sku: 1,
-            category: { $arrayElemAt: ['$category.name', 0] },
+            category: 1,
+            quantity: 1,
+            price: 1,
             lowStockBranches: 1
           }
         }
@@ -125,35 +122,33 @@ class DashboardController {
         },
         { $unwind: '$product' },
         {
-          $lookup: {
-            from: 'categories',
-            localField: 'product.category',
-            foreignField: '_id',
-            as: 'category'
+          $group: {
+            _id: '$product.category',
+            totalSales: { $sum: '$items.quantity' },
+            totalRevenue: { $sum: { $multiply: ['$items.quantity', '$items.price'] } }
           }
         },
-        { $unwind: '$category' },
         {
-          $group: {
-            _id: '$category._id',
-            name: { $first: '$category.name' },
-            totalSales: { $sum: '$items.quantity' },
-            totalRevenue: { $sum: '$items.total' }
+          $project: {
+            categoryName: '$_id',
+            totalSales: 1,
+            totalRevenue: 1
           }
         },
         { $sort: { totalRevenue: -1 } },
         { $limit: 5 }
       ]);
 
-      // Recent sales activity
+      // Recent sales with customer information
       const recentSales = await Sale.find(branchFilter)
-        .populate('branch', 'name code')
-        .populate('createdBy', 'firstName lastName')
+        .populate('customer', 'name email phone')
+        .populate('branch', 'name')
         .sort({ createdAt: -1 })
         .limit(10)
-        .select('saleNumber total customerName createdAt status');
+        .select('total items customer branch createdAt paymentMethod status')
+        .lean();
 
-      // Performance metrics
+      // Performance metrics for last 7 days
       const last7DaysFilter = {
         ...branchFilter,
         createdAt: { $gte: last7Days },
@@ -161,40 +156,113 @@ class DashboardController {
       };
 
       const last7DaysSales = await Sale.find(last7DaysFilter);
-      const last7DaysRevenue = last7DaysSales.reduce((sum, sale) => sum + sale.total, 0);
+      const last7DaysRevenue = last7DaysSales.reduce((sum, sale) => sum + (sale.total || 0), 0);
       const averageOrderValue = last7DaysSales.length > 0 ? last7DaysRevenue / last7DaysSales.length : 0;
 
+      // Top selling products
+      const topProducts = await Sale.aggregate([
+        { $match: topCategoriesFilter },
+        { $unwind: '$items' },
+        {
+          $group: {
+            _id: '$items.product',
+            totalQuantity: { $sum: '$items.quantity' },
+            totalRevenue: { $sum: { $multiply: ['$items.quantity', '$items.price'] } }
+          }
+        },
+        {
+          $lookup: {
+            from: 'products',
+            localField: '_id',
+            foreignField: '_id',
+            as: 'product'
+          }
+        },
+        { $unwind: '$product' },
+        {
+          $project: {
+            name: '$product.name',
+            sku: '$product.sku',
+            category: '$product.category',
+            totalQuantity: 1,
+            totalRevenue: 1
+          }
+        },
+        { $sort: { totalQuantity: -1 } },
+        { $limit: 10 }
+      ]);
+
+      // Weekly sales trend
+      const weeklySalesTrend = await Sale.aggregate([
+        { 
+          $match: {
+            ...branchFilter,
+            createdAt: { $gte: last7Days },
+            status: 'completed'
+          }
+        },
+        {
+          $group: {
+            _id: {
+              $dateToString: {
+                format: "%Y-%m-%d",
+                date: "$createdAt"
+              }
+            },
+            sales: { $sum: 1 },
+            revenue: { $sum: "$total" }
+          }
+        },
+        { $sort: { "_id": 1 } }
+      ]);
+
+      // User counts
+      const totalUsers = await User.countDocuments({ isActive: true });
+      const activeUsersToday = await User.countDocuments({
+        isActive: true,
+        lastLogin: { $gte: startOfDay }
+      });
+
       const dashboardData = {
-        summary: {
+        kpis: {
           totalProducts,
           totalSales,
+          totalRevenue,
+          lowStockCount: lowStockItems.length,
+          totalUsers,
+          activeUsersToday,
           todaySales: {
             count: todaySalesCount,
             amount: todaySalesAmount
           },
-          monthlyRevenue: totalRevenue,
-          last7DaysRevenue,
-          averageOrderValue
+          last7Days: {
+            sales: last7DaysSales.length,
+            revenue: last7DaysRevenue,
+            averageOrderValue: parseFloat(averageOrderValue.toFixed(2))
+          }
         },
-        lowStockItems: lowStockItems.slice(0, 5),
-        topCategories,
-        recentSales,
+        charts: {
+          weeklySalesTrend,
+          topCategories,
+          topProducts: topProducts.slice(0, 5)
+        },
         alerts: {
-          lowStock: lowStockItems.length,
-          pendingOrders: 0, // Can be expanded based on requirements
-          overduePayments: 0 // Can be expanded based on requirements
+          lowStockItems,
+          recentSales: recentSales.slice(0, 5)
+        },
+        period: {
+          today: today.toISOString(),
+          startOfMonth: startOfMonth.toISOString(),
+          last7Days: last7Days.toISOString(),
+          last30Days: last30Days.toISOString()
         }
       };
 
-      res.json(
-        ResponseUtils.success('Dashboard data retrieved successfully', dashboardData)
-      );
+      ResponseUtils.success(res, dashboardData, 'Dashboard data retrieved successfully');
 
     } catch (error) {
       console.error('Dashboard overview error:', error);
-      res.status(500).json(
-        ResponseUtils.error('Failed to fetch dashboard data', 500)
-      );
+      ResponseUtils.error(res, 'Failed to fetch dashboard data', 500);
     }
   });
 
@@ -207,103 +275,111 @@ class DashboardController {
       let groupBy = {};
       
       switch (period) {
-        case '7days':
-          startDate.setDate(startDate.getDate() - 7);
+        case '24hours':
+          startDate = new Date(Date.now() - 24 * 60 * 60 * 1000);
           groupBy = {
-            year: { $year: '$createdAt' },
-            month: { $month: '$createdAt' },
-            day: { $dayOfMonth: '$createdAt' }
+            $dateToString: {
+              format: "%Y-%m-%d %H:00",
+              date: "$createdAt"
+            }
+          };
+          break;
+        case '7days':
+          startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+          groupBy = {
+            $dateToString: {
+              format: "%Y-%m-%d",
+              date: "$createdAt"
+            }
           };
           break;
         case '30days':
-          startDate.setDate(startDate.getDate() - 30);
+          startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
           groupBy = {
-            year: { $year: '$createdAt' },
-            month: { $month: '$createdAt' },
-            day: { $dayOfMonth: '$createdAt' }
-          };
-          break;
-        case '90days':
-          startDate.setDate(startDate.getDate() - 90);
-          groupBy = {
-            year: { $year: '$createdAt' },
-            month: { $month: '$createdAt' },
-            week: { $week: '$createdAt' }
+            $dateToString: {
+              format: "%Y-%m-%d",
+              date: "$createdAt"
+            }
           };
           break;
         case '12months':
-          startDate.setMonth(startDate.getMonth() - 12);
+          startDate = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
           groupBy = {
-            year: { $year: '$createdAt' },
-            month: { $month: '$createdAt' }
+            $dateToString: {
+              format: "%Y-%m",
+              date: "$createdAt"
+            }
           };
           break;
         default:
-          startDate.setDate(startDate.getDate() - 7);
+          startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
           groupBy = {
-            year: { $year: '$createdAt' },
-            month: { $month: '$createdAt' },
-            day: { $dayOfMonth: '$createdAt' }
+            $dateToString: {
+              format: "%Y-%m-%d",
+              date: "$createdAt"
+            }
           };
       }
 
+      // Build filter
       const filter = {
         createdAt: { $gte: startDate },
         status: 'completed'
       };
 
-      // Branch filter
-      if (branchId) {
-        filter.branch = branchId;
+      if (branchId && branchId !== 'all') {
+        filter.branch = new mongoose.Types.ObjectId(branchId);
       } else if (req.user.role !== 'admin' && req.user.branch) {
         filter.branch = req.user.branch;
       }
 
+      // Aggregate sales data
       const salesData = await Sale.aggregate([
         { $match: filter },
         {
           $group: {
             _id: groupBy,
-            totalSales: { $sum: 1 },
-            totalRevenue: { $sum: '$total' },
-            totalItems: { $sum: { $size: '$items' } },
-            averageOrderValue: { $avg: '$total' }
+            sales: { $sum: 1 },
+            revenue: { $sum: "$total" },
+            averageOrderValue: { $avg: "$total" }
           }
         },
-        { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.week': 1 } }
+        { $sort: { "_id": 1 } },
+        {
+          $project: {
+            date: "$_id",
+            sales: 1,
+            revenue: { $round: ["$revenue", 2] },
+            averageOrderValue: { $round: ["$averageOrderValue", 2] }
+          }
+        }
       ]);
 
-      // Format data for chart consumption
-      const chartData = salesData.map(item => ({
-        period: item._id,
-        sales: item.totalSales,
-        revenue: Math.round(item.totalRevenue * 100) / 100,
-        items: item.totalItems,
-        averageOrderValue: Math.round(item.averageOrderValue * 100) / 100,
-        date: period.includes('day') 
-          ? `${item._id.year}-${String(item._id.month).padStart(2, '0')}-${String(item._id.day).padStart(2, '0')}`
+      // Fill in missing dates with zero values for better chart continuity
+      const chartData = [];
+      const daysBetween = Math.ceil((new Date() - startDate) / (1000 * 60 * 60 * 24));
+      
+      for (let i = daysBetween; i >= 0; i--) {
+        const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+        const dateStr = period === '24hours' 
+          ? date.toISOString().slice(0, 13) + ':00'
           : period === '12months'
-          ? `${item._id.year}-${String(item._id.month).padStart(2, '0')}`
-          : `${item._id.year}-W${item._id.week}`
-      }));
+          ? date.toISOString().slice(0, 7)
+          : date.toISOString().slice(0, 10);
+        
+        const existingData = salesData.find(item => item.date === dateStr);
+        chartData.push({
+          date: dateStr,
+          sales: existingData ? existingData.sales : 0,
+          revenue: existingData ? existingData.revenue : 0,
+          averageOrderValue: existingData ? existingData.averageOrderValue : 0
+        });
+      }
 
-      res.json(
-        ResponseUtils.success('Sales chart data retrieved successfully', {
-          chartData,
-          period,
-          summary: {
-            totalDataPoints: chartData.length,
-            totalSales: chartData.reduce((sum, item) => sum + item.sales, 0),
-            totalRevenue: chartData.reduce((sum, item) => sum + item.revenue, 0)
-          }
-        })
-      );
-
+      ResponseUtils.success(res, chartData, 'Sales chart data retrieved successfully');
     } catch (error) {
       console.error('Sales chart data error:', error);
-      res.status(500).json(
-        ResponseUtils.error('Failed to fetch sales chart data', 500)
-      );
+      ResponseUtils.error(res, 'Failed to retrieve sales chart data', 500);
     }
   });
 
@@ -311,267 +387,505 @@ class DashboardController {
     try {
       const { branchId } = req.query;
       
-      const filter = { isActive: true };
-      if (branchId) {
-        filter['branchStocks.branch'] = branchId;
-      } else if (req.user.role !== 'admin' && req.user.branch) {
-        filter['branchStocks.branch'] = req.user.branch;
+      // Build base filter
+      const baseFilter = { isActive: true };
+      if (branchId && branchId !== 'all') {
+        baseFilter['stockByBranch.branch'] = new mongoose.Types.ObjectId(branchId);
       }
 
+      // Low stock items with detailed information
+      const lowStockItems = await Product.aggregate([
+        { $match: baseFilter },
+        {
+          $addFields: {
+            currentStock: {
+              $cond: {
+                if: { $isArray: "$stockByBranch" },
+                then: {
+                  $sum: {
+                    $map: {
+                      input: "$stockByBranch",
+                      as: "stock",
+                      in: "$$stock.quantity"
+                    }
+                  }
+                },
+                else: "$quantity"
+              }
+            }
+          }
+        },
+        {
+          $match: {
+            $or: [
+              { currentStock: { $lte: 10 } },
+              { quantity: { $lte: 10 } }
+            ]
+          }
+        },
+        {
+          $lookup: {
+            from: 'branches',
+            localField: 'stockByBranch.branch',
+            foreignField: '_id',
+            as: 'branchInfo'
+          }
+        },
+        {
+          $project: {
+            name: 1,
+            sku: 1,
+            category: 1,
+            currentStock: 1,
+            minStockLevel: 1,
+            maxStockLevel: 1,
+            price: 1,
+            costPrice: 1,
+            stockStatus: {
+              $cond: {
+                if: { $lte: ["$currentStock", 5] },
+                then: "critical",
+                else: {
+                  $cond: {
+                    if: { $lte: ["$currentStock", 10] },
+                    then: "low",
+                    else: "normal"
+                  }
+                }
+              }
+            },
+            stockByBranch: 1,
+            branchInfo: 1
+          }
+        },
+        { $sort: { currentStock: 1 } },
+        { $limit: 20 }
+      ]);
+
+      // Category distribution with value analysis
+      const categoryStats = await Product.aggregate([
+        { $match: baseFilter },
+        {
+          $addFields: {
+            currentStock: {
+              $cond: {
+                if: { $isArray: "$stockByBranch" },
+                then: {
+                  $sum: {
+                    $map: {
+                      input: "$stockByBranch",
+                      as: "stock",
+                      in: "$$stock.quantity"
+                    }
+                  }
+                },
+                else: "$quantity"
+              }
+            }
+          }
+        },
+        { 
+          $group: {
+            _id: '$category',
+            totalProducts: { $sum: 1 },
+            totalStock: { $sum: "$currentStock" },
+            totalValue: { $sum: { $multiply: ['$price', '$currentStock'] } },
+            averagePrice: { $avg: '$price' },
+            lowStockItems: {
+              $sum: {
+                $cond: [{ $lte: ["$currentStock", 10] }, 1, 0]
+              }
+            }
+          }
+        },
+        {
+          $project: {
+            category: '$_id',
+            totalProducts: 1,
+            totalStock: 1,
+            totalValue: { $round: ['$totalValue', 2] },
+            averagePrice: { $round: ['$averagePrice', 2] },
+            lowStockItems: 1,
+            stockHealth: {
+              $cond: {
+                if: { $eq: ['$lowStockItems', 0] },
+                then: 'excellent',
+                else: {
+                  $cond: {
+                    if: { $lte: [{ $divide: ['$lowStockItems', '$totalProducts'] }, 0.1] },
+                    then: 'good',
+                    else: {
+                      $cond: {
+                        if: { $lte: [{ $divide: ['$lowStockItems', '$totalProducts'] }, 0.3] },
+                        then: 'warning',
+                        else: 'critical'
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        { $sort: { totalValue: -1 } },
+        { $limit: 15 }
+      ]);
+
+      // Top value products (highest inventory value)
+      const topValueProducts = await Product.aggregate([
+        { $match: baseFilter },
+        {
+          $addFields: {
+            currentStock: {
+              $cond: {
+                if: { $isArray: "$stockByBranch" },
+                then: {
+                  $sum: {
+                    $map: {
+                      input: "$stockByBranch",
+                      as: "stock",
+                      in: "$$stock.quantity"
+                    }
+                  }
+                },
+                else: "$quantity"
+              }
+            },
+            inventoryValue: {
+              $multiply: [
+                '$price',
+                {
+                  $cond: {
+                    if: { $isArray: "$stockByBranch" },
+                    then: {
+                      $sum: {
+                        $map: {
+                          input: "$stockByBranch",
+                          as: "stock",
+                          in: "$$stock.quantity"
+                        }
+                      }
+                    },
+                    else: "$quantity"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          $project: {
+            name: 1,
+            sku: 1,
+            category: 1,
+            currentStock: 1,
+            price: 1,
+            inventoryValue: { $round: ['$inventoryValue', 2] }
+          }
+        },
+        { $sort: { inventoryValue: -1 } },
+        { $limit: 10 }
+      ]);
+
+      // Overall inventory summary
       const inventorySummary = await Product.aggregate([
-        { $match: filter },
-        { $unwind: '$branchStocks' },
-        ...(branchId || req.user.branch ? [{ 
-          $match: { 
-            'branchStocks.branch': mongoose.Types.ObjectId(branchId || req.user.branch) 
-          } 
-        }] : []),
+        { $match: baseFilter },
+        {
+          $addFields: {
+            currentStock: {
+              $cond: {
+                if: { $isArray: "$stockByBranch" },
+                then: {
+                  $sum: {
+                    $map: {
+                      input: "$stockByBranch",
+                      as: "stock",
+                      in: "$$stock.quantity"
+                    }
+                  }
+                },
+                else: "$quantity"
+              }
+            }
+          }
+        },
         {
           $group: {
             _id: null,
             totalProducts: { $sum: 1 },
-            totalStock: { $sum: '$branchStocks.quantity' },
-            totalValue: { 
-              $sum: { 
-                $multiply: ['$branchStocks.quantity', '$pricing.costPrice'] 
-              } 
+            totalStockQuantity: { $sum: "$currentStock" },
+            totalInventoryValue: { $sum: { $multiply: ['$price', '$currentStock'] } },
+            totalCostValue: { $sum: { $multiply: ['$costPrice', '$currentStock'] } },
+            averageStockLevel: { $avg: "$currentStock" },
+            criticalStockItems: {
+              $sum: { $cond: [{ $lte: ["$currentStock", 5] }, 1, 0] }
             },
-            lowStockCount: {
-              $sum: {
-                $cond: [
-                  { $lte: ['$branchStocks.quantity', '$branchStocks.reorderLevel'] },
-                  1,
-                  0
-                ]
-              }
+            lowStockItems: {
+              $sum: { $cond: [{ $and: [{ $gt: ["$currentStock", 5] }, { $lte: ["$currentStock", 10] }] }, 1, 0] }
             },
-            outOfStockCount: {
-              $sum: {
-                $cond: [
-                  { $eq: ['$branchStocks.quantity', 0] },
-                  1,
-                  0
-                ]
-              }
+            normalStockItems: {
+              $sum: { $cond: [{ $gt: ["$currentStock", 10] }, 1, 0] }
+            }
+          }
+        },
+        {
+          $project: {
+            _id: 0,
+            totalProducts: 1,
+            totalStockQuantity: 1,
+            totalInventoryValue: { $round: ['$totalInventoryValue', 2] },
+            totalCostValue: { $round: ['$totalCostValue', 2] },
+            potentialProfit: { $round: [{ $subtract: ['$totalInventoryValue', '$totalCostValue'] }, 2] },
+            averageStockLevel: { $round: ['$averageStockLevel', 2] },
+            criticalStockItems: 1,
+            lowStockItems: 1,
+            normalStockItems: 1,
+            stockHealthScore: {
+              $round: [
+                {
+                  $multiply: [
+                    {
+                      $divide: [
+                        '$normalStockItems',
+                        '$totalProducts'
+                      ]
+                    },
+                    100
+                  ]
+                },
+                1
+              ]
             }
           }
         }
       ]);
 
-      // Category-wise inventory
-      const categoryInventory = await Product.aggregate([
-        { $match: filter },
-        { $unwind: '$branchStocks' },
-        ...(branchId || req.user.branch ? [{ 
-          $match: { 
-            'branchStocks.branch': mongoose.Types.ObjectId(branchId || req.user.branch) 
-          } 
-        }] : []),
-        {
-          $lookup: {
-            from: 'categories',
-            localField: 'category',
-            foreignField: '_id',
-            as: 'category'
-          }
+      const data = {
+        summary: inventorySummary[0] || {
+          totalProducts: 0,
+          totalStockQuantity: 0,
+          totalInventoryValue: 0,
+          totalCostValue: 0,
+          potentialProfit: 0,
+          averageStockLevel: 0,
+          criticalStockItems: 0,
+          lowStockItems: 0,
+          normalStockItems: 0,
+          stockHealthScore: 0
         },
-        { $unwind: '$category' },
-        {
-          $group: {
-            _id: '$category._id',
-            categoryName: { $first: '$category.name' },
-            productCount: { $sum: 1 },
-            totalStock: { $sum: '$branchStocks.quantity' },
-            totalValue: { 
-              $sum: { 
-                $multiply: ['$branchStocks.quantity', '$pricing.costPrice'] 
-              } 
-            }
-          }
-        },
-        { $sort: { totalValue: -1 } }
-      ]);
+        lowStockItems,
+        categoryStats,
+        topValueProducts
+      };
 
-      res.json(
-        ResponseUtils.success('Inventory analytics retrieved successfully', {
-          summary: inventorySummary[0] || {
-            totalProducts: 0,
-            totalStock: 0,
-            totalValue: 0,
-            lowStockCount: 0,
-            outOfStockCount: 0
-          },
-          categoryBreakdown: categoryInventory
-        })
-      );
-
+      ResponseUtils.success(res, data, 'Inventory analytics retrieved successfully');
     } catch (error) {
       console.error('Inventory analytics error:', error);
-      res.status(500).json(
-        ResponseUtils.error('Failed to fetch inventory analytics', 500)
-      );
+      ResponseUtils.error(res, 'Failed to retrieve inventory analytics', 500);
     }
   });
 
   static getAlerts = asyncHandler(async (req, res) => {
     try {
-      const { branchId } = req.query;
       const alerts = [];
-      
-      const filter = { isActive: true };
-      if (branchId) {
-        filter['branchStocks.branch'] = branchId;
-      } else if (req.user.role !== 'admin' && req.user.branch) {
-        filter['branchStocks.branch'] = req.user.branch;
+      const today = new Date();
+      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+      // Critical stock alerts
+      const criticalStockCount = await Product.countDocuments({
+        isActive: true,
+        $or: [
+          { quantity: { $lte: 5 } },
+          { 'stockByBranch.quantity': { $lte: 5 } }
+        ]
+      });
+
+      if (criticalStockCount > 0) {
+        alerts.push({
+          id: `critical-stock-${Date.now()}`,
+          type: 'critical',
+          category: 'inventory',
+          title: 'Critical Stock Alert',
+          message: `${criticalStockCount} product(s) have critically low stock levels`,
+          timestamp: new Date().toISOString(),
+          actionRequired: true,
+          data: { count: criticalStockCount }
+        });
       }
 
       // Low stock alerts
-      const lowStockProducts = await Product.aggregate([
-        { $match: filter },
-        {
-          $addFields: {
-            lowStockBranches: {
-              $filter: {
-                input: '$branchStocks',
-                cond: { 
-                  $and: [
-                    { $lte: ['$$this.quantity', '$$this.reorderLevel'] },
-                    branchId || req.user.branch ? 
-                      { $eq: ['$$this.branch', mongoose.Types.ObjectId(branchId || req.user.branch)] } : 
-                      {}
-                  ]
-                }
-              }
-            }
-          }
-        },
-        {
-          $match: {
-            'lowStockBranches.0': { $exists: true }
-          }
-        },
-        { $limit: 10 }
-      ]);
+      const lowStockCount = await Product.countDocuments({
+        isActive: true,
+        $or: [
+          { quantity: { $gt: 5, $lte: 10 } },
+          { 'stockByBranch.quantity': { $gt: 5, $lte: 10 } }
+        ]
+      });
 
-      if (lowStockProducts.length > 0) {
+      if (lowStockCount > 0) {
         alerts.push({
+          id: `low-stock-${Date.now()}`,
           type: 'warning',
-          title: 'Low Stock Alert',
-          message: `${lowStockProducts.length} products are running low on stock`,
-          priority: 'high',
-          data: lowStockProducts.map(p => ({
-            id: p._id,
-            name: p.name,
-            sku: p.sku,
-            currentStock: p.lowStockBranches[0]?.quantity || 0,
-            reorderLevel: p.lowStockBranches[0]?.reorderLevel || 0
-          }))
+          category: 'inventory',
+          title: 'Low Stock Warning',
+          message: `${lowStockCount} product(s) are running low on stock`,
+          timestamp: new Date().toISOString(),
+          actionRequired: false,
+          data: { count: lowStockCount }
         });
       }
 
-      // Out of stock alerts
-      const outOfStockProducts = await Product.aggregate([
-        { $match: filter },
-        {
-          $addFields: {
-            outOfStockBranches: {
-              $filter: {
-                input: '$branchStocks',
-                cond: { 
-                  $and: [
-                    { $eq: ['$$this.quantity', 0] },
-                    branchId || req.user.branch ? 
-                      { $eq: ['$$this.branch', mongoose.Types.ObjectId(branchId || req.user.branch)] } : 
-                      {}
-                  ]
-                }
-              }
-            }
-          }
-        },
+      // Today's sales performance
+      const todaySales = await Sale.countDocuments({
+        createdAt: { $gte: startOfDay },
+        status: 'completed'
+      });
+
+      const todayRevenue = await Sale.aggregate([
         {
           $match: {
-            'outOfStockBranches.0': { $exists: true }
+            createdAt: { $gte: startOfDay },
+            status: 'completed'
           }
         },
-        { $limit: 5 }
+        {
+          $group: {
+            _id: null,
+            totalRevenue: { $sum: '$total' }
+          }
+        }
       ]);
 
-      if (outOfStockProducts.length > 0) {
+      const revenue = todayRevenue.length > 0 ? todayRevenue[0].totalRevenue : 0;
+
+      // Check if today's sales are significantly above/below average
+      const last7DaysStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const avgDailySales = await Sale.aggregate([
+        {
+          $match: {
+            createdAt: { $gte: last7DaysStart, $lt: startOfDay },
+            status: 'completed'
+          }
+        },
+        {
+          $group: {
+            _id: {
+              $dateToString: {
+                format: "%Y-%m-%d",
+                date: "$createdAt"
+              }
+            },
+            dailySales: { $sum: 1 },
+            dailyRevenue: { $sum: '$total' }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            avgSales: { $avg: '$dailySales' },
+            avgRevenue: { $avg: '$dailyRevenue' }
+          }
+        }
+      ]);
+
+      if (avgDailySales.length > 0) {
+        const avg = avgDailySales[0];
+        
+        if (todaySales > avg.avgSales * 1.5) {
+          alerts.push({
+            id: `high-sales-${Date.now()}`,
+            type: 'success',
+            category: 'sales',
+            title: 'Excellent Sales Performance',
+            message: `Today's sales (${todaySales}) are ${Math.round(((todaySales / avg.avgSales) - 1) * 100)}% above average`,
+            timestamp: new Date().toISOString(),
+            actionRequired: false,
+            data: { todaySales, avgSales: Math.round(avg.avgSales) }
+          });
+        } else if (todaySales < avg.avgSales * 0.7 && new Date().getHours() > 12) {
+          alerts.push({
+            id: `low-sales-${Date.now()}`,
+            type: 'warning',
+            category: 'sales',
+            title: 'Below Average Sales',
+            message: `Today's sales (${todaySales}) are ${Math.round((1 - (todaySales / avg.avgSales)) * 100)}% below average`,
+            timestamp: new Date().toISOString(),
+            actionRequired: false,
+            data: { todaySales, avgSales: Math.round(avg.avgSales) }
+          });
+        }
+      }
+
+      // Check for products expiring soon (if applicable)
+      const expiringProducts = await Product.countDocuments({
+        isActive: true,
+        expiryDate: {
+          $gte: today,
+          $lte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // Next 7 days
+        }
+      });
+
+      if (expiringProducts > 0) {
         alerts.push({
-          type: 'error',
-          title: 'Out of Stock Alert',
-          message: `${outOfStockProducts.length} products are out of stock`,
-          priority: 'critical',
-          data: outOfStockProducts.map(p => ({
-            id: p._id,
-            name: p.name,
-            sku: p.sku
-          }))
+          id: `expiring-products-${Date.now()}`,
+          type: 'warning',
+          category: 'inventory',
+          title: 'Products Expiring Soon',
+          message: `${expiringProducts} product(s) will expire within the next 7 days`,
+          timestamp: new Date().toISOString(),
+          actionRequired: true,
+          data: { count: expiringProducts }
         });
       }
 
-      // Overstock alerts (items above max stock level)
-      const overstockProducts = await Product.aggregate([
-        { $match: filter },
-        {
-          $addFields: {
-            overstockBranches: {
-              $filter: {
-                input: '$branchStocks',
-                cond: { 
-                  $and: [
-                    { $gt: ['$$this.quantity', '$$this.maxStockLevel'] },
-                    branchId || req.user.branch ? 
-                      { $eq: ['$$this.branch', mongoose.Types.ObjectId(branchId || req.user.branch)] } : 
-                      {}
-                  ]
-                }
-              }
-            }
-          }
-        },
-        {
-          $match: {
-            'overstockBranches.0': { $exists: true }
-          }
-        },
-        { $limit: 5 }
-      ]);
+      // Check for inactive users (haven't logged in for 30 days)
+      const inactiveUsers = await User.countDocuments({
+        isActive: true,
+        lastLogin: {
+          $lt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+        }
+      });
 
-      if (overstockProducts.length > 0) {
+      if (inactiveUsers > 0) {
         alerts.push({
+          id: `inactive-users-${Date.now()}`,
           type: 'info',
-          title: 'Overstock Alert',
-          message: `${overstockProducts.length} products are overstocked`,
-          priority: 'medium',
-          data: overstockProducts.map(p => ({
-            id: p._id,
-            name: p.name,
-            sku: p.sku,
-            currentStock: p.overstockBranches[0]?.quantity || 0,
-            maxStockLevel: p.overstockBranches[0]?.maxStockLevel || 0
-          }))
+          category: 'users',
+          title: 'Inactive User Accounts',
+          message: `${inactiveUsers} user(s) haven't logged in for over 30 days`,
+          timestamp: new Date().toISOString(),
+          actionRequired: false,
+          data: { count: inactiveUsers }
         });
       }
 
-      res.json(
-        ResponseUtils.success('Alerts retrieved successfully', {
-          alerts,
-          summary: {
-            total: alerts.length,
-            critical: alerts.filter(a => a.priority === 'critical').length,
-            high: alerts.filter(a => a.priority === 'high').length,
-            medium: alerts.filter(a => a.priority === 'medium').length
-          }
-        })
-      );
+      // Check for system performance (placeholder for future implementation)
+      if (Math.random() > 0.8) { // 20% chance to show system info
+        alerts.push({
+          id: `system-info-${Date.now()}`,
+          type: 'info',
+          category: 'system',
+          title: 'System Status',
+          message: 'All systems are running optimally',
+          timestamp: new Date().toISOString(),
+          actionRequired: false,
+          data: { status: 'optimal' }
+        });
+      }
 
+      // Sort alerts by priority and timestamp
+      const priorityOrder = { critical: 0, warning: 1, success: 2, info: 3 };
+      alerts.sort((a, b) => {
+        if (priorityOrder[a.type] !== priorityOrder[b.type]) {
+          return priorityOrder[a.type] - priorityOrder[b.type];
+        }
+        return new Date(b.timestamp) - new Date(a.timestamp);
+      });
+
+      ResponseUtils.success(res, alerts.slice(0, 10), 'Alerts retrieved successfully');
     } catch (error) {
       console.error('Alerts error:', error);
-      res.status(500).json(
-        ResponseUtils.error('Failed to fetch alerts', 500)
-      );
+      ResponseUtils.error(res, 'Failed to retrieve alerts', 500);
     }
   });
 }

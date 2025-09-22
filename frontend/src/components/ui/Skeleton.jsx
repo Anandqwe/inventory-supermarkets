@@ -87,4 +87,61 @@ const SkeletonStats = ({ count = 4 }) => (
   </div>
 );
 
-export { Skeleton, SkeletonCard, SkeletonTable, SkeletonStats, skeletonVariants };
+// Text skeleton for paragraphs
+const SkeletonText = ({ lines = 3, className }) => (
+  <div className={cn("space-y-2", className)}>
+    {Array.from({ length: lines }).map((_, i) => (
+      <Skeleton 
+        key={i} 
+        variant="text" 
+        className={cn(
+          i === lines - 1 ? "w-3/4" : "w-full"
+        )} 
+      />
+    ))}
+  </div>
+);
+
+// Dashboard skeleton layout
+const SkeletonDashboard = () => (
+  <div className="space-y-6">
+    {/* Stats */}
+    <SkeletonStats count={4} />
+    
+    {/* Charts row */}
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <SkeletonCard className="p-6 h-80" />
+      <SkeletonCard className="p-6 h-80" />
+    </div>
+    
+    {/* Table */}
+    <SkeletonTable rows={8} columns={5} />
+  </div>
+);
+
+// Form skeleton
+const SkeletonForm = ({ fields = 4 }) => (
+  <div className="space-y-4">
+    {Array.from({ length: fields }).map((_, i) => (
+      <div key={i} className="space-y-2">
+        <Skeleton variant="text" className="w-24 h-4" />
+        <Skeleton className="w-full h-10" />
+      </div>
+    ))}
+    <div className="flex gap-2 pt-4">
+      <Skeleton variant="button" className="w-20" />
+      <Skeleton variant="button" className="w-16" />
+    </div>
+  </div>
+);
+
+export { 
+  Skeleton, 
+  SkeletonCard, 
+  SkeletonTable, 
+  SkeletonStats, 
+  SkeletonText,
+  SkeletonDashboard,
+  SkeletonForm,
+  skeletonVariants 
+};

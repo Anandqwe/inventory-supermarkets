@@ -1,124 +1,131 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   PlusIcon, 
   MagnifyingGlassIcon, 
   PencilIcon, 
   TrashIcon, 
   ExclamationTriangleIcon, 
-  CubeIcon
+  CubeIcon,
+  ArrowDownTrayIcon,
+  ArrowUpTrayIcon,
+  FunnelIcon,
+  Squares2X2Icon,
+  ListBulletIcon,
+  CheckIcon,
+  XMarkIcon,
+  DocumentDuplicateIcon,
+  TagIcon,
+  CameraIcon,
+  QrCodeIcon
 } from '@heroicons/react/24/outline';
 import { toast } from 'react-toastify';
 import { useAuth } from '../contexts/AuthContext';
 import { PageHeader } from '../components/shell';
-import { Button, Input, Card, Badge } from '../components/ui';
-import LoadingSpinner from '../components/LoadingSpinner';
+import { 
+  Button, 
+  Input, 
+  Card, 
+  Badge,
+  DataTable,
+  Modal,
+  EmptyState,
+  SkeletonTable
+} from '../components/ui';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 import ProductModal from '../components/ProductModal';
 import DeleteModal from '../components/DeleteModal';
+import { cn } from '../utils/cn';
 
+// Enhanced Product Management with DataTable and Advanced Features
 function Products() {
-  const [products, setProducts] = useState([]);
-  const [filteredProducts, setFilteredProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
+  
+  // State management
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [stockFilter, setStockFilter] = useState('all');
+  const [priceRange, setPriceRange] = useState({ min: '', max: '' });
+  const [viewMode, setViewMode] = useState('table'); // 'table' | 'grid'
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingProduct, setDeletingProduct] = useState(null);
-  const [categories, setCategories] = useState([]);
-  const { token } = useAuth();
+  const [selectedProducts, setSelectedProducts] = useState([]);
+  const [showBulkActions, setShowBulkActions] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [pagination, setPagination] = useState({
+    pageIndex: 0,
+    pageSize: 25,
+  });
+  const [sorting, setSorting] = useState([]);
 
-  // Fetch products from API
+  // API functions
   const fetchProducts = async () => {
-    try {
-      const response = await fetch('http://localhost:5000/api/products', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+    const params = new URLSearchParams({
+      page: pagination.pageIndex + 1,
+      limit: pagination.pageSize,
+      search: searchTerm,
+      category: selectedCategory,
+      stock: stockFilter,
+      minPrice: priceRange.min,
+      maxPrice: priceRange.max,
+      sortBy: sorting[0]?.id || 'createdAt',
+      sortOrder: sorting[0]?.desc ? 'desc' : 'asc'
+    });
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch products');
+    const response = await fetch(`http://localhost:5000/api/products?${params}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
       }
+    });
 
-      const data = await response.json();
-      setProducts(data.data);
-      
-      // Extract unique categories
-      const uniqueCategories = [...new Set(data.data.map(product => product.category))];
-      setCategories(uniqueCategories);
-      
-    } catch (error) {
-      console.error('Error fetching products:', error);
-      toast.error('Failed to load products');
-    } finally {
-      setLoading(false);
+    if (!response.ok) {
+      throw new Error('Failed to fetch products');
     }
+
+    return response.json();
   };
 
-  // Filter products based on search and category
-  useEffect(() => {
-    let filtered = products;
-
-    if (searchTerm) {
-      filtered = filtered.filter(product =>
-        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.brand?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    if (selectedCategory) {
-      filtered = filtered.filter(product => product.category === selectedCategory);
-    }
-
-    setFilteredProducts(filtered);
-  }, [products, searchTerm, selectedCategory]);
-
-  // Load products on component mount
-  useEffect(() => {
-    fetchProducts();
-  }, [token]);
-
-  // Handle product creation/update
-  const handleSaveProduct = async (productData) => {
-    try {
-      const url = editingProduct 
-        ? `http://localhost:5000/api/products/${editingProduct._id}`
-        : 'http://localhost:5000/api/products';
-      
-      const method = editingProduct ? 'PUT' : 'POST';
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(productData)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to save product');
+  const fetchCategories = async () => {
+    const response = await fetch('http://localhost:5000/api/products/categories', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
       }
+    });
 
-      toast.success(editingProduct ? 'Product updated successfully' : 'Product created successfully');
-      setShowModal(false);
-      setEditingProduct(null);
-      fetchProducts(); // Refresh the list
-    } catch (error) {
-      console.error('Error saving product:', error);
-      toast.error(error.message);
+    if (!response.ok) {
+      throw new Error('Failed to fetch categories');
     }
+
+    return response.json();
   };
 
-  // Handle product deletion
-  const handleDeleteProduct = async () => {
-    try {
-      const response = await fetch(`http://localhost:5000/api/products/${deletingProduct._id}`, {
+  // React Query hooks
+  const { 
+    data: productsData, 
+    isLoading, 
+    error,
+    refetch 
+  } = useQuery({
+    queryKey: ['products', pagination, searchTerm, selectedCategory, stockFilter, priceRange, sorting],
+    queryFn: fetchProducts,
+    keepPreviousData: true,
+  });
+
+  const { data: categoriesData } = useQuery({
+    queryKey: ['categories'],
+    queryFn: fetchCategories,
+  });
+
+  // Mutations
+  const deleteProductMutation = useMutation({
+    mutationFn: async (productId) => {
+      const response = await fetch(`http://localhost:5000/api/products/${productId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -130,217 +137,573 @@ function Products() {
         throw new Error('Failed to delete product');
       }
 
+      return response.json();
+    },
+    onSuccess: () => {
       toast.success('Product deleted successfully');
+      queryClient.invalidateQueries(['products']);
       setShowDeleteModal(false);
       setDeletingProduct(null);
-      fetchProducts(); // Refresh the list
-    } catch (error) {
-      console.error('Error deleting product:', error);
+    },
+    onError: (error) => {
       toast.error('Failed to delete product');
     }
-  };
+  });
 
-  // Get stock status and color
-  const getStockStatus = (quantity, reorderLevel) => {
-    if (quantity <= reorderLevel) return { status: 'low', label: 'Low Stock' };
-    if (quantity <= reorderLevel * 1.5) return { status: 'medium', label: 'Medium Stock' };
-    return { status: 'good', label: 'In Stock' };
-  };
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (productIds) => {
+      const response = await fetch('http://localhost:5000/api/products/bulk-delete', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ productIds })
+      });
 
-  const getStockColor = (status) => {
-    switch (status) {
-      case 'low': return 'text-red-600 bg-red-100 border-red-200';
-      case 'medium': return 'text-yellow-600 bg-yellow-100 border-yellow-200';
-      default: return 'text-green-600 bg-green-100 border-green-200';
+      if (!response.ok) {
+        throw new Error('Failed to delete products');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      toast.success(`${selectedProducts.length} products deleted successfully`);
+      queryClient.invalidateQueries(['products']);
+      setSelectedProducts([]);
+      setShowBulkActions(false);
+    },
+    onError: (error) => {
+      toast.error('Failed to delete products');
     }
-  };
+  });
 
-  // Open edit modal
+  const bulkUpdateCategoryMutation = useMutation({
+    mutationFn: async ({ productIds, category }) => {
+      const response = await fetch('http://localhost:5000/api/products/bulk-update', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ productIds, updates: { category } })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update products');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      toast.success('Products updated successfully');
+      queryClient.invalidateQueries(['products']);
+      setSelectedProducts([]);
+      setShowBulkActions(false);
+    },
+    onError: (error) => {
+      toast.error('Failed to update products');
+    }
+  });
+
+  // Data processing
+  const products = productsData?.data?.products || [];
+  const totalProducts = productsData?.data?.total || 0;
+  const categories = categoriesData?.data || [];
+
+  // DataTable columns configuration
+  const columns = useMemo(() => [
+    {
+      id: 'select',
+      header: ({ table }) => (
+        <input
+          type="checkbox"
+          checked={table.getIsAllPageRowsSelected()}
+          onChange={table.getToggleAllPageRowsSelectedHandler()}
+          className="rounded"
+        />
+      ),
+      cell: ({ row }) => (
+        <input
+          type="checkbox"
+          checked={row.getIsSelected()}
+          onChange={row.getToggleSelectedHandler()}
+          className="rounded"
+        />
+      ),
+      enableSorting: false,
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: 'name',
+      header: 'Product Name',
+      cell: ({ row }) => (
+        <div className="flex items-center gap-3">
+          {row.original.image ? (
+            <img 
+              src={row.original.image} 
+              alt={row.original.name}
+              className="h-10 w-10 rounded-lg object-cover"
+            />
+          ) : (
+            <div className="h-10 w-10 bg-surface-100 dark:bg-surface-800 rounded-lg flex items-center justify-center">
+              <CubeIcon className="h-5 w-5 text-surface-400" />
+            </div>
+          )}
+          <div>
+            <div className="font-medium text-surface-900 dark:text-surface-100">
+              {row.original.name}
+            </div>
+            <div className="text-sm text-surface-500 dark:text-surface-400">
+              SKU: {row.original.sku || row.original.barcode}
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'category',
+      header: 'Category',
+      cell: ({ row }) => (
+        <Badge variant="outline" className="capitalize">
+          {row.original.category}
+        </Badge>
+      ),
+    },
+    {
+      accessorKey: 'price',
+      header: 'Price',
+      cell: ({ row }) => (
+        <div className="font-medium">
+          ₹{row.original.price.toLocaleString('en-IN')}
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'stock',
+      header: 'Stock',
+      cell: ({ row }) => {
+        const stock = row.original.stock || 0;
+        const minLevel = row.original.minStockLevel || 10;
+        
+        const getStockStatus = () => {
+          if (stock === 0) return { variant: 'destructive', label: 'Out of Stock' };
+          if (stock <= minLevel) return { variant: 'warning', label: 'Low Stock' };
+          if (stock <= minLevel * 1.5) return { variant: 'secondary', label: 'Medium' };
+          return { variant: 'success', label: 'In Stock' };
+        };
+
+        const status = getStockStatus();
+
+        return (
+          <div className="flex items-center gap-2">
+            <Badge variant={status.variant} size="sm">
+              {stock} units
+            </Badge>
+            <span className="text-xs text-surface-500 dark:text-surface-400">
+              {status.label}
+            </span>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: 'supplier',
+      header: 'Supplier',
+      cell: ({ row }) => (
+        <span className="text-sm text-surface-600 dark:text-surface-400">
+          {row.original.supplier || 'N/A'}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'createdAt',
+      header: 'Added',
+      cell: ({ row }) => (
+        <span className="text-sm text-surface-600 dark:text-surface-400">
+          {new Date(row.original.createdAt).toLocaleDateString()}
+        </span>
+      ),
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleEditProduct(row.original)}
+            className="h-8 w-8 p-0"
+          >
+            <PencilIcon className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleDuplicateProduct(row.original)}
+            className="h-8 w-8 p-0"
+          >
+            <DocumentDuplicateIcon className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleDeleteClick(row.original)}
+            className="h-8 w-8 p-0 text-red-600 hover:text-red-500"
+          >
+            <TrashIcon className="h-4 w-4" />
+          </Button>
+        </div>
+      ),
+      enableSorting: false,
+      enableColumnFilter: false,
+    },
+  ], []);
+
+  // Event handlers
   const handleEditProduct = (product) => {
     setEditingProduct(product);
     setShowModal(true);
   };
 
-  // Open delete modal
+  const handleDuplicateProduct = (product) => {
+    const duplicatedProduct = {
+      ...product,
+      name: `${product.name} (Copy)`,
+      sku: `${product.sku}-copy`,
+      barcode: `${product.barcode}-copy`
+    };
+    delete duplicatedProduct._id;
+    setEditingProduct(duplicatedProduct);
+    setShowModal(true);
+  };
+
   const handleDeleteClick = (product) => {
     setDeletingProduct(product);
     setShowDeleteModal(true);
   };
 
-  if (loading) {
-    return <LoadingSpinner />;
+  const handleBulkDelete = () => {
+    if (selectedProducts.length === 0) return;
+    bulkDeleteMutation.mutate(selectedProducts.map(p => p._id));
+  };
+
+  const handleBulkCategoryUpdate = (category) => {
+    if (selectedProducts.length === 0) return;
+    bulkUpdateCategoryMutation.mutate({
+      productIds: selectedProducts.map(p => p._id),
+      category
+    });
+  };
+
+  const handleExportCSV = () => {
+    const headers = ['Name', 'SKU', 'Barcode', 'Category', 'Price', 'Stock', 'Supplier'];
+    const csvContent = [
+      headers.join(','),
+      ...products.map(product => [
+        `"${product.name}"`,
+        product.sku || '',
+        product.barcode || '',
+        product.category || '',
+        product.price || 0,
+        product.stock || 0,
+        `"${product.supplier || ''}"`
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `products-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+    toast.success('Products exported to CSV');
+  };
+
+  const handleImportCSV = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const csv = e.target.result;
+        const lines = csv.split('\n');
+        const headers = lines[0].split(',');
+        
+        // Process CSV data here
+        toast.success('CSV import feature coming soon');
+      } catch (error) {
+        toast.error('Failed to parse CSV file');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // Clear filters
+  const clearFilters = () => {
+    setSearchTerm('');
+    setSelectedCategory('');
+    setStockFilter('all');
+    setPriceRange({ min: '', max: '' });
+  };
+
+  // Loading state
+  if (isLoading && !productsData) {
+    return (
+      <div className="space-y-6">
+        <PageHeader 
+          title="Product Management" 
+          subtitle="Manage your inventory with advanced tools"
+        />
+        <SkeletonTable />
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <PageHeader 
-        title="Products"
-        subtitle="Manage your inventory items and stock levels"
-      >
-        <Button
-          onClick={() => setShowModal(true)}
-          variant="primary"
-          size="sm"
-        >
-          <PlusIcon className="h-4 w-4 mr-2" />
-          Add Product
-        </Button>
-      </PageHeader>
+    <div className="space-y-6">
+      {/* Enhanced Header with Actions */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <PageHeader 
+          title="Product Management" 
+          subtitle={`${totalProducts} products in inventory`}
+        />
+        
+        <div className="flex items-center gap-2">
+          {/* View Mode Toggle */}
+          <div className="flex rounded-lg border border-surface-300 dark:border-surface-700">
+            <Button
+              variant={viewMode === 'table' ? 'primary' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('table')}
+              className="rounded-r-none"
+            >
+              <ListBulletIcon className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'grid' ? 'primary' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('grid')}
+              className="rounded-l-none"
+            >
+              <Squares2X2Icon className="h-4 w-4" />
+            </Button>
+          </div>
 
-      {/* Filters */}
-      <Card className="p-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Search */}
-          <div className="relative">
-            <Input
-              type="text"
-              placeholder="Search products..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              icon={MagnifyingGlassIcon}
+          {/* Export/Import */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportCSV}
+          >
+            <ArrowDownTrayIcon className="h-4 w-4 mr-1" />
+            Export
+          </Button>
+          
+          <label className="cursor-pointer">
+            <Button variant="outline" size="sm" as="span">
+              <ArrowUpTrayIcon className="h-4 w-4 mr-1" />
+              Import
+            </Button>
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleImportCSV}
+              className="hidden"
             />
+          </label>
+
+          <Button
+            onClick={() => setShowModal(true)}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            <PlusIcon className="h-4 w-4 mr-1" />
+            Add Product
+          </Button>
+        </div>
+      </div>
+
+      {/* Advanced Filters */}
+      <Card className="p-4">
+        <div className="flex flex-col lg:flex-row gap-4">
+          {/* Search */}
+          <div className="flex-1">
+            <div className="relative">
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-surface-400" />
+              <Input
+                placeholder="Search products..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
           </div>
 
           {/* Category Filter */}
-          <div className="relative">
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="block w-full px-3 py-2 border border-surface-300 dark:border-surface-600 rounded-md leading-5 bg-white dark:bg-[#09090b] text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
-            >
-              <option value="">All Categories</option>
-              {categories.map(category => (
-                <option key={category} value={category}>{category}</option>
-              ))}
-            </select>
-          </div>
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="px-3 py-2 border border-surface-300 dark:border-surface-700 rounded-lg bg-white dark:bg-surface-800"
+          >
+            <option value="">All Categories</option>
+            {categories.map(category => (
+              <option key={category} value={category}>{category}</option>
+            ))}
+          </select>
 
-          {/* Results Count */}
-          <div className="flex items-center text-sm text-surface-600 dark:text-surface-400">
-            <CubeIcon className="h-4 w-4 mr-2" />
-            {filteredProducts.length} of {products.length} products
-          </div>
+          {/* Stock Filter */}
+          <select
+            value={stockFilter}
+            onChange={(e) => setStockFilter(e.target.value)}
+            className="px-3 py-2 border border-surface-300 dark:border-surface-700 rounded-lg bg-white dark:bg-surface-800"
+          >
+            <option value="all">All Stock</option>
+            <option value="in-stock">In Stock</option>
+            <option value="low-stock">Low Stock</option>
+            <option value="out-of-stock">Out of Stock</option>
+          </select>
+
+          {/* Advanced Filters Toggle */}
+          <Button
+            variant="outline"
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            <FunnelIcon className="h-4 w-4 mr-1" />
+            Filters
+          </Button>
+
+          {/* Clear Filters */}
+          {(searchTerm || selectedCategory || stockFilter !== 'all' || priceRange.min || priceRange.max) && (
+            <Button
+              variant="ghost"
+              onClick={clearFilters}
+              className="text-red-600 hover:text-red-500"
+            >
+              <XMarkIcon className="h-4 w-4 mr-1" />
+              Clear
+            </Button>
+          )}
         </div>
+
+        {/* Advanced Filters Panel */}
+        {showFilters && (
+          <div className="mt-4 pt-4 border-t border-surface-200 dark:border-surface-700">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Min Price</label>
+                <Input
+                  type="number"
+                  placeholder="0"
+                  value={priceRange.min}
+                  onChange={(e) => setPriceRange(prev => ({ ...prev, min: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Max Price</label>
+                <Input
+                  type="number"
+                  placeholder="1000000"
+                  value={priceRange.max}
+                  onChange={(e) => setPriceRange(prev => ({ ...prev, max: e.target.value }))}
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </Card>
+
+      {/* Bulk Actions */}
+      {selectedProducts.length > 0 && (
+        <Card className="p-4 bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <span className="text-sm font-medium">
+                {selectedProducts.length} product{selectedProducts.length !== 1 ? 's' : ''} selected
+              </span>
+              
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleBulkDelete}
+                  className="text-red-600 border-red-300 hover:bg-red-50"
+                >
+                  <TrashIcon className="h-4 w-4 mr-1" />
+                  Delete Selected
+                </Button>
+                
+                <select
+                  onChange={(e) => e.target.value && handleBulkCategoryUpdate(e.target.value)}
+                  className="px-3 py-1 text-sm border border-surface-300 dark:border-surface-700 rounded bg-white dark:bg-surface-800"
+                  defaultValue=""
+                >
+                  <option value="">Update Category</option>
+                  {categories.map(category => (
+                    <option key={category} value={category}>{category}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedProducts([])}
+            >
+              <XMarkIcon className="h-4 w-4" />
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {/* Products Table */}
       <Card>
-        <div className="px-4 py-5 sm:p-6">
-          {filteredProducts.length === 0 ? (
-            <div className="text-center py-12">
-              <CubeIcon className="mx-auto h-12 w-12 text-surface-400" />
-              <h3 className="mt-2 text-sm font-medium text-surface-900 dark:text-surface-100">No products found</h3>
-              <p className="mt-1 text-sm text-surface-500 dark:text-surface-400">
-                {searchTerm || selectedCategory ? 'Try adjusting your filters' : 'Get started by creating a new product'}
-              </p>
-              {!searchTerm && !selectedCategory && (
-                <div className="mt-6">
-                  <Button
-                    onClick={() => setShowModal(true)}
-                    variant="primary"
-                  >
-                    <PlusIcon className="h-4 w-4 mr-2" />
-                    Add Product
-                  </Button>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-surface-200 dark:divide-surface-700">
-                <thead className="bg-surface-50 dark:bg-[#0a0a0b]">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-surface-500 dark:text-surface-400 uppercase tracking-wider">
-                      Product
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-surface-500 dark:text-surface-400 uppercase tracking-wider">
-                      SKU
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-surface-500 dark:text-surface-400 uppercase tracking-wider">
-                      Category
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-surface-500 dark:text-surface-400 uppercase tracking-wider">
-                      Price
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-surface-500 dark:text-surface-400 uppercase tracking-wider">
-                      Stock
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-surface-500 dark:text-surface-400 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-surface-500 dark:text-surface-400 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-[#09090b] divide-y divide-surface-200 dark:divide-surface-700">
-                  {filteredProducts.map((product) => {
-                    const stockInfo = getStockStatus(product.quantity, product.reorderLevel || 10);
-                    return (
-                      <tr key={product._id} className="hover:bg-surface-50 dark:hover:bg-[#18181b] transition-colors">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-surface-900 dark:text-surface-100">{product.name}</div>
-                          {product.brand && (
-                            <div className="text-sm text-surface-500 dark:text-surface-400">{product.brand}</div>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-surface-900 dark:text-surface-100">
-                          {product.sku || '-'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-surface-900 dark:text-surface-100">
-                          {product.category}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-surface-900 dark:text-surface-100">
-                          ₹{product.price.toFixed(2)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-surface-900 dark:text-surface-100">
-                          {product.quantity} {product.unit}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <Badge
-                            variant={stockInfo.status === 'low' ? 'danger' : stockInfo.status === 'out' ? 'warning' : 'success'}
-                            size="sm"
-                          >
-                            {stockInfo.status === 'low' && <ExclamationTriangleIcon className="h-3 w-3 mr-1" />}
-                            {stockInfo.label}
-                          </Badge>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <div className="flex justify-end space-x-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEditProduct(product)}
-                              className="text-emerald-500 hover:text-emerald-400 dark:text-emerald-400 dark:hover:text-emerald-300"
-                            >
-                              <PencilIcon className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteClick(product)}
-                              className="text-rose-500 hover:text-rose-400 dark:text-rose-400 dark:hover:text-rose-300"
-                            >
-                              <TrashIcon className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+        {isLoading ? (
+          <div className="p-8">
+            <LoadingSpinner />
+          </div>
+        ) : products.length === 0 ? (
+          <EmptyState
+            icon={CubeIcon}
+            title="No products found"
+            description="Get started by adding your first product to the inventory."
+            action={
+              <Button onClick={() => setShowModal(true)}>
+                <PlusIcon className="h-4 w-4 mr-1" />
+                Add Product
+              </Button>
+            }
+          />
+        ) : (
+          <DataTable
+            data={products}
+            columns={columns}
+            pagination={pagination}
+            sorting={sorting}
+            rowSelection={selectedProducts}
+            onPaginationChange={setPagination}
+            onSortingChange={setSorting}
+            onRowSelectionChange={setSelectedProducts}
+            pageCount={Math.ceil(totalProducts / pagination.pageSize)}
+            totalRows={totalProducts}
+          />
+        )}
       </Card>
 
       {/* Product Modal */}
       {showModal && (
         <ProductModal
           product={editingProduct}
-          onSave={handleSaveProduct}
+          categories={categories}
+          onSave={(productData) => {
+            // Handle save logic here
+            queryClient.invalidateQueries(['products']);
+            setShowModal(false);
+            setEditingProduct(null);
+          }}
           onClose={() => {
             setShowModal(false);
             setEditingProduct(null);
@@ -353,11 +716,12 @@ function Products() {
         <DeleteModal
           title="Delete Product"
           message={`Are you sure you want to delete "${deletingProduct?.name}"? This action cannot be undone.`}
-          onConfirm={handleDeleteProduct}
+          onConfirm={() => deleteProductMutation.mutate(deletingProduct._id)}
           onCancel={() => {
             setShowDeleteModal(false);
             setDeletingProduct(null);
           }}
+          loading={deleteProductMutation.isLoading}
         />
       )}
     </div>

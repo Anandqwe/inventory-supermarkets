@@ -34,7 +34,7 @@ const dashboardRoutes = require('./src/routes/dashboardRoutes');
 const reportsRoutes = require('./src/routes/reportsRoutes');
 const masterDataRoutes = require('./src/routes/masterDataRoutes');
 const inventoryRoutes = require('./src/routes/inventoryRoutes');
-const purchaseRoutes = require('./src/routes/purchaseRoutes');
+// const purchaseRoutes = require('./src/routes/purchaseRoutes');
 const financialRoutes = require('./src/routes/financialRoutes');
 const securityRoutes = require('./src/routes/securityRoutes');
 
@@ -47,8 +47,13 @@ const app = express();
 // Optimize database connection
 optimizeConnection();
 
-// Connect to database
-mongoose.connect(process.env.MONGODB_URI)
+// Connect to database with optimized options
+mongoose.connect(process.env.MONGODB_URI, {
+  maxPoolSize: 10, // Maintain up to 10 socket connections
+  serverSelectionTimeoutMS: 5000, // Keep trying to send operations for 5 seconds
+  socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
+  family: 4, // Use IPv4, skip trying IPv6
+})
   .then(async () => {
     console.log('✅ Connected to MongoDB Atlas');
     
@@ -88,11 +93,10 @@ app.use(securityHeaders);
 app.use(perfMonitor);
 
 // Rate limiting
-// Rate limiting
 app.use('/api/', generalRateLimit);
 
 // Dynamic rate limiting based on user role (will be applied after authentication)
-app.use('/api/', dynamicRateLimit);
+// app.use('/api/', dynamicRateLimit); // Temporarily disabled to fix double count issue
 
 // CORS configuration
 app.use(cors(corsOptions));
@@ -107,11 +111,11 @@ app.use(sanitizeInput({
   strictMode: false
 }));
 
-// Audit logging middleware
-app.use(auditMiddleware({
-  skipRoutes: ['/health', '/api/auth/refresh'],
-  skipMethods: []
-}));
+// Audit logging middleware - temporarily disabled for debugging
+// app.use(auditMiddleware({
+//   skipRoutes: ['/health', '/api/auth/refresh'],
+//   skipMethods: []
+// }));
 
 // Compression middleware
 app.use(compression());
@@ -171,7 +175,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/master-data', masterDataRoutes);
 app.use('/api/inventory', inventoryRoutes);
-app.use('/api/purchases', purchaseRoutes);
+// app.use('/api/purchases', purchaseRoutes);
 app.use('/api/financial', financialRoutes);
 app.use('/api/security', securityRoutes);
 

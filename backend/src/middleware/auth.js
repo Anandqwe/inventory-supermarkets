@@ -101,7 +101,7 @@ const requireAdmin = (req, res, next) => {
     return ResponseUtils.unauthorized(res, 'Authentication required');
   }
 
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'Admin') {
     return ResponseUtils.forbidden(res, 'Admin access required');
   }
 
@@ -116,7 +116,7 @@ const requireManager = (req, res, next) => {
     return ResponseUtils.unauthorized(res, 'Authentication required');
   }
 
-  if (!['admin', 'manager'].includes(req.user.role)) {
+  if (!['Admin', 'Manager'].includes(req.user.role)) {
     return ResponseUtils.forbidden(res, 'Manager or admin access required');
   }
 
@@ -311,10 +311,10 @@ const authMiddleware = {
   auth: authenticateToken,
   
   // Role-based access
-  adminOnly: [authenticateToken, requireRole(['admin'])],
-  adminOrManager: [authenticateToken, requireRole(['admin', 'manager'])],
-  staffOnly: [authenticateToken, requireRole(['admin', 'manager', 'cashier'])],
-  allRoles: [authenticateToken, requireRole(['admin', 'manager', 'cashier', 'viewer'])],
+  adminOnly: [authenticateToken, requireRole(['Admin'])],
+  adminOrManager: [authenticateToken, requireRole(['Admin', 'Manager'])],
+  staffOnly: [authenticateToken, requireRole(['Admin', 'Manager', 'Cashier'])],
+  allRoles: [authenticateToken, requireRole(['Admin', 'Manager', 'Cashier', 'Viewer'])],
   
   // Permission-based access
   canManageUsers: [authenticateToken, requirePermission(['manage_users'])],
@@ -329,6 +329,8 @@ const authMiddleware = {
 
 module.exports = {
   authenticateToken,
+  requireAdmin,
+  requireManager,
   requireRole,
   requirePermission,
   authMiddleware

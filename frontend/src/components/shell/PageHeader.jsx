@@ -7,30 +7,40 @@ const PageHeader = ({
   subtitle, 
   children, 
   showBreadcrumbs = true,
-  className 
+  breadcrumbs,
+  className,
+  action,
+  tabs
 }) => {
   return (
-    <div className={cn("border-b border-surface-200 dark:border-surface-700 pb-2 mb-3", className)}>
-      {showBreadcrumbs && <Breadcrumbs />}
+    <div className={cn("border-b border-slate-200 dark:border-slate-700 pb-4 mb-6", className)}>
+      {showBreadcrumbs && <Breadcrumbs items={breadcrumbs} />}
       
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-bold leading-7 text-surface-900 dark:text-surface-100 sm:truncate sm:text-3xl sm:tracking-tight">
+          <h1 className="text-2xl font-bold leading-7 text-slate-900 dark:text-slate-100 sm:truncate sm:text-3xl sm:tracking-tight">
             {title}
           </h1>
           {subtitle && (
-            <p className="mt-1 text-sm text-surface-500 dark:text-surface-400">
+            <div className="mt-1 text-sm text-slate-500 dark:text-slate-400 max-w-2xl">
               {subtitle}
-            </p>
+            </div>
           )}
         </div>
         
-        {children && (
-          <div className="mt-4 flex sm:ml-4 sm:mt-0">
+        {(children || action) && (
+          <div className="flex flex-col sm:flex-row gap-2 sm:ml-4">
+            {action}
             {children}
           </div>
         )}
       </div>
+      
+      {tabs && (
+        <div className="mt-4">
+          {tabs}
+        </div>
+      )}
     </div>
   );
 };

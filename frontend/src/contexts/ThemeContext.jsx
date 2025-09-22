@@ -34,11 +34,13 @@ export const ThemeProvider = ({ children }) => {
   useEffect(() => {
     const root = document.documentElement;
     
-    // Remove previous theme classes
+    // Remove previous theme classes and attributes
     root.classList.remove('light', 'dark');
+    root.removeAttribute('data-theme');
     
-    // Add current theme class
+    // Add current theme class and data attribute
     root.classList.add(theme);
+    root.setAttribute('data-theme', theme);
     
     // Save to localStorage
     localStorage.setItem('theme', theme);

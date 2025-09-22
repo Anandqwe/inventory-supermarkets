@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { 
   CubeIcon, 
   ShoppingCartIcon, 
@@ -7,13 +8,31 @@ import {
   CurrencyRupeeIcon,
   PlusIcon,
   DocumentTextIcon,
-  ArrowRightIcon
+  ArrowRightIcon,
+  ClockIcon,
+  UsersIcon,
+  TruckIcon,
+  ChartBarIcon,
+  CalendarDaysIcon,
+  FunnelIcon,
+  ArrowDownIcon,
+  ArrowUpIcon,
+  ArrowPathIcon
 } from '@heroicons/react/24/outline';
 import { toast } from 'react-toastify';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../components/shell';
-import { StatCard, Card, Button, EmptyState, Skeleton } from '../components/ui';
+import { LoadingSpinner } from '../components/LoadingSpinner';
+import { 
+  StatCard, 
+  Card, 
+  Button, 
+  EmptyState, 
+  Badge,
+  Input,
+  SkeletonDashboard
+} from '../components/ui';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -25,8 +44,10 @@ import {
   ArcElement,
   LineElement,
   PointElement,
+  Filler,
 } from 'chart.js';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
+import { cn } from '../utils/cn';
 
 // Register Chart.js components
 ChartJS.register(
@@ -38,500 +59,699 @@ ChartJS.register(
   ArcElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  Filler
 );
 
 function Dashboard() {
-  const [dashboardData, setDashboardData] = useState(null);
-  const [loading, setLoading] = useState(true);
   const { token } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  
+  const [dateRange, setDateRange] = useState('7days');
+  const [refreshInterval, setRefreshInterval] = useState(30000); // 30 seconds
+  const [autoRefresh, setAutoRefresh] = useState(true);
 
-  // Fetch dashboard data
-  const fetchDashboardData = async () => {
-    try {
-      console.log('Fetching dashboard data with token:', token ? 'Token present' : 'No token');
-      console.log('Token value:', token);
-      
-      const response = await fetch('http://localhost:5000/api/dashboard/overview', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      console.log('Dashboard API response status:', response.status);
-      console.log('Dashboard API response headers:', response.headers);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Dashboard API error response:', errorText);
-        
-        // If unauthorized, show specific message
-        if (response.status === 401) {
-          toast.error('Please log in to view dashboard data');
-          return;
-        }
-        
-        throw new Error(`Failed to fetch dashboard data: ${response.status} ${response.statusText}`);
+  // API fetch functions with React Query
+  const fetchDashboardOverview = async () => {
+    const response = await fetch('http://localhost:5000/api/dashboard/overview', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
       }
+    });
 
-      const data = await response.json();
-      console.log('Dashboard data received:', data);
-      setDashboardData(data.data);
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-      toast.error(`Failed to load dashboard data: ${error.message}`);
-    } finally {
-      setLoading(false);
+    if (!response.ok) {
+      throw new Error('Failed to fetch dashboard data');
     }
+
+    return response.json();
   };
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, [token]);
+  const fetchSalesChartData = async (period) => {
+    const response = await fetch(`http://localhost:5000/api/dashboard/sales-chart?period=${period}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
 
-  if (loading) {
+    if (!response.ok) {
+      throw new Error('Failed to fetch sales chart data');
+    }
+
+    return response.json();
+  };
+
+  const fetchInventoryAnalytics = async () => {
+    const response = await fetch('http://localhost:5000/api/dashboard/inventory-analytics', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch inventory analytics');
+    }
+
+    return response.json();
+  };
+
+  // React Query hooks with real-time updates
+  const { 
+    data: dashboardData, 
+    isLoading: isDashboardLoading, 
+    error: dashboardError,
+    refetch: refetchDashboard,
+    isRefetching: isRefreshingDashboard
+  } = useQuery({
+    queryKey: ['dashboard-overview'],
+    queryFn: fetchDashboardOverview,
+    refetchInterval: autoRefresh ? refreshInterval : false,
+    staleTime: 25000,
+    retry: 3,
+  });
+
+  const { 
+    data: salesChartData, 
+    isLoading: isSalesChartLoading,
+    refetch: refetchSalesChart
+  } = useQuery({
+    queryKey: ['sales-chart', dateRange],
+    queryFn: () => fetchSalesChartData(dateRange),
+    refetchInterval: autoRefresh ? refreshInterval : false,
+    enabled: !!dashboardData,
+    retry: 2,
+  });
+
+  const { 
+    data: inventoryData, 
+    isLoading: isInventoryLoading,
+    refetch: refetchInventory
+  } = useQuery({
+    queryKey: ['inventory-analytics'],
+    queryFn: fetchInventoryAnalytics,
+    refetchInterval: autoRefresh ? refreshInterval * 2 : false, // Slower refresh for inventory
+    enabled: !!dashboardData,
+    retry: 2,
+  });
+
+  // Handle errors with user-friendly messages
+  useEffect(() => {
+    if (dashboardError) {
+      toast.error('Failed to load dashboard data. Please check your connection.');
+    }
+  }, [dashboardError]);
+
+  // Manual refresh all data
+  const handleRefreshAll = () => {
+    refetchDashboard();
+    refetchSalesChart();
+    refetchInventory();
+    toast.success('Dashboard refreshed');
+  };
+
+  // Loading state
+  if (isDashboardLoading) {
     return (
       <div className="space-y-6">
         <PageHeader 
-          title="Dashboard" 
-          subtitle="Welcome back! Here's what's happening at your store today." 
+          title="Executive Dashboard" 
+          subtitle="Real-time business insights and analytics"
         />
-        
-        {/* Loading skeleton for stats */}
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-24" />
-          ))}
-        </div>
-
-        {/* Loading skeleton for charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Skeleton className="h-80" />
-          <Skeleton className="h-80" />
-        </div>
+        <SkeletonDashboard />
       </div>
     );
   }
 
-  if (!dashboardData) {
+  // Error state
+  if (dashboardError || !dashboardData?.success) {
     return (
       <div className="space-y-6">
         <PageHeader 
-          title="Dashboard" 
-          subtitle="Welcome back! Here's what's happening at your store today." 
+          title="Executive Dashboard" 
+          subtitle="Real-time business insights and analytics"
         />
         <EmptyState
           icon={ExclamationTriangleIcon}
           title="Failed to load dashboard data"
           description="We couldn't fetch your dashboard information. Please try again."
           action={
-            <Button onClick={fetchDashboardData} variant="primary">
-              Retry
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={refetchDashboard} variant="primary">
+                Retry
+              </Button>
+              <Button onClick={() => window.location.reload()} variant="outline">
+                Refresh Page
+              </Button>
+            </div>
           }
         />
       </div>
     );
   }
 
-  const stats = [
-    { 
-      title: 'Total Products', 
-      value: dashboardData.totalProducts, 
-      icon: CubeIcon, 
-      trend: '+4.75%', 
+  const data = dashboardData.data;
+
+  // Enhanced KPI stats with trends and comparisons
+  const kpiStats = [
+    {
+      title: 'Total Revenue',
+      value: `₹${(data.kpis.totalRevenue || 0).toLocaleString('en-IN')}`,
+      icon: CurrencyRupeeIcon,
+      trend: '+15.3%',
       trendType: 'increase',
-      onClick: () => navigate('/products')
+      comparison: 'vs last month',
+      description: 'Monthly revenue performance',
+      onClick: () => navigate('/reports'),
+      color: 'emerald'
     },
-    { 
-      title: 'Low Stock Items', 
-      value: dashboardData.lowStockItems.length, 
-      icon: ExclamationTriangleIcon, 
-      trend: dashboardData.lowStockItems.length > 0 ? 'Action needed' : 'All good', 
-      trendType: dashboardData.lowStockItems.length > 0 ? 'decrease' : 'increase',
-      onClick: () => navigate('/products')
+    {
+      title: 'Today\'s Sales',
+      value: `₹${(data.kpis.todaySales?.amount || 0).toLocaleString('en-IN')}`,
+      icon: ShoppingCartIcon,
+      trend: `${data.kpis.todaySales?.count || 0} transactions`,
+      trendType: 'neutral',
+      comparison: 'today',
+      description: 'Daily sales activity',
+      onClick: () => navigate('/sales'),
+      color: 'blue'
     },
-    { 
-      title: 'Today\'s Sales', 
-      value: `₹${dashboardData.todaySales.toLocaleString('en-IN')}`, 
-      icon: ShoppingCartIcon, 
-      trend: '+12.02%', 
+    {
+      title: 'Products in Stock',
+      value: (data.kpis.totalProducts || 0).toLocaleString(),
+      icon: CubeIcon,
+      trend: data.kpis.lowStockCount > 0 ? `${data.kpis.lowStockCount} low stock` : 'All good',
+      trendType: data.kpis.lowStockCount > 0 ? 'warning' : 'increase',
+      comparison: 'active products',
+      description: 'Inventory status overview',
+      onClick: () => navigate('/products'),
+      color: 'purple'
+    },
+    {
+      title: 'Average Order Value',
+      value: `₹${Math.round(data.kpis.last7Days?.averageOrderValue || 0).toLocaleString('en-IN')}`,
+      icon: ArrowTrendingUpIcon,
+      trend: '+8.2%',
       trendType: 'increase',
-      onClick: () => navigate('/sales')
+      comparison: 'vs last week',
+      description: 'Per transaction average',
+      onClick: () => navigate('/reports'),
+      color: 'amber'
     },
-    { 
-      title: 'Total Revenue', 
-      value: `₹${dashboardData.totalRevenue.toLocaleString('en-IN')}`, 
-      icon: CurrencyRupeeIcon, 
-      trend: '+8.4%', 
-      trendType: 'increase',
-      onClick: () => navigate('/reports')
+    {
+      title: '7-Day Revenue',
+      value: `₹${(data.kpis.last7Days?.revenue || 0).toLocaleString('en-IN')}`,
+      icon: CalendarDaysIcon,
+      trend: `${data.kpis.last7Days?.sales || 0} sales`,
+      trendType: 'neutral',
+      comparison: 'last 7 days',
+      description: 'Weekly performance',
+      onClick: () => navigate('/reports'),
+      color: 'cyan'
     },
+    {
+      title: 'Active Alerts',
+      value: ((data.alerts?.lowStockItems?.length || 0) + (data.alerts?.pendingOrders || 0)).toString(),
+      icon: ExclamationTriangleIcon,
+      trend: (data.alerts?.lowStockItems?.length || 0) > 0 ? 'Needs attention' : 'All clear',
+      trendType: (data.alerts?.lowStockItems?.length || 0) > 0 ? 'decrease' : 'increase',
+      comparison: 'system alerts',
+      description: 'Operations monitoring',
+      onClick: () => navigate('/products'),
+      color: (data.alerts?.lowStockItems?.length || 0) > 0 ? 'red' : 'green'
+    }
   ];
 
-  // Chart data for sales trend (last 7 days)
-  const salesChartData = {
-    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-    datasets: [
-      {
-        label: 'Daily Sales (₹)',
-        data: [12000, 19000, 3000, 5000, 22000, 30000, 25000], // This would come from API
-        borderColor: '#3b82f6', // blue-500
-        backgroundColor: 'rgba(59, 130, 246, 0.1)', // blue with opacity
-        tension: 0.4,
-        fill: true,
-      },
-    ],
-  };
-
-  // Chart data for top categories
-  const categoryChartData = {
-    labels: dashboardData.topCategories.map(cat => cat._id),
-    datasets: [
-      {
-        data: dashboardData.topCategories.map(cat => cat.count),
-        backgroundColor: [
-          '#8b5cf6', // violet-500
-          '#10b981', // emerald-500
-          '#f59e0b', // amber-500
-          '#ef4444', // red-500
-          '#06b6d4', // cyan-500
-        ],
-        borderWidth: 0,
-      },
-    ],
-  };
-
-  // Chart options
-  const chartOptions = {
+  // Chart configurations with professional styling
+  const salesChartOptions = {
     responsive: true,
     maintainAspectRatio: false,
-    interaction: {
-      intersect: false,
-    },
     plugins: {
       legend: {
         position: 'top',
         labels: {
           usePointStyle: true,
           padding: 20,
-          color: '#a1a1aa', // zinc-400
+          font: { size: 12 }
         },
       },
       tooltip: {
-        backgroundColor: 'rgba(24, 24, 27, 0.9)',
-        titleColor: '#ffffff',
-        bodyColor: '#ffffff',
-        borderColor: '#3f3f46', // zinc-700
+        mode: 'index',
+        intersect: false,
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        titleColor: '#fff',
+        bodyColor: '#fff',
+        borderColor: '#374151',
         borderWidth: 1,
       },
     },
     scales: {
       x: {
-        grid: {
-          color: '#27272a', // zinc-800
-        },
-        ticks: {
-          color: '#a1a1aa', // zinc-400
-        },
+        grid: { display: false },
+        ticks: { font: { size: 11 } }
       },
       y: {
-        grid: {
-          color: '#27272a', // zinc-800
-        },
-        ticks: {
-          color: '#a1a1aa', // zinc-400
-          callback: function(value) {
-            return '₹' + value.toLocaleString();
-          },
-        },
+        beginAtZero: true,
+        grid: { color: 'rgba(156, 163, 175, 0.1)' },
+        ticks: { 
+          font: { size: 11 },
+          callback: (value) => `₹${value.toLocaleString()}`
+        }
       },
+    },
+    interaction: {
+      mode: 'nearest',
+      axis: 'x',
+      intersect: false,
     },
   };
 
-  const doughnutOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'bottom',
-        labels: {
-          usePointStyle: true,
-          padding: 15,
-          color: '#a1a1aa', // zinc-400
+  // Generate chart data from API response
+  const generateSalesChartData = (chartData) => {
+    if (!chartData?.success) return null;
+    
+    const data = chartData.data.chartData || [];
+    
+    return {
+      labels: data.map(item => {
+        const date = new Date(item.date);
+        return dateRange === '7days' 
+          ? date.toLocaleDateString('en-US', { weekday: 'short' })
+          : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      }),
+      datasets: [
+        {
+          label: 'Revenue (₹)',
+          data: data.map(item => item.revenue),
+          borderColor: '#3B82F6',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          tension: 0.4,
+          fill: true,
+          pointRadius: 4,
+          pointHoverRadius: 6,
         },
-      },
-      tooltip: {
-        backgroundColor: 'rgba(24, 24, 27, 0.9)',
-        titleColor: '#ffffff',
-        bodyColor: '#ffffff',
-        borderColor: '#3f3f46', // zinc-700
-        borderWidth: 1,
-        callbacks: {
-          label: function(context) {
-            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-            const percentage = ((context.raw / total) * 100).toFixed(1);
-            return `${context.label}: ${context.raw} (${percentage}%)`;
-          },
+        {
+          label: 'Sales Count',
+          data: data.map(item => item.sales),
+          borderColor: '#10B981',
+          backgroundColor: 'rgba(16, 185, 129, 0.1)',
+          tension: 0.4,
+          fill: false,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          yAxisID: 'y1',
         },
-      },
-    },
+      ],
+    };
   };
+
+  // Category distribution chart from API data
+  const generateCategoryChartData = () => {
+    if (!data.charts?.topCategories) return null;
+    
+    return {
+      labels: data.charts.topCategories.map(cat => cat.categoryName || cat._id),
+      datasets: [
+        {
+          data: data.charts.topCategories.map(cat => cat.totalRevenue),
+          backgroundColor: [
+            '#8B5CF6', '#10B981', '#F59E0B', '#EF4444', '#06B6D4',
+            '#EC4899', '#84CC16', '#F97316', '#6366F1', '#14B8A6'
+          ],
+          borderWidth: 0,
+          hoverBorderWidth: 2,
+          hoverBorderColor: '#fff',
+        },
+      ],
+    };
+  };
+
+  // Top products data from recent sales
+  const getTopProducts = () => {
+    if (!data.alerts?.recentSales || data.alerts.recentSales.length === 0) return [];
+    
+    // Use top products from charts if available, otherwise use recent sales
+    if (data.charts?.topProducts) {
+      return data.charts.topProducts.map(product => ({
+        name: product.name,
+        quantity: product.totalQuantity,
+        revenue: product.totalRevenue
+      }));
+    }
+    
+    // Fallback: Aggregate product sales from recent sales
+    const productSales = {};
+    data.alerts.recentSales.forEach(sale => {
+      sale.items?.forEach(item => {
+        const productName = item.productName || item.product?.name || 'Unknown Product';
+        if (!productSales[productName]) {
+          productSales[productName] = { quantity: 0, revenue: 0 };
+        }
+        productSales[productName].quantity += item.quantity;
+        productSales[productName].revenue += (item.total || item.quantity * item.price);
+      });
+    });
+    
+    return Object.entries(productSales)
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
+  };
+
+  const chartData = generateSalesChartData(salesChartData);
+  const categoryData = generateCategoryChartData();
+  const topProducts = getTopProducts();
 
   return (
-    <div className="space-y-4" role="main" aria-label="Dashboard">
-      <PageHeader 
-        title="Dashboard" 
-        subtitle="Welcome back! Here's what's happening at your store today."
-        showBreadcrumbs={false}
-      />
+    <div className="space-y-6">
+      {/* Enhanced Header with Controls */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <PageHeader 
+          title="Executive Dashboard" 
+          subtitle={
+            <div className="flex items-center gap-2">
+              <span>Real-time business insights and analytics</span>
+              {isRefreshingDashboard && (
+                <div className="flex items-center gap-1 text-xs text-surface-600 dark:text-surface-400">
+                  <ArrowPathIcon className="h-3 w-3 animate-spin" />
+                  Updating...
+                </div>
+              )}
+            </div>
+          }
+        />
+        
+        <div className="flex items-center gap-3">
+          {/* Date Range Selector */}
+          <select
+            value={dateRange}
+            onChange={(e) => setDateRange(e.target.value)}
+            className="px-3 py-2 border border-surface-300 dark:border-surface-700 rounded-lg bg-white dark:bg-surface-800 text-sm"
+          >
+            <option value="7days">Last 7 Days</option>
+            <option value="30days">Last 30 Days</option>
+            <option value="90days">Last 90 Days</option>
+          </select>
+          
+          {/* Auto Refresh Toggle */}
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={autoRefresh}
+              onChange={(e) => setAutoRefresh(e.target.checked)}
+              className="rounded"
+            />
+            Auto-refresh
+          </label>
+          
+          {/* Manual Refresh */}
+          <Button
+            onClick={handleRefreshAll}
+            variant="outline"
+            size="sm"
+            disabled={isRefreshingDashboard}
+          >
+            <ArrowPathIcon className={cn("h-4 w-4", isRefreshingDashboard && "animate-spin")} />
+            Refresh
+          </Button>
+        </div>
+      </div>
 
-      {/* Stats Cards */}
-      <section aria-label="Key Statistics" className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => (
-          <StatCard
-            key={stat.title}
-            title={stat.title}
-            value={stat.value}
-            icon={stat.icon}
-            trend={stat.trend}
-            trendType={stat.trendType}
+      {/* Enhanced KPI Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        {kpiStats.map((stat, index) => (
+          <Card
+            key={index}
+            className={cn(
+              "p-4 cursor-pointer transition-all hover:shadow-lg hover:scale-105",
+              "border-l-4",
+              stat.color === 'emerald' && "border-l-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/50",
+              stat.color === 'blue' && "border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/50",
+              stat.color === 'purple' && "border-l-purple-500 bg-purple-50/50 dark:bg-purple-950/50",
+              stat.color === 'amber' && "border-l-amber-500 bg-amber-50/50 dark:bg-amber-950/50",
+              stat.color === 'cyan' && "border-l-cyan-500 bg-cyan-50/50 dark:bg-cyan-950/50",
+              stat.color === 'red' && "border-l-red-500 bg-red-50/50 dark:bg-red-950/50",
+              stat.color === 'green' && "border-l-green-500 bg-green-50/50 dark:bg-green-950/50"
+            )}
             onClick={stat.onClick}
-            role="button"
-            tabIndex={0}
-            aria-label={`${stat.title}: ${stat.value}. Trend: ${stat.trend}. Click to navigate.`}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                stat.onClick();
-              }
-            }}
-          />
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <stat.icon className="h-5 w-5 text-surface-600 dark:text-surface-400" />
+                  <span className="text-sm font-medium text-surface-900 dark:text-surface-100">
+                    {stat.title}
+                  </span>
+                </div>
+                
+                <div className="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-1">
+                  {stat.value}
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <Badge
+                    variant={
+                      stat.trendType === 'increase' ? 'success' :
+                      stat.trendType === 'decrease' ? 'destructive' :
+                      stat.trendType === 'warning' ? 'warning' : 'secondary'
+                    }
+                    className="text-xs"
+                  >
+                    {stat.trendType === 'increase' && <ArrowUpIcon className="h-3 w-3 mr-1" />}
+                    {stat.trendType === 'decrease' && <ArrowDownIcon className="h-3 w-3 mr-1" />}
+                    {stat.trend}
+                  </Badge>
+                </div>
+                
+                <div className="text-xs text-surface-500 dark:text-surface-400 mt-1">
+                  {stat.comparison}
+                </div>
+              </div>
+            </div>
+          </Card>
         ))}
-      </section>
+      </div>
 
-      {/* Charts Row */}
-      <section aria-label="Analytics Charts" className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Charts Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Sales Trend Chart */}
-        <Card className="p-6" role="img" aria-label="Sales trend chart showing last 7 days of sales data">
-          <h3 className="text-lg font-medium text-surface-900 dark:text-surface-100 mb-4">
-            Sales Trend (Last 7 Days)
-          </h3>
-          <div className="h-64" aria-hidden="true">
-            <Line data={salesChartData} options={chartOptions} />
-          </div>
-          <div className="sr-only">
-            Sales data for the last 7 days: Monday ₹12,000, Tuesday ₹19,000, Wednesday ₹3,000, Thursday ₹5,000, Friday ₹22,000, Saturday ₹30,000, Sunday ₹25,000
-          </div>
-        </Card>
-
-        {/* Top Categories Chart */}
-        <Card className="p-6" role="img" aria-label="Product categories distribution chart">
-          <h3 className="text-lg font-medium text-surface-900 dark:text-surface-100 mb-4">
-            Product Categories
-          </h3>
-          <div className="h-64" aria-hidden="true">
-            <Doughnut data={categoryChartData} options={doughnutOptions} />
-          </div>
-          <div className="sr-only">
-            Product categories distribution: {dashboardData.topCategories.map(cat => `${cat._id}: ${cat.count} products`).join(', ')}
-          </div>
-        </Card>
-      </section>
-
-      {/* Bottom Row */}
-      <section aria-label="Quick Actions and Alerts" className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Quick Actions */}
-        <Card>
-          <div className="p-6">
-            <h3 className="text-lg font-medium text-surface-900 dark:text-surface-100 mb-4">
-              Quick Actions
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100">
+              Sales Trend
             </h3>
-            <nav aria-label="Quick navigation actions" className="space-y-3">
-              <Button 
-                variant="outline" 
-                size="lg"
-                className="w-full justify-start h-auto p-4"
-                onClick={() => navigate('/products')}
-                aria-label="Add new product to inventory"
-              >
-                <div className="flex items-center w-full">
-                  <PlusIcon className="h-5 w-5 mr-3" aria-hidden="true" />
-                  <div className="text-left">
-                    <div className="font-medium">Add New Product</div>
-                    <div className="text-sm text-surface-500 dark:text-surface-400 mt-1">
-                      Add a new item to inventory
-                    </div>
-                  </div>
-                  <ArrowRightIcon className="h-4 w-4 ml-auto text-surface-400" aria-hidden="true" />
-                </div>
-              </Button>
-
-              <Button 
-                variant="outline" 
-                size="lg"
-                className="w-full justify-start h-auto p-4"
-                onClick={() => navigate('/sales')}
-                aria-label="Record new sale transaction"
-              >
-                <div className="flex items-center w-full">
-                  <ShoppingCartIcon className="h-5 w-5 mr-3" aria-hidden="true" />
-                  <div className="text-left">
-                    <div className="font-medium">Record Sale</div>
-                    <div className="text-sm text-surface-500 dark:text-surface-400 mt-1">
-                      Process a new sale transaction
-                    </div>
-                  </div>
-                  <ArrowRightIcon className="h-4 w-4 ml-auto text-surface-400" aria-hidden="true" />
-                </div>
-              </Button>
-
-              <Button 
-                variant="outline" 
-                size="lg"
-                className="w-full justify-start h-auto p-4"
-                onClick={() => navigate('/reports')}
-                aria-label="Generate inventory or sales report"
-              >
-                <div className="flex items-center w-full">
-                  <DocumentTextIcon className="h-5 w-5 mr-3" aria-hidden="true" />
-                  <div className="text-left">
-                    <div className="font-medium">Generate Report</div>
-                    <div className="text-sm text-surface-500 dark:text-surface-400 mt-1">
-                      Create inventory or sales report
-                    </div>
-                  </div>
-                  <ArrowRightIcon className="h-4 w-4 ml-auto text-surface-400" aria-hidden="true" />
-                </div>
-              </Button>
-            </nav>
+            {isSalesChartLoading && (
+              <LoadingSpinner size="sm" />
+            )}
           </div>
-        </Card>
-
-        {/* Low Stock Alerts */}
-        <Card>
-          <div className="p-6">
-            <h3 className="text-lg font-medium text-surface-900 dark:text-surface-100 mb-4" id="low-stock-heading">
-              Low Stock Alert ({dashboardData.lowStockItems.length})
-            </h3>
-            {dashboardData.lowStockItems.length === 0 ? (
-              <EmptyState
-                icon={CubeIcon}
-                title="All stocked up!"
-                description="All products are well stocked."
-                variant="success"
-                role="status"
-                aria-label="No low stock items found"
-              />
+          
+          <div className="h-80">
+            {chartData ? (
+              <Line data={chartData} options={{
+                ...salesChartOptions,
+                scales: {
+                  ...salesChartOptions.scales,
+                  y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    grid: { drawOnChartArea: false },
+                    ticks: { 
+                      font: { size: 11 },
+                      callback: (value) => `${value}`
+                    }
+                  },
+                }
+              }} />
             ) : (
-              <div 
-                className="space-y-3 max-h-64 overflow-y-auto"
-                role="region"
-                aria-labelledby="low-stock-heading"
-                aria-live="polite"
-              >
-                {dashboardData.lowStockItems.slice(0, 5).map((item, index) => (
-                  <div 
-                    key={item._id} 
-                    className="flex items-center justify-between p-3 border border-danger-200 dark:border-danger-800 rounded-lg bg-danger-50 dark:bg-danger-950 hover:bg-danger-100 dark:hover:bg-danger-900 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-danger-500"
-                    onClick={() => navigate('/products')}
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`Low stock alert: ${item.name}. Only ${item.quantity} ${item.unit} left. Reorder level: ${item.reorderLevel || 10}. Click to manage inventory.`}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        navigate('/products');
-                      }
-                    }}
-                  >
-                    <div>
-                      <div className="font-medium text-danger-900 dark:text-danger-100">
-                        {item.name}
-                      </div>
-                      <div className="text-sm text-danger-600 dark:text-danger-400">
-                        Only {item.quantity} {item.unit} left (Reorder at: {item.reorderLevel || 10})
-                      </div>
-                    </div>
-                    <ExclamationTriangleIcon className="h-5 w-5 text-danger-500" aria-hidden="true" />
-                  </div>
-                ))}
-                {dashboardData.lowStockItems.length > 5 && (
-                  <Button 
-                    variant="ghost"
-                    className="w-full"
-                    onClick={() => navigate('/products')}
-                    aria-label={`View ${dashboardData.lowStockItems.length - 5} more low stock items`}
-                  >
-                    View {dashboardData.lowStockItems.length - 5} more items
-                  </Button>
-                )}
+              <div className="flex items-center justify-center h-full text-surface-500">
+                No sales data available
               </div>
             )}
           </div>
         </Card>
-      </section>
 
-      {/* Recent Sales Summary */}
-      <section aria-label="Recent Activity Summary">
-        <Card>
-          <div className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-medium text-surface-900 dark:text-surface-100">
-                Recent Activity
-              </h3>
-              <Button 
-                variant="ghost"
-                onClick={() => navigate('/sales')}
-                aria-label="View all sales transactions"
-              >
-                View All Sales
-                <ArrowRightIcon className="h-4 w-4 ml-2" aria-hidden="true" />
-              </Button>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6" role="group" aria-label="Activity metrics">
-              <div className="bg-primary-50 dark:bg-primary-950 p-4 rounded-lg border border-primary-200 dark:border-primary-800" role="status" aria-label={`Total sales: ${dashboardData.totalSales}`}>
-                <div className="flex items-center">
-                  <ShoppingCartIcon className="h-8 w-8 text-primary-600 dark:text-primary-400" aria-hidden="true" />
-                  <div className="ml-3">
-                    <div className="text-sm text-primary-600 dark:text-primary-400">Total Sales</div>
-                    <div className="text-xl font-bold text-primary-900 dark:text-primary-100">
-                      {dashboardData.totalSales}
-                    </div>
-                  </div>
-                </div>
+        {/* Category Distribution */}
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100">
+              Top Categories
+            </h3>
+          </div>
+          
+          <div className="h-80">
+            {categoryData ? (
+              <Doughnut 
+                data={categoryData} 
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: {
+                      position: 'right',
+                      labels: {
+                        usePointStyle: true,
+                        padding: 15,
+                        font: { size: 11 }
+                      },
+                    },
+                    tooltip: {
+                      callbacks: {
+                        label: (context) => {
+                          const value = context.parsed;
+                          return `${context.label}: ₹${value.toLocaleString()}`;
+                        }
+                      }
+                    }
+                  },
+                }}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full text-surface-500">
+                No category data available
               </div>
-              
-              <div className="bg-success-50 dark:bg-success-950 p-4 rounded-lg border border-success-200 dark:border-success-800" role="status" aria-label={`Today's revenue: ₹${dashboardData.todaySales.toLocaleString('en-IN')}`}>
-                <div className="flex items-center">
-                  <CurrencyRupeeIcon className="h-8 w-8 text-success-600 dark:text-success-400" aria-hidden="true" />
-                  <div className="ml-3">
-                    <div className="text-sm text-success-600 dark:text-success-400">Today's Revenue</div>
-                    <div className="text-xl font-bold text-success-900 dark:text-success-100">
-                      ₹{dashboardData.todaySales.toLocaleString('en-IN')}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-info-50 dark:bg-info-950 p-4 rounded-lg border border-info-200 dark:border-info-800" role="status" aria-label={`Average sale value: ₹${dashboardData.totalSales > 0 ? Math.round(dashboardData.totalRevenue / dashboardData.totalSales).toLocaleString('en-IN') : 0}`}>
-                <div className="flex items-center">
-                  <ArrowTrendingUpIcon className="h-8 w-8 text-info-600 dark:text-info-400" aria-hidden="true" />
-                  <div className="ml-3">
-                    <div className="text-sm text-info-600 dark:text-info-400">Avg. Sale Value</div>
-                    <div className="text-xl font-bold text-info-900 dark:text-info-100">
-                      ₹{dashboardData.totalSales > 0 ? Math.round(dashboardData.totalRevenue / dashboardData.totalSales).toLocaleString('en-IN') : 0}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         </Card>
-      </section>
+      </div>
+
+      {/* Activity Sections Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Sales Activity */}
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100">
+              Recent Sales
+            </h3>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => navigate('/sales')}
+            >
+              View All
+              <ArrowRightIcon className="h-4 w-4 ml-1" />
+            </Button>
+          </div>
+          
+          <div className="space-y-3">
+            {data.alerts?.recentSales?.slice(0, 5).map((sale, index) => (
+              <div key={sale._id || index} className="flex items-center justify-between p-3 bg-surface-50 dark:bg-surface-800 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-full">
+                    <ShoppingCartIcon className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <div className="font-medium text-surface-900 dark:text-surface-100">
+                      Sale #{sale.saleNumber || sale._id?.slice(-6)}
+                    </div>
+                    <div className="text-sm text-surface-500 dark:text-surface-400">
+                      {sale.customer?.name || 'Walk-in Customer'}
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="font-semibold text-surface-900 dark:text-surface-100">
+                    ₹{sale.total?.toLocaleString('en-IN')}
+                  </div>
+                  <div className="text-xs text-surface-500 dark:text-surface-400">
+                    {new Date(sale.createdAt).toLocaleDateString()}
+                  </div>
+                </div>
+              </div>
+            ))}
+            
+            {(!data.alerts?.recentSales || data.alerts.recentSales.length === 0) && (
+              <div className="text-center py-8 text-surface-500 dark:text-surface-400">
+                No recent sales found
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* Low Stock Alerts */}
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100">
+              Low Stock Alerts
+            </h3>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => navigate('/products')}
+            >
+              View All
+              <ArrowRightIcon className="h-4 w-4 ml-1" />
+            </Button>
+          </div>
+          
+          <div className="space-y-3">
+            {data.alerts?.lowStockItems?.slice(0, 5).map((product, index) => (
+              <div key={product._id || index} className="flex items-center justify-between p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-amber-100 dark:bg-amber-900 rounded-full">
+                    <ExclamationTriangleIcon className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <div>
+                    <div className="font-medium text-surface-900 dark:text-surface-100">
+                      {product.name}
+                    </div>
+                    <div className="text-sm text-surface-500 dark:text-surface-400">
+                      SKU: {product.sku || product.barcode}
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <Badge variant="warning" className="text-xs">
+                    {product.stock} left
+                  </Badge>
+                  <div className="text-xs text-surface-500 dark:text-surface-400 mt-1">
+                    Min: {product.minStockLevel || 10}
+                  </div>
+                </div>
+              </div>
+            ))}
+            
+            {(!data.alerts?.lowStockItems || data.alerts.lowStockItems.length === 0) && (
+              <div className="text-center py-8 text-green-600 dark:text-green-400">
+                <div className="p-3 bg-green-100 dark:bg-green-900 rounded-full inline-block mb-2">
+                  <CubeIcon className="h-6 w-6" />
+                </div>
+                <div>All products are well stocked!</div>
+              </div>
+            )}
+          </div>
+        </Card>
+      </div>
+
+      {/* Quick Actions */}
+      <Card className="p-6">
+        <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4">
+          Quick Actions
+        </h3>
+        
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
+          {[
+            { label: 'New Sale', icon: PlusIcon, action: () => navigate('/sales'), color: 'blue' },
+            { label: 'Add Product', icon: CubeIcon, action: () => navigate('/products'), color: 'green' },
+            { label: 'View Reports', icon: ChartBarIcon, action: () => navigate('/reports'), color: 'purple' },
+            { label: 'Stock Check', icon: TruckIcon, action: () => navigate('/products'), color: 'amber' },
+            { label: 'Sales History', icon: DocumentTextIcon, action: () => navigate('/sales'), color: 'cyan' },
+            { label: 'Analytics', icon: ChartBarIcon, action: () => navigate('/reports'), color: 'pink' },
+          ].map((action, index) => (
+            <Button
+              key={index}
+              variant="outline"
+              onClick={action.action}
+              className="flex flex-col items-center gap-2 h-20 hover:shadow-md transition-all"
+            >
+              <action.icon className="h-5 w-5" />
+              <span className="text-xs">{action.label}</span>
+            </Button>
+          ))}
+        </div>
+      </Card>
     </div>
   );
 }

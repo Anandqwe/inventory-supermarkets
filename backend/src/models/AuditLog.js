@@ -78,7 +78,8 @@ const auditLogSchema = new mongoose.Schema({
       
       // System actions
       'system_startup', 'system_shutdown', 'backup_create', 'data_import',
-      'data_export', 'config_change', 'security_event'
+      'data_export', 'config_change', 'security_event', 'system_error',
+      'post_unknown', 'get_unknown', 'put_unknown', 'delete_unknown'
     ]
   },
   
@@ -89,7 +90,7 @@ const auditLogSchema = new mongoose.Schema({
     enum: [
       'user', 'product', 'sale', 'inventory', 'purchase', 'invoice',
       'payment', 'category', 'brand', 'unit', 'supplier', 'branch',
-      'report', 'system', 'config'
+      'report', 'system', 'config', 'unknown'
     ]
   },
   

@@ -85,4 +85,52 @@ const StatusBadge = ({ status, ...props }) => {
 
 StatusBadge.displayName = "StatusBadge";
 
-export { Badge, StatusBadge, badgeVariants };
+// Notification Badge Component
+const NotificationBadge = ({ count, max = 99, ...props }) => {
+  const displayCount = count > max ? `${max}+` : count;
+  
+  return (
+    <Badge 
+      variant="destructive" 
+      className="h-5 min-w-5 justify-center rounded-full p-0 text-xs" 
+      {...props}
+    >
+      {displayCount}
+    </Badge>
+  );
+};
+
+NotificationBadge.displayName = "NotificationBadge";
+
+// Category Badge Component
+const CategoryBadge = ({ category, color, ...props }) => {
+  const getCategoryStyle = (category) => {
+    const categoryStyles = {
+      electronics: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
+      clothing: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300",
+      food: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
+      books: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300",
+      home: "bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300",
+      sports: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
+      toys: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
+      health: "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300",
+    };
+    
+    return categoryStyles[category?.toLowerCase()] || "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
+  };
+
+  return (
+    <Badge 
+      variant="outline" 
+      className={cn(getCategoryStyle(category), "border-transparent")}
+      style={color ? { backgroundColor: `${color}20`, color: color } : {}}
+      {...props}
+    >
+      {category}
+    </Badge>
+  );
+};
+
+CategoryBadge.displayName = "CategoryBadge";
+
+export { Badge, StatusBadge, NotificationBadge, CategoryBadge, badgeVariants };

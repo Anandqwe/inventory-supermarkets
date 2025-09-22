@@ -62,9 +62,9 @@ async function logAction(req, res, responseData, responseTime, options) {
     
     const auditData = {
       // User information
-      userId: user?.userId,
-      userEmail: user?.email,
-      userRole: user?.role,
+      userId: user?._id || user?.userId || 'system',
+      userEmail: user?.email || 'system@internal',
+      userRole: user?.role || 'system',
       
       // Branch information
       branchId: user?.branch?._id,

@@ -68,7 +68,7 @@
 const express = require('express');
 const { body } = require('express-validator');
 const AuthController = require('../controllers/authController');
-const { authenticateToken, requireAdmin, requireManager, checkPermission, requireRole } = require('../middleware/auth');
+const { authenticateToken, requireAdmin, requireManager, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -236,7 +236,7 @@ router.use(authenticateToken);
  *         description: User not found
  */
 router.get('/profile', 
-  checkPermission('profile:read'),
+  authenticateToken,
   AuthController.getProfile
 );
 
@@ -290,7 +290,7 @@ router.put('/profile', [
     .isMobilePhone()
     .withMessage('Please provide a valid phone number')
 ], 
-  checkPermission('profile:update'),
+  authenticateToken,
   AuthController.updateProfile
 );
 
@@ -339,7 +339,7 @@ router.post('/change-password', [
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
     .withMessage('New password must contain at least one uppercase letter, one lowercase letter, one number, and one special character')
 ], 
-  checkPermission('profile:update'),
+  authenticateToken,
   AuthController.changePassword
 );
 
@@ -378,7 +378,7 @@ router.post('/change-password', [
  *                       example: ["users:read", "products:create", "sales:read"]
  */
 router.get('/permissions', 
-  checkPermission('profile:read'),
+  authenticateToken,
   AuthController.getPermissions
 );
 
@@ -449,7 +449,7 @@ router.post('/logout', [
  *                   example: Logged out from all devices successfully
  */
 router.post('/logout-all', 
-  checkPermission('session:manage'),
+  authenticateToken,
   AuthController.logoutAll
 );
 
@@ -564,8 +564,7 @@ router.post('/register', [
     .isMobilePhone()
     .withMessage('Please provide a valid phone number')
 ], 
-  requireRole(['Admin', 'Manager']),
-  checkPermission('users:create'),
+  requireAdmin,
   AuthController.register
 );
 
@@ -640,7 +639,7 @@ router.post('/register', [
  */
 router.get('/users', 
   requireRole(['Admin', 'Manager']),
-  checkPermission('users:read'),
+  requireAdmin,
   AuthController.getAllUsers
 );
 
@@ -778,7 +777,7 @@ router.get('/users',
  */
 router.get('/users/:userId', 
   requireRole(['Admin', 'Manager']),
-  checkPermission('users:read'),
+  requireAdmin,
   AuthController.getUserById
 );
 
@@ -810,7 +809,7 @@ router.put('/users/:userId', [
     .withMessage('Please provide a valid phone number')
 ], 
   requireAdmin,
-  checkPermission('users:update'),
+  requireAdmin,
   AuthController.updateUser
 );
 
@@ -860,7 +859,7 @@ router.put('/users/:userId', [
  */
 router.patch('/users/:userId/toggle-status', 
   requireAdmin,
-  checkPermission('users:update'),
+  requireAdmin,
   AuthController.toggleUserStatus
 );
 
@@ -923,13 +922,13 @@ router.patch('/users/:userId/reset-password', [
     .withMessage('New password must contain at least one uppercase letter, one lowercase letter, one number, and one special character')
 ], 
   requireAdmin,
-  checkPermission('users:update'),
+  requireAdmin,
   AuthController.resetUserPassword
 );
 
 router.delete('/users/:userId', 
   requireAdmin,
-  checkPermission('users:delete'),
+  requireAdmin,
   AuthController.deleteUser
 );
 
@@ -984,7 +983,7 @@ router.delete('/users/:userId',
  */
 router.get('/roles-permissions', 
   requireRole(['Admin', 'Manager']),
-  checkPermission('roles:read'),
+  requireAdmin,
   AuthController.getRolesAndPermissions
 );
 
@@ -1050,7 +1049,7 @@ router.patch('/users/:userId/permissions', [
     .withMessage('Each permission must be a string')
 ], 
   requireAdmin,
-  checkPermission('permissions:update'),
+  requireAdmin,
   AuthController.updateUserPermissions
 );
 
@@ -1153,7 +1152,7 @@ router.patch('/users/:userId/permissions', [
  */
 router.get('/activity-logs', 
   requireAdmin,
-  checkPermission('audit:read'),
+  requireAdmin,
   AuthController.getActivityLogs
 );
 
@@ -1232,7 +1231,7 @@ router.get('/activity-logs',
  */
 router.get('/users/:userId/login-history', 
   requireRole(['Admin', 'Manager']),
-  checkPermission('audit:read'),
+  requireAdmin,
   AuthController.getUserLoginHistory
 );
 
@@ -1273,7 +1272,7 @@ router.get('/users/:userId/login-history',
  */
 router.post('/users/:userId/force-logout', 
   requireAdmin,
-  checkPermission('session:manage'),
+  authenticateToken,
   AuthController.forceUserLogout
 );
 

@@ -58,10 +58,12 @@ const performanceMonitor = (req, res, next) => {
     });
     
     // Add performance headers
-    res.set({
-      'X-Response-Time': `${responseTime.toFixed(2)}ms`,
-      'X-Memory-Usage': `${(endMemory.heapUsed / 1024 / 1024).toFixed(2)}MB`
-    });
+    if (!res.headersSent) {
+      res.set({
+        'X-Response-Time': `${responseTime.toFixed(2)}ms`,
+        'X-Memory-Usage': `${(endMemory.heapUsed / 1024 / 1024).toFixed(2)}MB`
+      });
+    }
     
     originalEnd.apply(this, args);
   };

@@ -7,6 +7,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const User = require('../src/models/User');
 const Product = require('../src/models/Product');
+const Branch = require('../src/models/Branch');
 
 // Sample data
 const sampleProducts = [
@@ -210,13 +211,36 @@ const seedDatabase = async () => {
       password: 'Admin@123456', // The pre-save hook will hash this
       firstName: 'System',
       lastName: 'Administrator',
-      role: 'admin',
+      role: 'Admin',
       phone: '9999999999',
       isActive: true
     });
     
     await adminUser.save();
     console.log('✅ Admin user created:', adminUser.email);
+    
+    // Create main branch
+    console.log('🏢 Creating main branch...');
+    const mainBranch = new Branch({
+      name: 'Main Store',
+      code: 'MAIN01',
+      address: {
+        street: '123 Main Street',
+        city: 'Mumbai',
+        state: 'Maharashtra',
+        zipCode: '400001',
+        country: 'India'
+      },
+      contact: {
+        phone: '022-12345678',
+        email: 'main@supermarket.com'
+      },
+      isActive: true,
+      createdBy: adminUser._id
+    });
+    
+    await mainBranch.save();
+    console.log('✅ Main branch created:', mainBranch.name);
     
     // Create manager user
     console.log('👤 Creating manager user...');
@@ -225,7 +249,8 @@ const seedDatabase = async () => {
       password: 'Manager@123456', // The pre-save hook will hash this
       firstName: 'Store',
       lastName: 'Manager',
-      role: 'manager',
+      role: 'Manager',
+      branch: mainBranch._id,
       phone: '9999999998',
       isActive: true,
       createdBy: adminUser._id
@@ -241,7 +266,8 @@ const seedDatabase = async () => {
       password: 'Cashier@123456', // The pre-save hook will hash this
       firstName: 'Store',
       lastName: 'Cashier',
-      role: 'cashier',
+      role: 'Cashier',
+      branch: mainBranch._id,
       phone: '9999999997',
       isActive: true,
       createdBy: adminUser._id

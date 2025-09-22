@@ -39,11 +39,11 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       const response = await authAPI.login(email, password);
-      const { token: newToken, user: userData } = response.data.data;
+      const { accessToken, user: userData } = response.data.data;
       
-      setToken(newToken);
+      setToken(accessToken);
       setUser(userData);
-      localStorage.setItem('token', newToken);
+      localStorage.setItem('token', accessToken);
       localStorage.setItem('user', JSON.stringify(userData));
       
       return { success: true };

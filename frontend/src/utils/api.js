@@ -120,6 +120,95 @@ export const salesAPI = {
   }
 };
 
+// Inventory API
+export const inventoryAPI = {
+  getAdjustments: async (params = {}) => {
+    const response = await api.get('/inventory/adjustments', { params });
+    return response.data;
+  },
+
+  createAdjustment: async (data) => {
+    const response = await api.post('/inventory/adjustments', data);
+    return response.data;
+  },
+
+  getTransfers: async (params = {}) => {
+    const response = await api.get('/inventory/transfers', { params });
+    return response.data;
+  },
+
+  createTransfer: async (data) => {
+    const response = await api.post('/inventory/transfers', data);
+    return response.data;
+  },
+
+  getLowStockAlerts: async () => {
+    const response = await api.get('/inventory/low-stock');
+    return response.data;
+  },
+
+  getStockMovements: async (params = {}) => {
+    const response = await api.get('/inventory/stock-movements', { params });
+    return response.data;
+  },
+
+  getReorderSuggestions: async () => {
+    const response = await api.get('/purchases/reorder-suggestions');
+    return response.data;
+  }
+};
+
+// Purchase Orders API
+export const purchaseAPI = {
+  getOrders: async (params = {}) => {
+    const response = await api.get('/purchases/orders', { params });
+    return response.data;
+  },
+
+  createOrder: async (data) => {
+    const response = await api.post('/purchases/orders', data);
+    return response.data;
+  },
+
+  getOrderById: async (id) => {
+    const response = await api.get(`/purchases/orders/${id}`);
+    return response.data;
+  },
+
+  updateOrderStatus: async (id, status) => {
+    const response = await api.put(`/purchases/orders/${id}/status`, { status });
+    return response.data;
+  }
+};
+
+// Master Data API
+export const masterDataAPI = {
+  getSuppliers: async () => {
+    const response = await api.get('/master-data/suppliers');
+    return response.data;
+  },
+
+  getBranches: async () => {
+    const response = await api.get('/master-data/branches');
+    return response.data;
+  },
+
+  getCategories: async () => {
+    const response = await api.get('/master-data/categories');
+    return response.data;
+  },
+
+  getBrands: async () => {
+    const response = await api.get('/master-data/brands');
+    return response.data;
+  },
+
+  getUnits: async () => {
+    const response = await api.get('/master-data/units');
+    return response.data;
+  }
+};
+
 // Dashboard API
 export const dashboardAPI = {
   getSummary: async () => {

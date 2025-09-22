@@ -7,7 +7,9 @@ import {
   ChartBarIcon,
   ExclamationTriangleIcon,
   XMarkIcon,
-  ArrowRightOnRectangleIcon
+  ArrowRightOnRectangleIcon,
+  ArchiveBoxIcon,
+  Cog6ToothIcon
 } from '@heroicons/react/24/outline';
 import { Badge } from '../ui/Badge';
 import { cn } from '../../utils/cn';
@@ -32,10 +34,22 @@ const navigation = [
     description: 'Record transactions'
   },
   { 
+    name: 'Inventory', 
+    href: '/inventory', 
+    icon: ArchiveBoxIcon,
+    description: 'Stock operations'
+  },
+  { 
     name: 'Reports', 
     href: '/reports', 
     icon: ChartBarIcon,
     description: 'Business insights'
+  },
+  { 
+    name: 'Settings', 
+    href: '/settings', 
+    icon: Cog6ToothIcon,
+    description: 'System configuration'
   },
 ];
 
@@ -53,18 +67,17 @@ const Sidebar = ({ isOpen, onClose, lowStockCount = 0, onLogout }) => {
 
       {/* Desktop sidebar - Fixed positioned */}
       <div className="hidden lg:block lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:w-64">
-        <div className="flex h-full flex-col bg-white dark:bg-[#09090b] border-r border-surface-200 dark:border-[#27272a]">
-          {/* Header */}
+        <div className="flex h-full flex-col bg-white dark:bg-[#000000] border-r border-surface-200 dark:border-zinc-800">{/* Header */}
           <div className="flex items-center flex-shrink-0 px-4 py-5">
             <div className="flex items-center">
               <div className="flex-shrink-0 h-8 w-8 bg-primary-600 rounded-lg flex items-center justify-center" aria-hidden="true">
                 <CubeIcon className="h-5 w-5 text-white" />
               </div>
               <div className="ml-3">
-                <h1 className="text-lg font-semibold text-surface-900 dark:text-surface-100">
+                <h1 className="text-lg font-semibold text-surface-900 dark:text-zinc-100">
                   Inventory
                 </h1>
-                <p className="text-xs text-surface-500 dark:text-surface-400">
+                <p className="text-xs text-surface-500 dark:text-zinc-400">
                   Management System
                 </p>
               </div>
@@ -89,8 +102,8 @@ const Sidebar = ({ isOpen, onClose, lowStockCount = 0, onLogout }) => {
                     cn(
                       "group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-all duration-200",
                       isActive
-                        ? "bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border-r-2 border-violet-600"
-                        : "text-surface-600 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-surface-700 hover:text-surface-900 dark:hover:text-surface-100"
+                        ? "bg-violet-50 dark:bg-violet-900/10 text-violet-700 dark:text-violet-300 border-r-2 border-violet-600"
+                        : "text-surface-600 dark:text-zinc-400 hover:bg-surface-50 dark:hover:bg-zinc-900/50 hover:text-surface-900 dark:hover:text-zinc-100"
                     )
                   }
                   aria-label={`Navigate to ${item.name}: ${item.description}`}
@@ -102,13 +115,13 @@ const Sidebar = ({ isOpen, onClose, lowStockCount = 0, onLogout }) => {
                           "mr-3 flex-shrink-0 h-5 w-5",
                           isActive 
                             ? "text-violet-600 dark:text-violet-400" 
-                            : "text-surface-400 dark:text-surface-500 group-hover:text-surface-500 dark:group-hover:text-surface-400"
+                            : "text-surface-400 dark:text-zinc-500 group-hover:text-surface-500 dark:group-hover:text-zinc-400"
                         )}
                         aria-hidden="true"
                       />
                       <div className="flex-1">
                         <div>{item.name}</div>
-                        <div className="text-xs text-surface-500 dark:text-surface-400 mt-0.5">
+                        <div className="text-xs text-surface-500 dark:text-zinc-400 mt-0.5">
                           {item.description}
                         </div>
                       </div>
@@ -154,13 +167,13 @@ const Sidebar = ({ isOpen, onClose, lowStockCount = 0, onLogout }) => {
             <div className="mx-2 mb-4">
               <button
                 onClick={onLogout}
-                className="w-full flex items-center px-2 py-2 text-sm font-medium rounded-md text-surface-600 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-surface-700 hover:text-surface-900 dark:hover:text-surface-100 transition-all duration-200"
+                className="w-full flex items-center px-2 py-2 text-sm font-medium rounded-md text-surface-600 dark:text-zinc-400 hover:bg-surface-50 dark:hover:bg-zinc-900/50 hover:text-surface-900 dark:hover:text-zinc-100 transition-all duration-200"
                 aria-label="Sign out of your account"
               >
                 <ArrowRightOnRectangleIcon className="mr-3 flex-shrink-0 h-5 w-5" aria-hidden="true" />
                 <div className="flex-1 text-left">
                   <div>Sign Out</div>
-                  <div className="text-xs text-surface-500 dark:text-surface-400 mt-0.5">
+                  <div className="text-xs text-surface-500 dark:text-zinc-400 mt-0.5">
                     Log out of your account
                   </div>
                 </div>
@@ -172,25 +185,25 @@ const Sidebar = ({ isOpen, onClose, lowStockCount = 0, onLogout }) => {
 
       {/* Mobile sidebar */}
       <div className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-[#09090b] shadow-lg transform transition-transform duration-300 ease-in-out lg:hidden",
+        "fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-[#000000] shadow-lg transform transition-transform duration-300 ease-in-out lg:hidden",
         isOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-surface-200 dark:border-gray-800">
+          <div className="flex items-center justify-between p-4 border-b border-surface-200 dark:border-zinc-800">
             <div className="flex items-center">
               <div className="flex-shrink-0 h-8 w-8 bg-primary-600 rounded-lg flex items-center justify-center">
                 <CubeIcon className="h-5 w-5 text-white" />
               </div>
               <div className="ml-3">
-                <h1 className="text-lg font-semibold text-surface-900 dark:text-surface-100">
+                <h1 className="text-lg font-semibold text-surface-900 dark:text-zinc-100">
                   Inventory
                 </h1>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="p-1 rounded-md text-surface-400 hover:text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-700 transition-colors"
+              className="p-1 rounded-md text-surface-400 hover:text-surface-500 hover:bg-surface-100 dark:hover:bg-zinc-900/50 transition-colors"
               aria-label="Close sidebar"
             >
               <XMarkIcon className="h-6 w-6" />
@@ -211,8 +224,8 @@ const Sidebar = ({ isOpen, onClose, lowStockCount = 0, onLogout }) => {
                     cn(
                       "group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-all duration-200",
                       isActive
-                        ? "bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300"
-                        : "text-surface-600 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-surface-700 hover:text-surface-900 dark:hover:text-surface-100"
+                        ? "bg-violet-50 dark:bg-violet-900/10 text-violet-700 dark:text-violet-300"
+                        : "text-surface-600 dark:text-zinc-400 hover:bg-surface-50 dark:hover:bg-zinc-900/50 hover:text-surface-900 dark:hover:text-zinc-100"
                     )
                   }
                 >
@@ -223,12 +236,12 @@ const Sidebar = ({ isOpen, onClose, lowStockCount = 0, onLogout }) => {
                           "mr-3 flex-shrink-0 h-5 w-5",
                           isActive 
                             ? "text-violet-600 dark:text-violet-400" 
-                            : "text-surface-400 dark:text-surface-500 group-hover:text-surface-500 dark:group-hover:text-surface-400"
+                            : "text-surface-400 dark:text-zinc-500 group-hover:text-surface-500 dark:group-hover:text-zinc-400"
                         )}
                       />
                       <div className="flex-1">
                         <div>{item.name}</div>
-                        <div className="text-xs text-surface-500 dark:text-surface-400 mt-0.5">
+                        <div className="text-xs text-surface-500 dark:text-zinc-400 mt-0.5">
                           {item.description}
                         </div>
                       </div>

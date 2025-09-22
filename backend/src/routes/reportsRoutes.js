@@ -3,7 +3,7 @@
  */
 const express = require('express');
 const ReportsController = require('../controllers/reportsController');
-const { authenticateToken, checkPermission, requireRole } = require('../middleware/auth');
+const { authenticateToken, requireAdmin, requireManager, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -12,35 +12,33 @@ router.use(authenticateToken);
 
 // Basic Reports (All authenticated users can view their own data)
 router.get('/daily', 
-  checkPermission('reports:read'),
+  requireManager,
   ReportsController.getDailyReport
 );
 
 router.get('/sales', 
-  checkPermission('reports:read'),
+  requireManager,
   ReportsController.getSalesReport
 );
 
 router.get('/products', 
-  checkPermission('reports:read'),
+  requireManager,
   ReportsController.getProductReport
 );
 
 router.get('/inventory', 
-  checkPermission('reports:read'),
+  requireManager,
   ReportsController.getInventoryReport
 );
 
 // Advanced Analytics (Manager+ only)
 router.get('/profit-analysis', 
-  requireRole(['Admin', 'Manager']),
-  checkPermission('reports:analytics'),
+  requireManager,
   ReportsController.getProfitAnalysis
 );
 
 router.get('/customer-analysis', 
-  requireRole(['Admin', 'Manager']),
-  checkPermission('reports:analytics'),
+  requireManager,
   ReportsController.getCustomerAnalysis
 );
 

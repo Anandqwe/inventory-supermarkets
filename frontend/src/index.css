@@ -16,7 +16,7 @@
     padding: 0;
     height: 100%;
     line-height: var(--line-height-body, 1.5);
-    background-color: rgb(var(--color-bg-secondary, 248 250 252));
+    background-color: rgb(var(--color-bg-primary, 255 255 255));
     color: rgb(var(--color-text-primary, 15 23 42));
     transition: background-color 200ms, color 200ms;
   }
@@ -60,12 +60,49 @@
 
 /* AMOLED Dark Mode Enhancements */
 @layer utilities {
+  /* Ensure pure black background in dark mode */
   .dark body {
     background-color: #000000 !important;
   }
   
+  /* AMOLED optimized card backgrounds */
   .dark .bg-surface-card {
-    @apply bg-gray-900 border-gray-800;
+    background-color: #18181b !important; /* zinc-800 */
+    border-color: #27272a !important; /* zinc-700 */
+  }
+  
+  /* AMOLED navigation and sidebar backgrounds */
+  .dark .bg-surface-nav {
+    background-color: #09090b !important; /* zinc-900 */
+    border-color: #27272a !important; /* zinc-700 */
+  }
+  
+  /* AMOLED modal and elevated surfaces */
+  .dark .bg-surface-elevated {
+    background-color: #18181b !important; /* zinc-800 */
+    border-color: #3f3f46 !important; /* zinc-600 */
+  }
+  
+  /* AMOLED hover states */
+  .dark .hover\:bg-surface-hover:hover {
+    background-color: #27272a !important; /* zinc-700 */
+  }
+  
+  /* AMOLED focus states with subtle glow */
+  .dark .focus\:ring-amoled:focus {
+    box-shadow: 0 0 0 2px #000000, 0 0 0 4px rgba(124, 58, 237, 0.3) !important;
+  }
+  
+  /* AMOLED text shadows for better contrast */
+  .dark .text-shadow-amoled {
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  }
+  
+  /* AMOLED glass effect for certain components */
+  .dark .glass-amoled {
+    background: rgba(24, 24, 27, 0.8) !important;
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(63, 63, 70, 0.3);
   }
 }
 

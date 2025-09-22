@@ -1,5 +1,28 @@
 import React from 'react';
+import { cva } from 'class-variance-authority';
 import { cn } from '../../utils/cn';
+
+const tableVariants = cva(
+  "w-full caption-bottom text-sm",
+  {
+    variants: {
+      size: {
+        sm: "text-xs",
+        default: "text-sm",
+        lg: "text-base",
+      },
+      variant: {
+        default: "",
+        striped: "[&_tbody_tr:nth-child(odd)]:bg-surface-50 dark:[&_tbody_tr:nth-child(odd)]:bg-surface-800",
+        bordered: "border border-border",
+      },
+    },
+    defaultVariants: {
+      size: "default",
+      variant: "default",
+    },
+  }
+);
 
 const Table = React.forwardRef(({ className, ...props }, ref) => (
   <div className="relative w-full overflow-auto">
@@ -230,4 +253,5 @@ export {
   TableCell,
   TableCaption,
   DataTable,
+  tableVariants,
 };
