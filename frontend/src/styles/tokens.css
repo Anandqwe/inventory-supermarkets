@@ -239,58 +239,64 @@
   --section-gap: var(--spacing-12);
 }
 
-/* AMOLED Dark Mode Overrides - Pure Black Theme */
+/* PURE AMOLED Dark Mode Overrides - True Black Theme */
 [data-theme="dark"],
 [data-theme="dark"],
 .dark {
-  /* AMOLED Dark Mode Surface Colors - True Black Base */
+  /* AMOLED Dark Mode Surface Colors - Pure Black Base */
   --color-surface-50: 0 0 0;       /* Pure black */
-  --color-surface-100: 9 9 11;     /* zinc-900 - Very dark but with slight warmth */
-  --color-surface-200: 24 24 27;   /* zinc-800 */
-  --color-surface-300: 39 39 42;   /* zinc-700 */
-  --color-surface-400: 63 63 70;   /* zinc-600 */
-  --color-surface-500: 113 113 122; /* zinc-500 */
-  --color-surface-600: 161 161 170; /* zinc-400 */
-  --color-surface-700: 212 212 216; /* zinc-300 */
-  --color-surface-800: 244 244 245; /* zinc-100 */
-  --color-surface-900: 250 250 250; /* zinc-50 */
-  --color-surface-950: 255 255 255; /* white */
+  --color-surface-100: 10 10 10;   /* Very dark gray - almost black */
+  --color-surface-200: 18 18 18;   /* Dark gray */
+  --color-surface-300: 26 26 26;   /* Slightly lighter gray */
+  --color-surface-400: 38 38 38;   /* Medium dark gray */
+  --color-surface-500: 64 64 64;   /* Medium gray */
+  --color-surface-600: 115 115 115; /* Light gray */
+  --color-surface-700: 163 163 163; /* Lighter gray */
+  --color-surface-800: 212 212 212; /* Very light gray */
+  --color-surface-900: 245 245 245; /* Almost white */
+  --color-surface-950: 255 255 255; /* Pure white */
   
-  /* AMOLED Dark Mode Text Colors - High Contrast */
-  --color-text-primary: 250 250 250;    /* zinc-50 - Almost white for max contrast */
-  --color-text-secondary: 212 212 216;  /* zinc-300 - Light gray for secondary text */
-  --color-text-tertiary: 161 161 170;   /* zinc-400 - Medium gray */
-  --color-text-muted: 113 113 122;      /* zinc-500 - Muted text */
-  --color-text-placeholder: 82 82 91;   /* zinc-600 - Placeholder text */
-  --color-text-disabled: 63 63 70;      /* zinc-600 - Disabled text */
-  --color-text-inverse: 24 24 27;       /* zinc-800 - Dark text for light backgrounds */
+  /* AMOLED Dark Mode Text Colors - High Contrast on Pure Black */
+  --color-text-primary: 255 255 255;    /* Pure white for maximum contrast */
+  --color-text-secondary: 212 212 212;  /* Light gray for secondary text */
+  --color-text-tertiary: 163 163 163;   /* Medium gray */
+  --color-text-muted: 115 115 115;      /* Muted text */
+  --color-text-placeholder: 64 64 64;   /* Placeholder text */
+  --color-text-disabled: 38 38 38;      /* Disabled text */
+  --color-text-inverse: 0 0 0;          /* Black text for light backgrounds */
   
   /* AMOLED Dark Mode Background Colors - Pure Black Base */
   --color-bg-primary: 0 0 0;        /* Pure black - Main background */
-  --color-bg-secondary: 9 9 11;     /* zinc-900 - Subtle elevation */
-  --color-bg-tertiary: 24 24 27;    /* zinc-800 - Card backgrounds */
-  --color-bg-elevated: 24 24 27;    /* zinc-800 - Elevated surfaces like modals */
-  --color-bg-hover: 39 39 42;       /* zinc-700 - Hover states */
-  --color-bg-active: 63 63 70;      /* zinc-600 - Active/pressed states */
+  --color-bg-secondary: 10 10 10;   /* Very dark - Subtle elevation */
+  --color-bg-tertiary: 18 18 18;    /* Dark - Card backgrounds */
+  --color-bg-elevated: 26 26 26;    /* Darker gray - Elevated surfaces like modals */
+  --color-bg-hover: 38 38 38;       /* Medium dark - Hover states */
+  --color-bg-active: 64 64 64;      /* Medium gray - Active/pressed states */
   
-  /* AMOLED Dark Mode Border Colors - Subtle but visible */
-  --color-border-primary: 39 39 42;    /* zinc-700 - Primary borders */
-  --color-border-secondary: 63 63 70;  /* zinc-600 - Secondary borders */
-  --color-border-strong: 113 113 122; /* zinc-500 - Strong borders for emphasis */
+  /* AMOLED Dark Mode Border Colors - Minimal but visible on black */
+  --color-border-primary: 38 38 38;    /* Dark gray - Primary borders */
+  --color-border-secondary: 64 64 64;  /* Medium gray - Secondary borders */
+  --color-border-strong: 115 115 115;  /* Light gray - Strong borders for emphasis */
   
-  /* Enhanced AMOLED Shadows - Deeper and more dramatic */
-  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.8);
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.8);
-  --shadow-base: 0 1px 3px 0 rgb(0 0 0 / 0.9), 0 1px 2px -1px rgb(0 0 0 / 0.9);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.9), 0 2px 4px -2px rgb(0 0 0 / 0.9);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.9), 0 4px 6px -4px rgb(0 0 0 / 0.9);
-  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.9), 0 8px 10px -6px rgb(0 0 0 / 0.9);
-  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.95);
-  --shadow-inner: inset 0 2px 4px 0 rgb(0 0 0 / 0.8);
+  /* Primary color adjustments for AMOLED */
+  --color-primary: 147 51 234;         /* Brighter purple for better visibility on black */
+  --color-primary-hover: 168 85 247;   /* Even brighter on hover */
+  --color-primary-light: 196 181 253;  /* Light purple */
+  --color-primary-dark: 107 33 168;    /* Darker purple */
   
-  /* AMOLED specific enhancements */
-  --color-accent-glow: 124 58 237; /* violet-600 for subtle glows */
-  --color-surface-glow: rgb(124 58 237 / 0.05); /* Very subtle purple glow for elevated surfaces */
+  /* Enhanced AMOLED Shadows - Pure black shadows */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 1);
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 1);
+  --shadow-base: 0 1px 3px 0 rgb(0 0 0 / 1), 0 1px 2px -1px rgb(0 0 0 / 1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 1), 0 2px 4px -2px rgb(0 0 0 / 1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 1), 0 4px 6px -4px rgb(0 0 0 / 1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 1), 0 8px 10px -6px rgb(0 0 0 / 1);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 1);
+  --shadow-inner: inset 0 2px 4px 0 rgb(0 0 0 / 1);
+  
+  /* AMOLED specific enhancements - Pure theme */
+  --color-accent-glow: 147 51 234; /* Brighter purple for subtle glows */
+  --color-surface-glow: rgb(147 51 234 / 0.03); /* Very subtle purple glow for elevated surfaces */
 }
 
 /* Professional Base Styles */

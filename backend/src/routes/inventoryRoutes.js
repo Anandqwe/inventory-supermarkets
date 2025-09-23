@@ -73,4 +73,15 @@ router.get('/summary',
   InventoryController.getInventorySummary
 );
 
+/**
+ * @route   GET /api/inventory/low-stock
+ * @desc    Get low stock items
+ * @access  Private (Manager+ only)
+ */
+router.get('/low-stock',
+  authenticateToken,
+  requireManager,
+  InventoryController.getLowStockItems
+);
+
 module.exports = router;

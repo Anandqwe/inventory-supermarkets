@@ -5,13 +5,13 @@
     extend: {
       colors: {
         primary: { 
-          50: '#eef2ff', 
-          100: '#e0e7ff',
-          400: '#818cf8', 
-          500: '#6366f1', 
-          600: '#4f46e5', 
-          700: '#4338ca',
-          900: '#312e81'
+          50: '#f3f4ff', 
+          100: '#ede9fe',
+          400: '#a78bfa', 
+          500: '#8b5cf6', 
+          600: '#7c3aed', 
+          700: '#6d28d9',
+          900: '#4c1d95'
         },
         success: { 400: '#34d399', 600: '#059669' },
         danger: { 400: '#f87171', 600: '#dc2626' },
@@ -27,27 +27,38 @@
           700: '#334155', 
           800: '#1e293b', 
           900: '#0f172a',
-          // AMOLED Dark Mode Colors (zinc scale for warmth)
+          // AMOLED Pure Black Theme Colors
           950: '#000000',    // Pure black
-          975: '#09090b',    // zinc-900 - Very dark with slight warmth
-          980: '#18181b',    // zinc-800
-          985: '#27272a',    // zinc-700
-          990: '#3f3f46',    // zinc-600
+          960: '#0a0a0a',    // Very dark gray
+          970: '#121212',    // Dark gray for cards
+          980: '#1a1a1a',    // Darker gray for elevated surfaces
+          985: '#262626',    // Medium dark gray for borders
+          990: '#404040',    // Medium gray for stronger borders
         }
       },
       backgroundColor: {
         'amoled-black': '#000000',
-        'amoled-gray': '#09090b',
-        'amoled-card': '#18181b',
+        'amoled-dark': '#0a0a0a',
+        'amoled-card': '#121212',
+        'amoled-elevated': '#1a1a1a',
+        'amoled-hover': '#262626',
       },
       borderColor: {
-        'amoled-border': '#27272a',
-        'amoled-border-light': '#3f3f46',
+        'amoled-border': '#262626',
+        'amoled-border-light': '#404040',
+        'amoled-border-strong': '#737373',
       },
       textColor: {
-        'amoled-primary': '#fafafa',    // zinc-50
-        'amoled-secondary': '#d4d4d8',  // zinc-300
-        'amoled-muted': '#71717a',      // zinc-500
+        'amoled-primary': '#ffffff',    // Pure white
+        'amoled-secondary': '#d4d4d4',  // Light gray
+        'amoled-muted': '#a3a3a3',      // Medium gray
+        'amoled-disabled': '#404040',   // Dark gray
+      },
+      boxShadow: {
+        'amoled-sm': '0 1px 2px 0 rgb(0 0 0 / 1)',
+        'amoled-md': '0 4px 6px -1px rgb(0 0 0 / 1), 0 2px 4px -2px rgb(0 0 0 / 1)',
+        'amoled-lg': '0 10px 15px -3px rgb(0 0 0 / 1), 0 4px 6px -4px rgb(0 0 0 / 1)',
+        'amoled-xl': '0 20px 25px -5px rgb(0 0 0 / 1), 0 8px 10px -6px rgb(0 0 0 / 1)',
       }
     }
   },

@@ -47,7 +47,7 @@ const Modal = ({
               leaveTo="opacity-0 scale-95"
             >
               <Dialog.Panel className={cn(
-                "w-full transform overflow-hidden rounded-lg bg-white dark:bg-surface-800 p-6 text-left align-middle shadow-xl transition-all",
+                "w-full transform overflow-hidden rounded-lg bg-white dark:bg-amoled-card p-6 text-left align-middle shadow-xl dark:shadow-amoled-xl transition-all",
                 sizeClasses[size],
                 className
               )}>

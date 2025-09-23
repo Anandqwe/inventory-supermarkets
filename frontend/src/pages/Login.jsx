@@ -14,6 +14,7 @@ const Login = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const { login, isAuthenticated, loading: authLoading } = useAuth();
   const { theme } = useTheme();
   const navigate = useNavigate();
@@ -33,6 +34,7 @@ const Login = () => {
   }
 
   const handleChange = (e) => {
+    setError(''); // Clear error when user starts typing
     setFormData({
       ...formData,
       [e.target.name]: e.target.value
@@ -41,9 +43,12 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError(''); // Clear previous errors
     
     if (!formData.email || !formData.password) {
-      toast.error('Please fill in all fields');
+      const errorMsg = 'Please fill in all fields';
+      setError(errorMsg);
+      toast.error(errorMsg);
       return;
     }
 
@@ -56,10 +61,14 @@ const Login = () => {
         toast.success('Login successful!');
         navigate('/', { replace: true });
       } else {
-        toast.error(result.message);
+        const errorMsg = result.message || 'Invalid email or password';
+        setError(errorMsg);
+        toast.error(errorMsg);
       }
     } catch (error) {
-      toast.error('Login failed. Please try again.');
+      const errorMsg = error.message || 'Login failed. Please try again.';
+      setError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -110,6 +119,13 @@ const Login = () => {
 
           {/* Login form */}
           <Card className="p-8">
+            {/* Error Message */}
+            {error && (
+              <div className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+              </div>
+            )}
+            
             <form className="space-y-6" onSubmit={handleSubmit}>
               <div className="space-y-4">
                 <Input

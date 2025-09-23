@@ -457,9 +457,9 @@ function Sales() {
   ];
 
   return (
-    <div className="h-screen flex flex-col bg-surface-50 dark:bg-surface-900">
+    <div className="h-screen flex flex-col bg-white dark:bg-amoled-black">
       {/* Header */}
-      <div className="bg-white dark:bg-surface-800 border-b border-surface-200 dark:border-surface-700 px-6 py-4">
+      <div className="bg-white dark:bg-amoled-black border-b border-surface-200 dark:border-amoled-border px-6 py-4">
         <div className="flex items-center justify-between">
           <PageHeader 
             title="Point of Sale" 
@@ -513,7 +513,7 @@ function Sales() {
         {/* Products Panel */}
         <div className="flex-1 flex flex-col">
           {/* Search & Filters */}
-          <div className="bg-white dark:bg-surface-800 border-b border-surface-200 dark:border-surface-700 p-4">
+          <div className="bg-white dark:bg-amoled-black border-b border-surface-200 dark:border-amoled-border p-4">
             <div className="flex gap-4">
               {/* Product Search */}
               <div className="flex-1 relative">
@@ -547,7 +547,7 @@ function Sales() {
               <select
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                className="px-3 py-2 border border-surface-300 dark:border-surface-700 rounded-lg bg-white dark:bg-surface-800"
+                className="px-3 py-2 border border-surface-300 dark:border-amoled-border rounded-lg bg-white dark:bg-amoled-card text-slate-900 dark:text-amoled-primary"
               >
                 <option value="">All Categories</option>
                 {categories.map(category => (
@@ -570,10 +570,10 @@ function Sales() {
             {isLoadingProducts ? (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
                 {Array.from({ length: 12 }).map((_, i) => (
-                  <div key={i} className="bg-white dark:bg-surface-800 rounded-lg p-4 animate-pulse">
-                    <div className="bg-surface-200 dark:bg-surface-700 h-24 rounded mb-3"></div>
-                    <div className="bg-surface-200 dark:bg-surface-700 h-4 rounded mb-2"></div>
-                    <div className="bg-surface-200 dark:bg-surface-700 h-3 rounded w-2/3"></div>
+                  <div key={i} className="bg-white dark:bg-amoled-card rounded-lg p-4 animate-pulse">
+                    <div className="bg-surface-200 dark:bg-amoled-hover h-24 rounded mb-3"></div>
+                    <div className="bg-surface-200 dark:bg-amoled-hover h-4 rounded mb-2"></div>
+                    <div className="bg-surface-200 dark:bg-amoled-hover h-3 rounded w-2/3"></div>
                   </div>
                 ))}
               </div>
@@ -596,7 +596,7 @@ function Sales() {
                   >
                     <div className="p-4">
                       {/* Product Image */}
-                      <div className="h-24 bg-surface-100 dark:bg-surface-700 rounded-lg mb-3 flex items-center justify-center overflow-hidden">
+                      <div className="h-24 bg-surface-100 dark:bg-amoled-hover rounded-lg mb-3 flex items-center justify-center overflow-hidden">
                         {product.image ? (
                           <img 
                             src={product.image} 
@@ -643,7 +643,7 @@ function Sales() {
         </div>
 
         {/* Cart Panel */}
-        <div className="w-96 bg-white dark:bg-surface-800 border-l border-surface-200 dark:border-surface-700 flex flex-col">
+        <div className="w-96 bg-white dark:bg-amoled-black border-l border-surface-200 dark:border-amoled-border flex flex-col">
           {/* Cart Header */}
           <div className="p-4 border-b border-surface-200 dark:border-surface-700">
             <div className="flex items-center justify-between">
@@ -673,7 +673,7 @@ function Sales() {
             ) : (
               <div className="space-y-3">
                 {cart.map((item) => (
-                  <div key={item._id} className="bg-surface-50 dark:bg-surface-700 rounded-lg p-3">
+                  <div key={item._id} className="bg-surface-50 dark:bg-amoled-card rounded-lg p-3">
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1">
                         <h4 className="font-medium text-sm text-surface-900 dark:text-surface-100">
@@ -744,7 +744,7 @@ function Sales() {
                   <select
                     value={discount.type}
                     onChange={(e) => setDiscount(prev => ({ ...prev, type: e.target.value }))}
-                    className="px-2 py-1 text-xs border border-surface-300 dark:border-surface-700 rounded bg-white dark:bg-surface-800"
+                    className="px-2 py-1 text-xs border border-surface-300 dark:border-amoled-border rounded bg-white dark:bg-amoled-card text-slate-900 dark:text-amoled-primary"
                   >
                     <option value="percentage">%</option>
                     <option value="fixed">₹</option>
@@ -901,7 +901,7 @@ function Sales() {
             )}
 
             {/* Order Summary */}
-            <div className="bg-surface-50 dark:bg-surface-800 rounded-lg p-4">
+            <div className="bg-surface-50 dark:bg-amoled-card rounded-lg p-4">
               <h3 className="font-medium mb-3">Order Summary</h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">

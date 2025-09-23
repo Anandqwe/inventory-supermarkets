@@ -830,6 +830,99 @@ class InventoryController {
       });
     }
   }
+
+  /**
+   * Get low stock items
+   */
+  static async getLowStockItems(req, res) {
+    try {
+      const {
+        page = 1,
+        limit = 20,
+        branch,
+        category,
+        sortBy = 'stockQuantity',
+        sortOrder = 'asc'
+      } = req.query;
+
+      // Build filter for low stock items
+      const filter = {
+        isActive: true,
+        $expr: {
+          $lt: ['$stockQuantity', '$reorderLevel']
+        }
+      };
+
+      // Add category filter if specified
+      if (category) {
+        filter.category = category;
+      }
+
+      // Branch filter for RBAC
+      if (req.user.role !== 'admin' && req.user.branch) {
+        filter['branchStocks.branch'] = req.user.branch._id;
+      } else if (branch) {
+        filter['branchStocks.branch'] = branch;
+      }
+
+      // Build sort object
+      const sort = {};
+      sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
+      // Execute query with pagination
+      const [products, total] = await Promise.all([
+        Product.find(filter)
+          .populate('category', 'name')
+          .populate('brand', 'name')
+          .populate('unit', 'name abbreviation')
+          .populate('supplier', 'name contactInfo')
+          .sort(sort)
+          .limit(limit * 1)
+          .skip((page - 1) * limit)
+          .lean(),
+        Product.countDocuments(filter)
+      ]);
+
+      // Calculate additional metrics for each product
+      const lowStockItems = products.map(product => ({
+        ...product,
+        stockStatus: 'low',
+        reorderQuantity: Math.max(product.maxStockLevel - product.stockQuantity, 0),
+        stockValue: product.stockQuantity * product.costPrice,
+        urgency: product.stockQuantity === 0 ? 'critical' : 
+                 product.stockQuantity <= (product.reorderLevel * 0.5) ? 'high' : 'medium'
+      }));
+
+      res.json({
+        success: true,
+        message: 'Low stock items retrieved successfully',
+        data: {
+          products: lowStockItems,
+          pagination: {
+            currentPage: parseInt(page),
+            totalPages: Math.ceil(total / limit),
+            totalItems: total,
+            itemsPerPage: parseInt(limit),
+            hasNext: page < Math.ceil(total / limit),
+            hasPrev: page > 1
+          },
+          summary: {
+            totalLowStockItems: total,
+            criticalItems: lowStockItems.filter(item => item.urgency === 'critical').length,
+            highUrgencyItems: lowStockItems.filter(item => item.urgency === 'high').length
+          }
+        }
+      });
+
+    } catch (error) {
+      console.error('Error getting low stock items:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to get low stock items',
+        error: error.message
+      });
+    }
+  }
 }
 
 /**

@@ -853,7 +853,6 @@ class MasterDataController {
 
       const [suppliers, total] = await Promise.all([
         Supplier.find(filter)
-          .populate('categories', 'name code')
           .populate('createdBy', 'firstName lastName')
           .sort(sort)
           .skip(skip)

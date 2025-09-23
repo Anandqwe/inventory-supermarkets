@@ -18,8 +18,8 @@ export const ThemeProvider = ({ children }) => {
       return savedTheme;
     }
     
-    // Default to light theme instead of system preference
-    return 'light';
+    // Default to dark theme for AMOLED experience
+    return 'dark';
   });
 
   const toggleTheme = () => {

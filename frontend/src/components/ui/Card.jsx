@@ -3,7 +3,7 @@ import { cva } from 'class-variance-authority';
 import { cn } from '../../utils/cn';
 
 const cardVariants = cva(
-  "rounded-lg border bg-white dark:bg-[#09090b] shadow-sm border-surface-200 dark:border-[#27272a] transition-colors dark:text-gray-100",
+  "rounded-lg border bg-white dark:bg-amoled-card shadow-sm border-surface-200 dark:border-amoled-border transition-colors dark:text-amoled-primary",
   {
     variants: {
       padding: {
@@ -15,8 +15,8 @@ const cardVariants = cva(
       shadow: {
         none: "shadow-none",
         sm: "shadow-sm",
-        default: "shadow-md",
-        lg: "shadow-lg",
+        default: "shadow-md dark:shadow-amoled-md",
+        lg: "shadow-lg dark:shadow-amoled-lg",
       }
     },
     defaultVariants: {

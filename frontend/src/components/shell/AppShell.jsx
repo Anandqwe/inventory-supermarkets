@@ -10,7 +10,7 @@ const AppShell = ({ children, className }) => {
   const { user, logout } = useAuth();
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#000000]">
+    <div className="min-h-screen bg-white dark:bg-amoled-black">
       {/* Skip Links for accessibility */}
       <SkipLink href="#main-content" />
       <SkipLink href="#sidebar-navigation" className="focus:top-16">
@@ -48,9 +48,9 @@ const AppShell = ({ children, className }) => {
         </main>
         
         {/* Footer */}
-        <footer className="bg-white dark:bg-[#09090b] border-t border-slate-200 dark:border-zinc-800 mt-auto">
+        <footer className="bg-white dark:bg-amoled-dark border-t border-surface-200 dark:border-amoled-border mt-auto">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="flex flex-col sm:flex-row justify-between items-center text-sm text-slate-500 dark:text-zinc-400">
+            <div className="flex flex-col sm:flex-row justify-between items-center text-sm text-slate-500 dark:text-amoled-muted">
               <div className="flex items-center space-x-4">
                 <span>© 2024 Supermarket Inventory System</span>
                 <span>•</span>
@@ -59,14 +59,14 @@ const AppShell = ({ children, className }) => {
               <div className="flex items-center space-x-4 mt-2 sm:mt-0">
                 <a 
                   href="#" 
-                  className="hover:text-slate-700 dark:hover:text-zinc-200 transition-colors"
+                  className="hover:text-slate-700 dark:hover:text-amoled-secondary transition-colors"
                 >
                   Help
                 </a>
                 <span>•</span>
                 <a 
                   href="#" 
-                  className="hover:text-slate-700 dark:hover:text-zinc-200 transition-colors"
+                  className="hover:text-slate-700 dark:hover:text-amoled-secondary transition-colors"
                 >
                   Support
                 </a>
@@ -79,7 +79,7 @@ const AppShell = ({ children, className }) => {
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-40 lg:hidden"
+          className="fixed inset-0 bg-black bg-opacity-75 backdrop-blur-sm z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
           aria-hidden="true"
         />

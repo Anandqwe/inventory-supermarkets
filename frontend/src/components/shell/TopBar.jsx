@@ -34,7 +34,7 @@ const TopBar = ({ user, onMenuClick, onLogout }) => {
   };
 
   return (
-    <header className="bg-white dark:bg-[#000000] border-b border-slate-200 dark:border-zinc-800 h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8 flex-shrink-0 sticky top-0 z-40 backdrop-blur-sm bg-white/95 dark:bg-[#000000]/95">
+    <header className="bg-white dark:bg-amoled-black border-b border-slate-200 dark:border-amoled-border h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8 flex-shrink-0 sticky top-0 z-40 backdrop-blur-sm bg-white/95 dark:bg-amoled-black/95">
       {/* Left side - Mobile menu button and logo */}
       <div className="flex items-center">
         {/* Mobile menu button */}
@@ -51,12 +51,12 @@ const TopBar = ({ user, onMenuClick, onLogout }) => {
         {/* Logo and title */}
         <div className="flex items-center">
           <div className="flex-shrink-0 lg:hidden">
-            <h1 className="text-lg font-semibold text-slate-900 dark:text-zinc-100">
+            <h1 className="text-lg font-semibold text-slate-900 dark:text-amoled-primary">
               Inventory
             </h1>
           </div>
           <div className="hidden lg:block">
-            <h1 className="text-xl font-semibold text-slate-900 dark:text-zinc-100">
+            <h1 className="text-xl font-semibold text-slate-900 dark:text-amoled-primary">
               Supermarket Inventory System
             </h1>
           </div>
@@ -67,14 +67,14 @@ const TopBar = ({ user, onMenuClick, onLogout }) => {
       <div className="hidden md:block flex-1 max-w-lg mx-8">
         <form onSubmit={handleSearch} className="relative">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <MagnifyingGlassIcon className="h-5 w-5 text-slate-400 dark:text-zinc-500" />
+            <MagnifyingGlassIcon className="h-5 w-5 text-slate-400 dark:text-amoled-muted" />
           </div>
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search products, sales, customers..."
-            className="block w-full pl-10 pr-3 py-2 border border-slate-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 placeholder-slate-500 dark:placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all duration-200"
+            className="block w-full pl-10 pr-3 py-2 border border-slate-300 dark:border-amoled-border rounded-lg bg-white dark:bg-amoled-card text-slate-900 dark:text-amoled-primary placeholder-slate-500 dark:placeholder-amoled-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm transition-all duration-200"
           />
         </form>
       </div>
@@ -83,7 +83,7 @@ const TopBar = ({ user, onMenuClick, onLogout }) => {
       <div className="flex items-center space-x-1">
         {/* Notifications */}
         <Menu as="div" className="relative">
-          <Menu.Button className="relative p-2 text-slate-400 hover:text-slate-500 dark:text-zinc-500 dark:hover:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 rounded-lg transition-colors">
+          <Menu.Button className="relative p-2 text-slate-400 hover:text-slate-500 dark:text-amoled-muted dark:hover:text-amoled-secondary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 rounded-lg transition-colors">
             <span className="sr-only">View notifications</span>
             <BellIcon className="h-6 w-6" />
             {unreadCount > 0 && (
@@ -91,10 +91,10 @@ const TopBar = ({ user, onMenuClick, onLogout }) => {
             )}
           </Menu.Button>
 
-          <Menu.Items className="absolute right-0 z-50 mt-2 w-80 origin-top-right rounded-lg bg-white dark:bg-zinc-950 shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-zinc-700 focus:outline-none">
+          <Menu.Items className="absolute right-0 z-50 mt-2 w-80 origin-top-right rounded-lg bg-white dark:bg-amoled-card shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-amoled-border focus:outline-none">
             <div className="p-4">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium text-slate-900 dark:text-zinc-100">
+                <h3 className="text-sm font-medium text-slate-900 dark:text-amoled-primary">
                   Notifications
                 </h3>
                 <Badge variant="secondary" size="sm">
@@ -130,7 +130,7 @@ const TopBar = ({ user, onMenuClick, onLogout }) => {
                 ))}
               </div>
               
-              <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
+              <div className="mt-3 pt-3 border-t border-slate-200 dark:border-amoled-border">
                 <Button variant="ghost" size="sm" className="w-full">
                   View all notifications
                 </Button>
@@ -144,31 +144,31 @@ const TopBar = ({ user, onMenuClick, onLogout }) => {
 
         {/* User menu */}
         <Menu as="div" className="relative">
-          <Menu.Button className="flex items-center text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-violet-500 p-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+          <Menu.Button className="flex items-center text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 p-2 hover:bg-slate-100 dark:hover:bg-amoled-hover transition-colors">
             <span className="sr-only">Open user menu</span>
             <div className="flex items-center space-x-2">
-              <div className="h-8 w-8 rounded-full bg-violet-600 flex items-center justify-center">
+              <div className="h-8 w-8 rounded-full bg-primary-600 flex items-center justify-center">
                 <UserIcon className="h-5 w-5 text-white" />
               </div>
               <div className="hidden sm:block text-left">
-                <div className="text-sm font-medium text-slate-900 dark:text-zinc-100">
+                <div className="text-sm font-medium text-slate-900 dark:text-amoled-primary">
                   {user?.fullName || user?.name || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'User'}
                 </div>
-                <div className="text-xs text-slate-500 dark:text-zinc-400">
+                <div className="text-xs text-slate-500 dark:text-amoled-muted">
                   {user?.email || 'No email'}
                 </div>
               </div>
-              <ChevronDownIcon className="hidden sm:block h-4 w-4 text-slate-400 dark:text-zinc-500" />
+              <ChevronDownIcon className="hidden sm:block h-4 w-4 text-slate-400 dark:text-amoled-muted" />
             </div>
           </Menu.Button>
 
-          <Menu.Items className="absolute right-0 z-50 mt-2 w-56 origin-top-right rounded-lg bg-white dark:bg-zinc-950 shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-zinc-700 focus:outline-none">
+          <Menu.Items className="absolute right-0 z-50 mt-2 w-56 origin-top-right rounded-lg bg-white dark:bg-amoled-card shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-amoled-border focus:outline-none">
             <div className="py-1">
-              <div className="px-4 py-3 border-b border-slate-200 dark:border-zinc-700">
-                <div className="text-sm font-medium text-slate-900 dark:text-zinc-100">
+              <div className="px-4 py-3 border-b border-slate-200 dark:border-amoled-border">
+                <div className="text-sm font-medium text-slate-900 dark:text-amoled-primary">
                   {user?.fullName || user?.name || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'User'}
                 </div>
-                <div className="text-xs text-slate-500 dark:text-zinc-400">
+                <div className="text-xs text-slate-500 dark:text-amoled-muted">
                   {user?.email || 'No email'}
                 </div>
                 {user?.role && (
@@ -184,8 +184,8 @@ const TopBar = ({ user, onMenuClick, onLogout }) => {
                     <button className={cn(
                       "w-full text-left px-4 py-2 text-sm flex items-center transition-colors",
                       active 
-                        ? "bg-slate-100 dark:bg-zinc-900 text-slate-900 dark:text-zinc-100" 
-                        : "text-slate-700 dark:text-zinc-300"
+                        ? "bg-slate-100 dark:bg-amoled-hover text-slate-900 dark:text-amoled-primary" 
+                        : "text-slate-700 dark:text-amoled-secondary"
                     )}>
                       <UserCircleIcon className="h-4 w-4 mr-3" />
                       Your Profile
@@ -198,8 +198,8 @@ const TopBar = ({ user, onMenuClick, onLogout }) => {
                     <button className={cn(
                       "w-full text-left px-4 py-2 text-sm flex items-center transition-colors",
                       active 
-                        ? "bg-slate-100 dark:bg-zinc-900 text-slate-900 dark:text-zinc-100" 
-                        : "text-slate-700 dark:text-zinc-300"
+                        ? "bg-slate-100 dark:bg-amoled-hover text-slate-900 dark:text-amoled-primary" 
+                        : "text-slate-700 dark:text-amoled-secondary"
                     )}>
                       <Cog6ToothIcon className="h-4 w-4 mr-3" />
                       Settings
@@ -207,7 +207,7 @@ const TopBar = ({ user, onMenuClick, onLogout }) => {
                   )}
                 </Menu.Item>
                 
-                <div className="border-t border-slate-200 dark:border-zinc-700 my-1" />
+                <div className="border-t border-slate-200 dark:border-amoled-border my-1" />
                 
                 <Menu.Item>
                   {({ active }) => (
@@ -216,8 +216,8 @@ const TopBar = ({ user, onMenuClick, onLogout }) => {
                       className={cn(
                         "w-full text-left px-4 py-2 text-sm flex items-center transition-colors",
                         active 
-                          ? "bg-slate-100 dark:bg-zinc-900 text-slate-900 dark:text-zinc-100" 
-                          : "text-slate-700 dark:text-zinc-300"
+                          ? "bg-slate-100 dark:bg-amoled-hover text-slate-900 dark:text-amoled-primary" 
+                          : "text-slate-700 dark:text-amoled-secondary"
                       )}
                     >
                       <ArrowRightOnRectangleIcon className="h-4 w-4 mr-3" />

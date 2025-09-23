@@ -193,9 +193,9 @@ function Inventory() {
 
       {lowStockLoading ? (
         <LoadingSpinner />
-      ) : (
+      ) : lowStockData?.data?.products?.length > 0 ? (
         <div className="grid gap-4">
-          {lowStockData?.data?.map((item) => (
+          {lowStockData.data.products.map((item) => (
             <Card key={item._id} className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
@@ -208,22 +208,27 @@ function Inventory() {
                         {item.name}
                       </h4>
                       <p className="text-sm text-slate-600 dark:text-slate-400">
-                        SKU: {item.sku} | Current Stock: {item.currentStock}
+                        SKU: {item.sku} | Current Stock: {item.stockQuantity}
                       </p>
                     </div>
                   </div>
                 </div>
                 <div className="text-right">
-                  <Badge variant="destructive">
-                    {item.currentStock} / {item.minLevel}
+                  <Badge variant={item.urgency === 'critical' ? 'destructive' : 'warning'}>
+                    {item.stockQuantity} / {item.reorderLevel}
                   </Badge>
                   <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                    Branch: {item.branch?.name}
+                    {item.urgency === 'critical' ? 'Critical' : 'Low Stock'}
                   </p>
                 </div>
               </div>
             </Card>
           ))}
+        </div>
+      ) : (
+        <div className="text-center py-8">
+          <CubeIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+          <p className="text-slate-600 dark:text-slate-400">No low stock items found</p>
         </div>
       )}
     </div>

@@ -24,6 +24,12 @@ const productRoutes = require('./src/routes/productRoutes');
 const salesRoutes = require('./src/routes/salesRoutes');
 const dashboardRoutes = require('./src/routes/dashboardRoutes');
 const reportsRoutes = require('./src/routes/reportsRoutes');
+const inventoryRoutes = require('./src/routes/inventoryRoutes');
+const masterDataRoutes = require('./src/routes/masterDataRoutes');
+const purchaseRoutes = require('./src/routes/purchaseRoutes');
+const financialRoutes = require('./src/routes/financialRoutes');
+const securityRoutes = require('./src/routes/securityRoutes');
+const emailRoutes = require('./src/routes/emailRoutes');
 
 // Import database connection
 const mongoose = require('mongoose');
@@ -113,6 +119,12 @@ app.use('/api/products', productRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/reports', reportsRoutes);
+app.use('/api/inventory', inventoryRoutes);
+app.use('/api/master-data', masterDataRoutes);
+app.use('/api/purchases', purchaseRoutes);
+app.use('/api/financial', financialRoutes);
+app.use('/api/security', securityRoutes);
+app.use('/api/email', emailRoutes);
 
 // Welcome route
 app.get('/', (req, res) => {
@@ -125,7 +137,13 @@ app.get('/', (req, res) => {
       products: '/api/products',
       sales: '/api/sales',
       dashboard: '/api/dashboard',
-      reports: '/api/reports'
+      reports: '/api/reports',
+      inventory: '/api/inventory',
+      masterData: '/api/master-data',
+      purchases: '/api/purchases',
+      financial: '/api/financial',
+      security: '/api/security',
+      email: '/api/email'
     },
     docs: 'https://documenter.getpostman.com/view/your-docs',
     timestamp: new Date().toISOString()

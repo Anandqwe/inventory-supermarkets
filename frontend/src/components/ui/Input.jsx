@@ -3,7 +3,7 @@ import { cva } from 'class-variance-authority';
 import { cn } from '../../utils/cn';
 
 const inputVariants = cva(
-  "flex w-full rounded-md border border-surface-300 bg-white px-3 py-2 text-sm placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:placeholder:text-gray-400",
+  "flex w-full rounded-md border border-surface-300 bg-white px-3 py-2 text-sm placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 dark:border-amoled-border dark:bg-amoled-card dark:text-amoled-primary dark:placeholder:text-amoled-muted",
   {
     variants: {
       size: {
@@ -44,7 +44,7 @@ const Input = React.forwardRef(({
       {label && (
         <label 
           htmlFor={inputId}
-          className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1"
+          className="block text-sm font-medium text-surface-700 dark:text-amoled-secondary mb-1"
         >
           {label}
           {required && <span className="text-danger-500 ml-1">*</span>}
