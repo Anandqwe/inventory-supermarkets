@@ -17,20 +17,36 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Initialize user from localStorage if available
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (error) {
+        console.error('Error parsing stored user:', error);
+        localStorage.removeItem('user');
+      }
+    }
+
     if (token) {
       localStorage.setItem('token', token);
-      // Optionally verify token and get user profile
-      authAPI.getProfile()
-        .then((userData) => {
-          setUser(userData.data.data);
-        })
-        .catch(() => {
-          // Token is invalid
-          logout();
-        })
-        .finally(() => {
-          setLoading(false);
-        });
+      // Verify token and get user profile if user data is not available
+      if (!storedUser) {
+        authAPI.getProfile()
+          .then((userData) => {
+            setUser(userData.data.data);
+            localStorage.setItem('user', JSON.stringify(userData.data.data));
+          })
+          .catch(() => {
+            // Token is invalid
+            logout();
+          })
+          .finally(() => {
+            setLoading(false);
+          });
+      } else {
+        setLoading(false);
+      }
     } else {
       setLoading(false);
     }
@@ -39,7 +55,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       const response = await authAPI.login(email, password);
-      const { accessToken, user: userData } = response.data.data;
+      const { token: accessToken, user: userData } = response.data.data;
       
       setToken(accessToken);
       setUser(userData);
@@ -68,7 +84,7 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     loading,
-    isAuthenticated: !!token
+    isAuthenticated: !!token && !!user
   };
 
   return (

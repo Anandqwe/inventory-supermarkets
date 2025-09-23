@@ -30,9 +30,9 @@ const queryClient = new QueryClient({
 
 // Protected Route Component with enhanced error handling
 function ProtectedRoute({ children }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
   
-  if (isLoading) {
+  if (loading) {
     return <PageLoader message="Checking authentication..." />;
   }
   
@@ -51,9 +51,9 @@ function ProtectedRoute({ children }) {
 
 // Public Route Component
 function PublicRoute({ children }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
   
-  if (isLoading) {
+  if (loading) {
     return <PageLoader message="Loading..." />;
   }
   

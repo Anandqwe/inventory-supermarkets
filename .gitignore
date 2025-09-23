@@ -135,3 +135,22 @@ docs/generated/
 generated/
 build/
 dist/
+
+# Copilot instructions file
+.github/copilot-instructions.md
+
+# Development/temporary documentation
+**/CLEANUP_SUMMARY.md
+**/MIGRATION_COMPLETE.md
+**/FOUNDATION_SETUP.md
+**/TODAY_CHECKLIST.md
+**/MODERN_UI_IMPLEMENTATION.md
+**/DESIGN_TOKENS.md
+
+# Test files (temporary)
+test-login.js
+test-*.js
+
+# Environment files that shouldn't be in repo
+.env.production
+.env.staging

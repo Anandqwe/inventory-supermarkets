@@ -203,6 +203,7 @@ const seedDatabase = async () => {
     console.log('🗑️ Clearing existing data...');
     await User.deleteMany({});
     await Product.deleteMany({});
+    await Branch.deleteMany({});
     
     // Create admin user
     console.log('👤 Creating admin user...');

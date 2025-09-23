@@ -44,7 +44,7 @@ const authenticateToken = async (req, res, next) => {
     }
     
     // Find user and check if still exists
-    const user = await User.findById(decoded.userId)
+    const user = await User.findById(decoded.id)
       .select('-password -refreshTokens')
       .populate('branch', 'name code');
       
@@ -73,6 +73,7 @@ const authenticateToken = async (req, res, next) => {
 
     // Add user info to request
     req.user = {
+      id: user._id,
       userId: user._id,
       email: user.email,
       role: user.role,
