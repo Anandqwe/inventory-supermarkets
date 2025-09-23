@@ -29,18 +29,18 @@ function ProductModal({ product, onSave, onClose }) {
       setFormData({
         name: product.name || '',
         description: product.description || '',
-        category: product.category || '',
-        subcategory: product.subcategory || '',
-        brand: product.brand || '',
+        category: product.category?.name || product.category || '',
+        subcategory: product.subcategory?.name || product.subcategory || '',
+        brand: product.brand?.name || product.brand || '',
         sku: product.sku || '',
         barcode: product.barcode || '',
         price: product.price || '',
         costPrice: product.costPrice || '',
         quantity: product.quantity || '',
-        unit: product.unit || 'pieces',
+        unit: product.unit?.name || product.unit || 'pieces',
         reorderLevel: product.reorderLevel || '',
         maxStockLevel: product.maxStockLevel || '',
-        supplier: product.supplier || '',
+        supplier: product.supplier?.name || product.supplier || '',
         expiryDate: product.expiryDate ? product.expiryDate.split('T')[0] : '',
         gstRate: product.gstRate || '18'
       });

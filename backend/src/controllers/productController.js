@@ -321,12 +321,10 @@ class ProductController {
       itemsPerPage: limitNum
     };
 
-    res.json(
-      ResponseUtils.success('Products retrieved successfully', {
-        products,
-        pagination
-      })
-    );
+    ResponseUtils.success(res, {
+      products,
+      pagination
+    }, 'Products retrieved successfully');
   });
 
   static getProductById = asyncHandler(async (req, res) => {
@@ -900,9 +898,7 @@ class ProductController {
       .populate('parentCategory', 'name')
       .sort({ name: 1 });
 
-    res.json(
-      ResponseUtils.success('Categories retrieved successfully', categories)
-    );
+    ResponseUtils.success(res, categories, 'Categories retrieved successfully');
   });
 
   static getSubcategories = asyncHandler(async (req, res) => {

@@ -1,238 +1,375 @@
-# Supermarket Inventory & Sales Management System
+# Supermarket Inventory & Sales Management System - Backend API
 
-A comprehensive cloud-based solution for managing supermarket inventory and sales operations.
+A comprehensive RESTful API for managing supermarket inventory, sales transactions, and business analytics built with Node.js, Express.js, MongoDB, and Redis Cloud integration.
 
-## 🏗️ Project Structure
+## 🚀 Features
 
-```
-inventory-supermarkets/
-├── frontend/                 # React + Tailwind frontend
-│   ├── src/
-│   │   ├── components/      # Reusable UI components
-│   │   ├── pages/          # Route components
-│   │   ├── App.jsx         # Main app component
-│   │   └── main.jsx        # Entry point
-│   ├── package.json
-│   └── README.md
-├── backend/                 # Node.js + Express backend
-│   ├── models/             # Database models
-│   ├── routes/             # API routes
-│   ├── controllers/        # Route handlers
-│   ├── middleware/         # Custom middleware
-│   ├── server.js           # Main server file
-│   └── package.json
-├── docs/                   # Project documentation
-│   ├── DATA_MODELS.md      # Database schemas
-│   ├── SETUP.md           # Deployment guide
-│   └── TODAY_CHECKLIST.md # MVP definition
-└── README.md              # This file
-```
+### Core Functionality
+- **Secure Authentication**: JWT-based auth with refresh tokens and bcrypt password hashing
+- **Role-Based Access Control**: Admin, Manager, Cashier, and Viewer roles
+- **Product Management**: Complete CRUD operations with category and brand management
+- **Sales Processing**: Transaction handling with automatic stock deduction
+- **Inventory Tracking**: Real-time stock levels with automated low-stock alerts
+- **Dashboard Analytics**: Comprehensive business insights and reporting
 
-## 🚀 Tech Stack
+### Advanced Features
+- **Email System**: Professional email notifications and automated alerts
+- **Caching Layer**: Redis Cloud integration with intelligent fallback
+- **Performance Optimization**: Database connection pooling and query optimization
+- **Security**: Rate limiting, CORS, helmet headers, input validation
+- **Monitoring**: Health checks, error logging, and performance tracking
 
-### Frontend
-- **React 18** - Modern UI library
-- **Vite** - Fast build tool and dev server
-- **Tailwind CSS** - Utility-first CSS framework
-- **React Router** - Client-side routing
-- **Lucide React** - Beautiful icons
-- **Axios** - HTTP client for API calls
+### Technical Features
+- **Production-Ready**: Comprehensive error handling and validation
+- **Security First**: Rate limiting, CORS, helmet security headers
+- **Indian Market Focus**: ₹ INR pricing, GST calculations, Indian categories
+- **MongoDB Atlas**: Cloud database with connection pooling
+- **Redis Cloud**: High-performance caching with fallback
+- **Scalable Architecture**: Modular MVC structure with middleware patterns
 
-### Backend
-- **Node.js** - JavaScript runtime
-- **Express.js** - Web application framework
-- **MongoDB** - NoSQL database
-- **Mongoose** - MongoDB object modeling
-- **JWT** - Authentication tokens
-- **bcryptjs** - Password hashing
-- **CORS** - Cross-origin resource sharing
+## 📋 Prerequisites
 
-### Cloud Services
-- **MongoDB Atlas** - Cloud database
-- **Render** - Backend hosting
-- **Vercel** - Frontend hosting
+- Node.js (v18.0.0 or higher)
+- MongoDB Atlas account
+- Redis Cloud account (optional but recommended)
+- Gmail account with App Password (for email features)
+- npm or yarn package manager
 
-## 🏃‍♂️ Quick Start
+## 🛠️ Installation
 
-### Prerequisites
-- Node.js (v18 or higher)
-- npm or yarn
-- Git
-
-### Local Development
-
-1. **Clone the repository**:
+1. **Install dependencies**
    ```bash
-   git clone https://github.com/Anandqwe/inventory-supermarkets.git
-   cd inventory-supermarkets
-   ```
-
-2. **Setup Backend**:
-   ```bash
-   cd backend
    npm install
-   cp .env.example .env
-   # Edit .env with your MongoDB URI and other variables
-   npm run dev
    ```
 
-3. **Setup Frontend** (in a new terminal):
+2. **Environment Configuration**
    ```bash
-   cd frontend
-   npm install
    cp .env.example .env
-   # Edit .env with your API URL
-   npm run dev
+   ```
+   
+   Update the `.env` file with your configuration:
+   ```env
+   # Server Configuration
+   NODE_ENV=development
+   PORT=5000
+   
+   # MongoDB Atlas
+   MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/supermarket-inventory
+   
+   # JWT Configuration
+   JWT_SECRET=your-super-secure-jwt-secret-key-minimum-64-characters-long
+   JWT_EXPIRES_IN=24h
+   JWT_REFRESH_SECRET=your-super-secure-refresh-secret-key-minimum-64-characters
+   JWT_REFRESH_EXPIRES_IN=7d
+   
+   # Email Configuration (Gmail SMTP)
+   EMAIL_SERVICE=gmail
+   EMAIL_USER=your-email@gmail.com
+   EMAIL_PASSWORD=your-gmail-app-password
+   EMAIL_FROM=Supermarket Inventory System <your-email@gmail.com>
+   
+   # Redis Cloud Configuration (Optional but recommended)
+   REDIS_ENABLED=true
+   REDIS_HOST=your-redis-cloud-host
+   REDIS_PORT=12067
+   REDIS_USERNAME=default
+   REDIS_PASSWORD=your-redis-password
+   REDIS_DB=0
+   
+   # Security Configuration
+   RATE_LIMIT_WINDOW_MS=900000
+   RATE_LIMIT_MAX_REQUESTS=100
+   AUTH_RATE_LIMIT_MAX_REQUESTS=5
+   
+   # CORS Configuration
+   ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
    ```
 
-4. **Open your browser**: http://localhost:3000
+3. **Database Setup**
+   ```bash
+   # Create database indexes (optional)
+   npm run db:indexes
+   
+   # Seed the database with sample data (optional)
+   npm run seed
+   ```
 
-## 📋 Features
+4. **Start the server**
+   ```bash
+   # Development mode with auto-reload
+   npm run dev
+   
+   # Production mode
+   npm start
+   ```
 
-### 🔐 Authentication & Authorization
-- User login with JWT tokens
-- Role-based access control (Admin, Manager, Cashier)
-- Protected routes and API endpoints
+## 🔧 Available Scripts
 
-### 📦 Product Management
-- Complete CRUD operations for products
-- Category-based organization
-- Stock level tracking
-- SKU and barcode support
-- Search and filtering capabilities
+- **`npm start`** - Start production server
+- **`npm run dev`** - Start development server with nodemon
+- **`npm test`** - Run test suite
+- **`npm run test:coverage`** - Run tests with coverage report
+- **`npm run seed`** - Seed database with sample data
+- **`npm run db:indexes`** - Create database indexes
+- **`npm run cache:clear`** - Clear application cache
+- **`npm run perf:check`** - Run performance checks
+- **`npm run lint`** - Run ESLint
+- **`npm run format`** - Format code with Prettier
 
-### 💰 Sales Management
-- Point-of-sale interface
-- Real-time inventory updates
-- Multiple payment methods
-- Transaction history
-- Receipt generation
+## 🔗 API Endpoints
 
-### 📊 Analytics & Reporting
-- Sales performance charts
-- Inventory level monitoring
-- Low stock alerts
-- PDF report generation
-- Dashboard with key metrics
+### Authentication (`/api/auth`)
+| Method | Endpoint | Description | Access |
+|--------|----------|-------------|---------|
+| POST | `/login` | User login | Public |
+| POST | `/refresh-token` | Refresh JWT token | Public |
+| GET | `/profile` | Get user profile | Authenticated |
+| PUT | `/profile` | Update profile | Authenticated |
+| POST | `/change-password` | Change password | Authenticated |
+| POST | `/forgot-password` | Request password reset | Public |
+| POST | `/reset-password` | Reset password with token | Public |
+| POST | `/register` | Register new user | Manager+ |
+| GET | `/users` | List all users | Manager+ |
 
-### 📱 Responsive Design
-- Mobile-first approach
-- Tablet and desktop optimization
-- Touch-friendly interface
+### Products (`/api/products`)
+| Method | Endpoint | Description | Access |
+|--------|----------|-------------|---------|
+| GET | `/` | List products with filters | Authenticated |
+| POST | `/` | Create new product | Manager+ |
+| GET | `/:id` | Get product by ID | Authenticated |
+| PUT | `/:id` | Update product | Manager+ |
+| DELETE | `/:id` | Delete product | Manager+ |
+| GET | `/search/:query` | Search by barcode/SKU | Authenticated |
+| GET | `/low-stock` | Low stock products | Authenticated |
+| GET | `/categories` | List categories | Authenticated |
+| GET | `/brands` | List brands | Authenticated |
 
-## 📚 Documentation
+### Sales (`/api/sales`)
+| Method | Endpoint | Description | Access |
+|--------|----------|-------------|---------|
+| POST | `/` | Create new sale | Authenticated |
+| GET | `/` | List sales with filters | Authenticated |
+| GET | `/:id` | Get sale by ID | Authenticated |
+| PUT | `/:id` | Update sale | Manager+ |
+| DELETE | `/:id` | Delete sale | Admin |
+| GET | `/summary` | Sales analytics | Authenticated |
+| GET | `/daily-report` | Daily sales report | Authenticated |
 
-- **[Data Models](docs/DATA_MODELS.md)** - Database schemas and relationships
-- **[Setup Guide](docs/SETUP.md)** - Complete deployment instructions
-- **[MVP Checklist](docs/TODAY_CHECKLIST.md)** - Definition of done for minimum viable product
+### Dashboard (`/api/dashboard`)
+| Method | Endpoint | Description | Access |
+|--------|----------|-------------|---------|
+| GET | `/overview` | Complete dashboard data | Authenticated |
+| GET | `/sales-chart` | Sales chart data | Authenticated |
+| GET | `/inventory-analytics` | Inventory insights | Authenticated |
+| GET | `/alerts` | System alerts | Authenticated |
+| GET | `/performance` | Performance metrics | Manager+ |
 
-## 🌐 Live Demo
+### Email System (`/api/email`)
+| Method | Endpoint | Description | Access |
+|--------|----------|-------------|---------|
+| GET | `/status` | Email service status | Authenticated |
+| POST | `/test` | Send test email | Admin |
+| POST | `/send-test` | Send test to specific email | Admin |
+| POST | `/password-reset` | Send password reset email | Admin |
+| POST | `/low-stock-alert` | Send low stock alert | Manager+ |
+| POST | `/send-report` | Email report | Manager+ |
 
-- **Frontend**: [Coming Soon]
-- **Backend API**: [Coming Soon]
+### Health & Monitoring
+| Method | Endpoint | Description | Access |
+|--------|----------|-------------|---------|
+| GET | `/health` | System health check | Public |
+| GET | `/api/cache/stats` | Cache statistics | Admin |
+| GET | `/api/cache/health` | Cache health check | Admin |
+## 🔒 Authentication
 
-## 🛠️ Development Workflow
+The API uses JWT (JSON Web Tokens) for authentication with refresh token support. Include the token in the Authorization header:
 
-### Git Workflow
-```bash
-# Create feature branch
-git checkout -b feature/your-feature-name
-
-# Make changes and commit
-git add .
-git commit -m "Add: your feature description"
-
-# Push to GitHub
-git push origin feature/your-feature-name
-
-# Create pull request on GitHub
+```
+Authorization: Bearer your-jwt-token
 ```
 
-### API Testing
-```bash
-# Health check
-curl http://localhost:5000/health
+### Token Management
+- **Access Token**: Expires in 24 hours
+- **Refresh Token**: Expires in 7 days
+- **Automatic Refresh**: Frontend can automatically refresh tokens
 
-# Test with sample data
-curl -X POST http://localhost:5000/api/products \
-  -H "Content-Type: application/json" \
-  -d '{"name": "Test Product", "price": 9.99, "stock": 100}'
-```
+### Default Users (after seeding)
+- **Admin**: `admin@supermarket.com` / `Admin@123456`
+- **Manager**: `manager@supermarket.com` / `Manager@123456`  
+- **Cashier**: `cashier@supermarket.com` / `Cashier@123456`
+- **Viewer**: `viewer@supermarket.com` / `Viewer@123456`
+
+### Role Permissions
+- **Admin**: Full system access, user management, system configuration
+- **Manager**: Product management, sales, reports, inventory management
+- **Cashier**: Sales transactions, product lookup, basic inventory view
+- **Viewer**: Read-only access to products and basic reports
 
 ## 🚀 Deployment
 
-### Backend (Render)
-1. Connect GitHub repository
-2. Set environment variables
-3. Deploy automatically on push
+### Environment Variables for Production
 
-### Frontend (Vercel)
-1. Connect GitHub repository
-2. Configure build settings
-3. Deploy automatically on push
+```env
+NODE_ENV=production
+PORT=5000
+MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/inventory
+JWT_SECRET=production-jwt-secret-64-characters-minimum
+JWT_REFRESH_SECRET=production-refresh-secret-64-characters-minimum
+EMAIL_SERVICE=gmail
+EMAIL_USER=production-email@gmail.com
+EMAIL_PASSWORD=production-app-password
+REDIS_ENABLED=true
+REDIS_HOST=production-redis-host
+REDIS_PORT=12067
+REDIS_USERNAME=default
+REDIS_PASSWORD=production-redis-password
+ALLOWED_ORIGINS=https://yourdomain.com,https://www.yourdomain.com
+```
 
-See [Setup Guide](docs/SETUP.md) for detailed instructions.
+### Render Deployment
 
-## 🤝 Contributing
+1. **Create Render Account**
+   - Sign up at [render.com](https://render.com)
+   - Connect your GitHub repository
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+2. **Configure Web Service**
+   ```yaml
+   Name: supermarket-inventory-api
+   Environment: Node
+   Build Command: npm install
+   Start Command: npm start
+   Plan: Free (for development)
+   ```
 
-### Code Style
-- Use ESLint configuration
-- Follow React best practices
-- Write descriptive commit messages
-- Add comments for complex logic
+3. **Environment Variables**
+   Add all required environment variables in Render dashboard
 
-## 📄 License
+4. **MongoDB Atlas**
+   - Whitelist Render's IP: `0.0.0.0/0`
+   - Update connection string in environment variables
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+5. **Redis Cloud Setup**
+   - Create free Redis Cloud account
+   - Get connection details
+   - Add to environment variables
 
-## 🆘 Support
+### Railway Deployment
 
-If you encounter any issues:
+1. **Connect Repository**
+   - Import from GitHub
+   - Select Node.js template
 
-1. Check the [Setup Guide](docs/SETUP.md)
-2. Review [GitHub Issues](https://github.com/Anandqwe/inventory-supermarkets/issues)
-3. Create a new issue with detailed description
+2. **Configure Environment**
+   - Add all environment variables
+   - Set start command: `npm start`
 
-## 🗺️ Roadmap
+3. **Deploy**
+   - Automatic deployment on git push
+   - Custom domain available
 
-### Phase 1 (MVP) - Current
-- [x] Project structure setup
-- [x] Basic UI components
-- [x] Authentication system
-- [ ] Core CRUD operations
-- [ ] Sales interface
-- [ ] Basic reporting
+## 📊 API Response Format
 
-### Phase 2 (Enhanced)
-- [ ] Advanced analytics
-- [ ] Barcode scanning
-- [ ] Multi-location support
-- [ ] Email notifications
-- [ ] API rate limiting
+### Success Response
+```javascript
+{
+  "success": true,
+  "message": "Operation completed successfully",
+  "data": { /* response data */ },
+  "timestamp": "2023-09-23T10:30:00.000Z"
+}
+```
 
-### Phase 3 (Enterprise)
-- [ ] Real-time sync
-- [ ] Advanced reporting
-- [ ] Integration APIs
-- [ ] Mobile app
-- [ ] Multi-tenant support
+### Error Response
+```javascript
+{
+  "success": false,
+  "message": "Error description",
+  "error": "VALIDATION_ERROR", // Error code
+  "details": { /* additional error details */ },
+  "timestamp": "2023-09-23T10:30:00.000Z"
+}
+```
 
-## 📊 Project Status
+### Pagination Response
+```javascript
+{
+  "success": true,
+  "data": { /* array of items */ },
+  "pagination": {
+    "currentPage": 1,
+    "totalPages": 10,
+    "totalItems": 100,
+    "itemsPerPage": 10,
+    "hasNext": true,
+    "hasPrev": false
+  },
+  "timestamp": "2023-09-23T10:30:00.000Z"
+}
+```
 
-- **Backend**: 🟡 In Progress
-- **Frontend**: 🟡 In Progress
-- **Database**: 🟢 Ready
-- **Deployment**: 🟢 Ready
-- **Documentation**: 🟢 Complete
+## 🔧 Development
+
+### Project Structure
+```
+backend/
+├── src/
+│   ├── config/         # Configuration files
+│   │   ├── database.js # MongoDB connection
+│   │   ├── cache.js    # Redis configuration
+│   │   └── swagger.js  # API documentation
+│   ├── controllers/    # Route handlers
+│   ├── middleware/     # Custom middleware
+│   ├── models/         # Database models
+│   ├── routes/         # API routes
+│   └── utils/          # Utility functions
+├── scripts/            # Database and utility scripts
+├── tests/              # Test files
+├── uploads/            # File uploads directory
+├── app.js              # Main application file
+└── package.json        # Dependencies and scripts
+```
+
+### Testing
+```bash
+# Run all tests
+npm test
+
+# Run tests with coverage
+npm run test:coverage
+
+# Run specific test file
+npm test tests/auth.test.js
+
+# Watch mode for development
+npm run test:watch
+```
+
+### API Documentation
+- **Swagger UI**: `http://localhost:5000/api-docs`
+- **Health Check**: `http://localhost:5000/health`
+- **API Base**: `http://localhost:5000/api/`
+
+## 🛡️ Security Features
+
+- **Rate Limiting**: Prevents API abuse
+- **CORS Protection**: Configurable cross-origin requests
+- **Helmet Headers**: Security headers for production
+- **Input Validation**: Joi schema validation
+- **SQL Injection Prevention**: Mongoose parameterized queries
+- **XSS Protection**: Input sanitization
+- **JWT Security**: Secure token implementation
+
+## 📈 Performance Features
+
+- **Redis Caching**: High-performance data caching
+- **Database Optimization**: Indexed queries and aggregations
+- **Response Compression**: Gzip compression for responses
+- **Connection Pooling**: Efficient database connections
+- **Background Tasks**: Non-blocking inventory monitoring
+- **Error Handling**: Comprehensive error management
 
 ---
 
-**Built with ❤️ for supermarket owners and managers**
+**Built with ❤️ for modern supermarket management systems**
 
-*Last updated: September 13, 2025*
+*Last updated: September 23, 2025*

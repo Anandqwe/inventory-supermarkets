@@ -167,11 +167,11 @@ function Sales() {
 
   // Data Processing
   const products = productsData?.data?.products || [];
-  const categories = [...new Set(products.map(p => p.category))].filter(Boolean);
+  const categories = [...new Set(products.map(p => p.category?.name || p.category))].filter(Boolean);
 
   // Cart Calculations
   const cartCalculations = useMemo(() => {
-    const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const subtotal = cart.reduce((sum, item) => sum + ((item.price || 0) * item.quantity), 0);
     
     let discountAmount = 0;
     if (discount.type === 'percentage') {
@@ -330,8 +330,8 @@ function Sales() {
         product: item._id,
         productName: item.name,
         quantity: item.quantity,
-        price: item.price,
-        total: item.price * item.quantity
+        price: item.price || 0,
+        total: (item.price || 0) * item.quantity
       })),
       customer: customer.name ? customer : null,
       paymentMethod,
@@ -616,7 +616,7 @@ function Sales() {
                         
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-lg font-bold text-surface-900 dark:text-surface-100">
-                            ₹{product.price.toFixed(0)}
+                            ₹{(product.price || 0).toFixed(0)}
                           </span>
                           
                           <Badge
@@ -631,7 +631,7 @@ function Sales() {
                         </div>
                         
                         <div className="text-xs text-surface-500 dark:text-surface-400">
-                          {product.category}
+                          {product.category?.name || product.category || 'N/A'}
                         </div>
                       </div>
                     </div>
@@ -680,7 +680,7 @@ function Sales() {
                           {item.name}
                         </h4>
                         <p className="text-xs text-surface-500 dark:text-surface-400">
-                          ₹{item.price} each
+                          ₹{item.price || 0} each
                         </p>
                       </div>
                       
@@ -721,7 +721,7 @@ function Sales() {
                       </div>
                       
                       <span className="font-semibold text-surface-900 dark:text-surface-100">
-                        ₹{(item.price * item.quantity).toFixed(2)}
+                        ₹{((item.price || 0) * item.quantity).toFixed(2)}
                       </span>
                     </div>
                   </div>

@@ -1,6 +1,6 @@
 # Setup Guide
 
-This guide will help you set up the complete supermarket inventory management system with cloud deployments.
+This comprehensive guide will help you set up the complete supermarket inventory management system with cloud deployments, Redis caching, email notifications, and all advanced features.
 
 ## Prerequisites
 
@@ -8,8 +8,10 @@ This guide will help you set up the complete supermarket inventory management sy
 - npm or yarn
 - Git
 - MongoDB Atlas account
-- Render account (for backend)
-- Vercel account (for frontend)
+- Redis Cloud account (optional but recommended)
+- Gmail account with App Password
+- Render account (for backend hosting)
+- Vercel account (for frontend hosting)
 
 ## 1. MongoDB Atlas Setup
 
@@ -48,6 +50,215 @@ This guide will help you set up the complete supermarket inventory management sy
    mongodb+srv://inventory_admin:<password>@inventory-cluster.xxxxx.mongodb.net/?retryWrites=true&w=majority
    ```
 4. Replace `<password>` with your actual password
+
+## 4. Environment Configuration
+
+### Backend Environment (.env)
+
+Create a `.env` file in the `backend` directory:
+
+```env
+# Environment Configuration
+NODE_ENV=development
+PORT=5000
+
+# MongoDB Atlas Configuration
+MONGODB_URI=mongodb+srv://inventory_admin:your-password@inventory-cluster.xxxxx.mongodb.net/?retryWrites=true&w=majority&appName=inventory-supermarkets
+
+# JWT Configuration (Generate secure 64+ character keys)
+JWT_SECRET=8f2e9c4b7a6d3e1f9c8b5a2d7e4f1c6b9a8e5d2c7f4b1e8a5c2f9d6b3e0c7a4d1f8e5b2c9f6a3d0e7c4b1f8a5e2d9c6b3f0a7d4c1e8b5f2a9d6c3e0b7a4f1d8c5b2e9a6d3f0c7a4b1e8d5c2
+JWT_EXPIRES_IN=24h
+JWT_REFRESH_SECRET=3f6e9c2b5a8d1e4f7c0b3a6d9e2f5c8b1a4e7d0c3f6b9a2e5d8c1b4f7a0e3d6c9b2f5a8e1d4c7b0f3a6e9d2c5b8a1f4e7c0d3b6f9a2e5c8d1b4a7f0e3c6b9f2a5d8e1c4b7a0f3d6c9e2b5a8f1d4c7b0a3f6e9c2d5b8a1e4f7c0d3a6b9f2e5c8d1a4b7f0e3c6a9d2b5f8e1c4a7b0d3f6c9a2e5b8d1f4a7c0e3b6f9a2d5c8b1e4a7f0d3c6b9e2a5f8d1c4b7a0e3d6c9b2f5
+JWT_REFRESH_EXPIRES_IN=7d
+
+# API Configuration
+API_VERSION=v1
+
+# CORS Configuration
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173
+
+# Rate Limiting
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX_REQUESTS=100
+AUTH_RATE_LIMIT_MAX_REQUESTS=5
+
+# Email Configuration (Gmail SMTP)
+EMAIL_SERVICE=gmail
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASSWORD=your-16-character-app-password
+EMAIL_FROM=Supermarket Inventory System <your-email@gmail.com>
+
+# Redis Cloud Configuration
+REDIS_ENABLED=true
+REDIS_HOST=redis-xxxxx.xxxxx.xxxxx.redns.redis-cloud.com
+REDIS_PORT=12067
+REDIS_USERNAME=default
+REDIS_PASSWORD=your-redis-password
+REDIS_DB=0
+
+# File Upload Configuration
+MAX_FILE_SIZE=5242880
+UPLOAD_PATH=uploads/
+
+# Database Options
+DB_MAX_POOL_SIZE=10
+DB_MIN_POOL_SIZE=5
+
+# Logging
+LOG_LEVEL=info
+```
+
+### Frontend Environment (.env)
+
+Create a `.env` file in the `frontend` directory:
+
+```env
+# API Configuration
+VITE_API_URL=http://localhost:5000
+VITE_API_BASE_URL=http://localhost:5000/api
+
+# Application Configuration
+VITE_APP_NAME=Supermarket Inventory System
+VITE_APP_VERSION=1.0.0
+
+# Environment
+VITE_NODE_ENV=development
+```
+
+## 5. Local Development Setup
+
+### Backend Setup
+
+1. **Navigate to backend directory**:
+   ```bash
+   cd backend
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+
+3. **Create environment file**:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your configurations
+   ```
+
+4. **Run database scripts** (optional):
+   ```bash
+   # Create database indexes
+   npm run db:indexes
+   
+   # Seed with sample data
+   npm run seed
+   ```
+
+5. **Start the development server**:
+   ```bash
+   npm run dev
+   ```
+
+### Frontend Setup
+
+1. **Navigate to frontend directory**:
+   ```bash
+   cd frontend
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+
+3. **Create environment file**:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your API URL
+   ```
+
+4. **Start the development server**:
+   ```bash
+   npm run dev
+   ```
+
+## 6. Testing the Setup
+
+### Test Backend API
+
+1. **Health Check**:
+   ```bash
+   curl http://localhost:5000/health
+   ```
+
+2. **Test Authentication**:
+   ```bash
+   curl -X POST http://localhost:5000/api/auth/login \
+     -H "Content-Type: application/json" \
+     -d '{"email": "admin@supermarket.com", "password": "Admin@123456"}'
+   ```
+
+3. **Test Email Service**:
+   ```bash
+   curl -X GET http://localhost:5000/api/email/status \
+     -H "Authorization: Bearer your-jwt-token"
+   ```
+
+4. **Test Redis Cache**:
+   ```bash
+   curl -X GET http://localhost:5000/api/cache/health \
+     -H "Authorization: Bearer your-jwt-token"
+   ```
+
+### Test Frontend
+
+1. Open browser: `http://localhost:3000` or `http://localhost:5173`
+2. Login with default credentials
+3. Navigate through different pages
+4. Test CRUD operations
+
+### Create Redis Cloud Account
+
+1. Go to [Redis Cloud](https://redis.com/try-free/) and sign up
+2. Create a new subscription:
+   - Choose "Fixed" plan
+   - Select "30MB" free tier
+   - Choose your preferred cloud provider and region
+
+### Create Database
+
+1. Click "New Database"
+2. Configure:
+   - Database Name: `inventory-cache`
+   - Protocol: Redis Stack
+   - Modules: Enable RedisJSON and RediSearch (optional)
+
+### Get Connection Details
+
+1. Go to your database configuration
+2. Copy the connection details:
+   - **Endpoint**: `redis-xxxxx.xxxxx.xxxxx.redns.redis-cloud.com`
+   - **Port**: `12067` (or your assigned port)
+   - **Username**: `default`
+   - **Password**: Your database password
+
+## 3. Gmail SMTP Setup
+
+### Enable App Passwords
+
+1. Go to your [Google Account settings](https://myaccount.google.com/)
+2. Navigate to "Security" → "2-Step Verification"
+3. Enable 2-Step Verification if not already enabled
+4. Go to "App passwords"
+5. Generate a new app password for "Mail"
+6. Save the 16-character password (e.g., `abcd efgh ijkl mnop`)
+
+### Email Configuration
+
+- **Service**: Gmail
+- **Username**: Your Gmail address
+- **Password**: The 16-character app password (not your regular password)
+- **Security**: Use App Password, not OAuth2
 5. Add database name: `/inventory-supermarkets` before the `?`
 
 ## 2. Local Development Setup

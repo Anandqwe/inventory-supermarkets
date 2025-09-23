@@ -188,12 +188,12 @@ const requirePermission = (permission) => {
       });
     }
 
-    // Admin has all permissions
-    if (req.user.role === 'admin') {
+    // Admin has all permissions (case-insensitive check)
+    if (req.user.role && req.user.role.toLowerCase() === 'admin') {
       return next();
     }
 
-    const userPermissions = req.user.permissions || {};
+    const userPermissions = req.user.permissions || [];
     
     // Check if user has the required permission
     const hasPermission = checkPermission(userPermissions, permission);
@@ -202,7 +202,8 @@ const requirePermission = (permission) => {
       return res.status(403).json({
         success: false,
         message: 'Insufficient permissions',
-        required: permission
+        required: permission,
+        userPermissions: userPermissions // Add for debugging
       });
     }
 
@@ -212,10 +213,17 @@ const requirePermission = (permission) => {
 
 /**
  * Check if user has specific permission
- * @param {object} userPermissions - User's permission object
+ * @param {object|array} userPermissions - User's permission object or array
  * @param {string} permission - Permission to check
  */
 function checkPermission(userPermissions, permission) {
+  // Handle array format (e.g., ['products:read', 'products:create'])
+  if (Array.isArray(userPermissions)) {
+    // Convert dot notation to colon notation for comparison
+    const colonPermission = permission.replace('.', ':');
+    return userPermissions.includes(colonPermission);
+  }
+
   // Handle nested permission structure (e.g., 'products.create')
   if (permission.includes('.')) {
     const [resource, action] = permission.split('.');

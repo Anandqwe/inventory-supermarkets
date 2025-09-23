@@ -2,33 +2,42 @@
 
 ## Overview
 
-The Supermarket Inventory & Sales Management System is a full-stack web application built with modern technologies, designed for scalability, maintainability, and extensibility.
+The Supermarket Inventory & Sales Management System is a comprehensive full-stack web application built with modern technologies, featuring advanced caching, email notifications, real-time monitoring, and cloud integrations. The system is designed for scalability, maintainability, performance, and extensibility.
 
 ## Architecture Diagram
 
 ```mermaid
 graph TB
     subgraph "Frontend Layer"
-        UI[React App<br/>Vite + Tailwind CSS]
+        UI[React 18 App<br/>Vite + Tailwind CSS]
         Comp[UI Components<br/>Reusable Library]
         Context[Context Store<br/>Auth & Theme]
         Router[React Router<br/>Client Routes]
+        State[State Management<br/>Context API]
     end
 
-    subgraph "API Gateway"
+    subgraph "API Gateway & Security"
         Gateway[Express.js Server<br/>Port 5000]
-        Auth[JWT Auth<br/>Middleware]
-        Rate[Rate Limiting<br/>& Validation]
-        CORS[CORS Policy<br/>& Security]
+        Auth[JWT Auth + Refresh<br/>Role-Based Access]
+        Rate[Rate Limiting<br/>& Request Throttling]
+        CORS[CORS Policy<br/>& Security Headers]
+        Valid[Input Validation<br/>& Sanitization]
+    end
+
+    subgraph "Caching Layer"
+        Redis[(Redis Cloud<br/>Primary Cache)]
+        Memory[Node Cache<br/>Fallback Cache]
+        CacheManager[Cache Manager<br/>Intelligent Routing]
     end
 
     subgraph "Backend Services"
-        AuthSvc[Auth Service<br/>Login/Register]
+        AuthSvc[Auth Service<br/>Login/Register/Reset]
         ProdSvc[Product Service<br/>CRUD Operations]
         SalesSvc[Sales Service<br/>Transaction Processing]
         ReportSvc[Report Service<br/>Analytics & PDF]
         DashSvc[Dashboard Service<br/>Metrics & Charts]
-        AlertSvc[Alert Service<br/>Stock Notifications]
+        EmailSvc[Email Service<br/>Notifications & Alerts]
+        MonitorSvc[Monitoring Service<br/>Inventory Tracking]
     end
 
     subgraph "Data Layer"
@@ -38,97 +47,155 @@ graph TB
             Products[products<br/>Inventory Management]
             Sales[sales<br/>Transaction Records]
             Categories[categories<br/>Product Classification]
-            Alerts[alerts<br/>System Notifications]
-            Reports[reports<br/>Generated Analytics]
+            Brands[brands<br/>Brand Management]
+            Invoices[invoices<br/>Purchase Records]
+            Transfers[transfers<br/>Stock Movements]
+            AuditLogs[audit_logs<br/>System Audit Trail]
         end
     end
 
     subgraph "External Services"
-        Email[Email Service<br/>SMTP/SendGrid]
+        Gmail[Gmail SMTP<br/>Email Delivery]
         Storage[File Storage<br/>PDF Reports/Images]
-        Logger[Logging Service<br/>Winston/Morgan]
+        Logger[Winston Logger<br/>Structured Logging]
+        Health[Health Monitoring<br/>System Status]
+    end
+
+    subgraph "Cloud Infrastructure"
+        MongoAtlas[MongoDB Atlas<br/>Database Hosting]
+        RedisCloud[Redis Cloud<br/>Caching Service]
+        Render[Render.com<br/>Backend Hosting]
+        Vercel[Vercel<br/>Frontend Hosting]
     end
 
     %% Connections
     UI --> Gateway
     Comp --> Context
     Router --> Comp
+    State --> Context
     
     Gateway --> Auth
     Gateway --> Rate
     Gateway --> CORS
+    Gateway --> Valid
+    
+    Gateway --> CacheManager
+    CacheManager --> Redis
+    CacheManager --> Memory
     
     Auth --> AuthSvc
     Gateway --> ProdSvc
     Gateway --> SalesSvc
     Gateway --> ReportSvc
     Gateway --> DashSvc
-    Gateway --> AlertSvc
+    Gateway --> EmailSvc
+    Gateway --> MonitorSvc
     
     AuthSvc --> Users
     ProdSvc --> Products
     ProdSvc --> Categories
+    ProdSvc --> Brands
     SalesSvc --> Sales
+    SalesSvc --> Invoices
     SalesSvc --> Products
-    ReportSvc --> Reports
     ReportSvc --> Sales
     ReportSvc --> Products
     DashSvc --> Sales
     DashSvc --> Products
-    AlertSvc --> Alerts
-    AlertSvc --> Products
+    EmailSvc --> Gmail
+    MonitorSvc --> Products
+    MonitorSvc --> EmailSvc
     
     Users --> Mongo
     Products --> Mongo
     Sales --> Mongo
     Categories --> Mongo
-    Alerts --> Mongo
-    Reports --> Mongo
+    Brands --> Mongo
+    Invoices --> Mongo
+    Transfers --> Mongo
+    AuditLogs --> Mongo
     
-    ReportSvc --> Email
-    ReportSvc --> Storage
     Gateway --> Logger
+    Gateway --> Health
+    
+    Mongo --> MongoAtlas
+    Redis --> RedisCloud
+    Gateway --> Render
+    UI --> Vercel
 
     classDef frontend fill:#e1f5fe
     classDef backend fill:#f3e5f5
     classDef database fill:#e8f5e8
     classDef external fill:#fff3e0
+    classDef cache fill:#fce4ec
+    classDef cloud fill:#f1f8e9
     
-    class UI,Comp,Context,Router frontend
-    class Gateway,Auth,Rate,CORS,AuthSvc,ProdSvc,SalesSvc,ReportSvc,DashSvc,AlertSvc backend
-    class Mongo,Users,Products,Sales,Categories,Alerts,Reports database
-    class Email,Storage,Logger external
+    class UI,Comp,Context,Router,State frontend
+    class Gateway,Auth,Rate,CORS,Valid,AuthSvc,ProdSvc,SalesSvc,ReportSvc,DashSvc,EmailSvc,MonitorSvc backend
+    class Mongo,Users,Products,Sales,Categories,Brands,Invoices,Transfers,AuditLogs database
+    class Gmail,Storage,Logger,Health external
+    class Redis,Memory,CacheManager cache
+    class MongoAtlas,RedisCloud,Render,Vercel cloud
 ```
 
-## Current State Analysis (A-C Completed)
+## System Status Overview
 
-### ✅ Completed Features (80-85% MVP)
+### ✅ Completed Features (90%+ Implementation)
 
-**A. Core Authentication & Authorization**
-- JWT-based authentication system
-- Role-based access control (Admin, Manager, Cashier)
+**A. Advanced Authentication & Authorization**
+- JWT-based authentication with refresh token support
+- Role-based access control (Admin, Manager, Cashier, Viewer)
 - Protected routes and API endpoints
-- User management and profiles
+- Password reset functionality via email
+- User management and profile system
+- Session management and security
 
-**B. Inventory Management (CRUD)**
-- Complete product management system
-- Category-based organization
-- Stock level tracking and alerts
-- Search and filtering capabilities
-- Low stock monitoring
+**B. Comprehensive Inventory Management**
+- Complete product CRUD operations
+- Category and brand management
+- Multi-branch stock tracking
+- Advanced search and filtering
+- Low stock monitoring with email alerts
+- Automated inventory checks every 60 minutes
 
-**C. Sales Processing**
+**C. Sales Processing & Transaction Management**
 - Point-of-sale interface
 - Real-time stock deduction
 - Multiple payment methods
-- Transaction history
-- Customer information capture
+- Transaction history and tracking
+- Invoice management
+- Receipt generation
 
-**D. Reporting & Analytics**
-- Comprehensive dashboard
-- Sales performance charts
-- Inventory status reports
-- PDF report generation
+**D. Advanced Reporting & Analytics**
+- Comprehensive dashboard with real-time metrics
+- Sales performance charts and analytics
+- Inventory status reports with insights
+- PDF report generation and email delivery
+- Financial reporting and trend analysis
+- Performance monitoring and tracking
+
+**E. Professional Email System**
+- Automated low stock alerts
+- Password reset emails with secure tokens
+- Welcome emails for new users
+- Report delivery via email
+- Professional HTML email templates
+- Gmail SMTP integration with App Password security
+
+**F. High-Performance Caching**
+- Redis Cloud integration for distributed caching
+- Intelligent fallback to in-memory caching
+- Cache invalidation patterns
+- Performance monitoring and hit rate tracking
+- Optimized database query caching
+
+**G. Security & Performance**
+- Rate limiting and request throttling
+- Input validation and sanitization
+- Comprehensive error handling
+- Health monitoring endpoints
+- Structured logging with Winston
+- Database optimization and indexing
 - Date range filtering
 
 **E. Modern UI/UX**
@@ -180,72 +247,133 @@ graph TB
    - Date range filters
    - Category/subcategory filters
    - Custom field filtering
+## Development Roadmap
 
-### Phase 3: Business Intelligence (Week 5-6)
+### ✅ Phase 1: Core MVP (Completed)
+**Status: Complete**
+
+1. **Authentication & Authorization ✅**
+   - JWT authentication with refresh tokens
+   - Role-based access control (Admin, Manager, Cashier, Viewer)
+   - Password reset functionality
+   - User management system
+
+2. **Product Management ✅**
+   - Complete CRUD operations
+   - Category and brand management
+   - Stock tracking with alerts
+   - Advanced search and filtering
+
+3. **Sales System ✅**
+   - Point-of-sale interface
+   - Transaction processing
+   - Real-time inventory updates
+   - Payment method handling
+
+### ✅ Phase 2: Advanced Features (Completed)
+**Status: Complete**
+
+1. **Email System ✅**
+   - Professional email templates
+   - Automated low stock alerts
+   - Password reset emails
+   - Report delivery via email
+
+2. **Caching & Performance ✅**
+   - Redis Cloud integration
+   - Intelligent cache fallback
+   - Database optimization
+   - Performance monitoring
+
+3. **Enhanced Reporting ✅**
+   - Comprehensive dashboard analytics
+   - PDF report generation
+   - Sales performance tracking
+   - Inventory insights
+
+### 🚧 Phase 3: Business Intelligence (In Progress)
 **Priority: Medium**
 
-1. **Advanced Analytics**
+1. **Advanced Analytics** 🔄
    - Profit/loss analysis
-   - Sales forecasting
-   - Inventory optimization
-   - Performance metrics
+   - Sales forecasting algorithms
+   - Inventory optimization recommendations
+   - Advanced performance metrics
 
-2. **Automated Alerts**
-   - Email notifications
-   - Low stock alerts
-   - Expiry date warnings
-   - Sales threshold alerts
+2. **Enhanced Frontend** 🔄
+   - Modern React components
+   - Responsive design improvements
+   - Real-time updates
+   - Advanced UI interactions
 
-3. **Enhanced Reporting**
-   - Tax reports
-   - Supplier reports
-   - Performance dashboards
-   - Custom report builder
+3. **Mobile Optimization** 📋
+   - Mobile-first responsive design
+   - Touch-friendly interfaces
+   - Offline capability
+   - Progressive Web App features
 
-### Phase 4: Multi-Branch & Scaling (Week 7-8)
+### 📋 Phase 4: Enterprise Features (Planned)
 **Priority: Low**
 
 1. **Multi-Branch Support**
-   - Branch management
-   - Inter-branch transfers
+   - Branch management system
+   - Inter-branch stock transfers
    - Centralized reporting
-   - Role-based branch access
+   - Branch-specific role access
 
-2. **Advanced Features**
-   - Real-time notifications
-   - Audit logging
-   - Data backup/restore
-   - Performance monitoring
+2. **Integration & APIs**
+   - Third-party POS integration
+   - Accounting system APIs
+   - Barcode scanner integration
+   - External reporting tools
 
-## Technology Stack
+3. **Advanced Security**
+   - Two-factor authentication
+   - Advanced audit logging
+   - Data encryption at rest
+   - Compliance features
 
-### Frontend
-- **React 18** - Component-based UI library
-- **Vite** - Fast build tool and dev server
-- **Tailwind CSS** - Utility-first styling
-- **React Router** - Client-side routing
-- **Chart.js** - Data visualization
-- **Axios** - HTTP client
+## Technology Stack Details
 
-### Backend
-- **Node.js** - JavaScript runtime
-- **Express.js** - Web framework
-- **MongoDB** - NoSQL database
-- **Mongoose** - ODM for MongoDB
-- **JWT** - Authentication tokens
-- **bcryptjs** - Password hashing
+### Frontend Technologies
+- **React 18** - Modern component-based UI library
+- **Vite** - Lightning-fast build tool and dev server
+- **Tailwind CSS** - Utility-first CSS framework
+- **React Router** - Declarative client-side routing
+- **Lucide React** - Beautiful, customizable icons
+- **Axios** - Promise-based HTTP client
+- **Chart.js** - Flexible data visualization library
 
-### DevOps & Quality
-- **ESLint** - Code linting
-- **Prettier** - Code formatting
-- **Husky** - Git hooks
-- **Jest** - Testing framework
-- **Winston** - Logging
-- **Joi/Zod** - Validation
+### Backend Technologies
+- **Node.js 18+** - JavaScript runtime environment
+- **Express.js** - Fast, minimal web framework
+- **MongoDB Atlas** - Cloud-hosted NoSQL database
+- **Mongoose** - Elegant MongoDB object modeling
+- **JWT** - Secure authentication tokens
+- **bcryptjs** - Password hashing library
+- **Nodemailer** - Email sending functionality
+- **Redis** - High-performance in-memory caching
+- **Winston** - Versatile logging library
 
-## Data Architecture
+### Cloud Services & Infrastructure
+- **MongoDB Atlas** - Database hosting and management
+- **Redis Cloud** - Managed Redis caching service
+- **Gmail SMTP** - Reliable email delivery service
+- **Render** - Backend application hosting
+- **Vercel** - Frontend deployment and CDN
+- **GitHub** - Version control and CI/CD
 
-### Core Collections
+### Development & Quality Tools
+- **ESLint** - JavaScript linting and code quality
+- **Prettier** - Opinionated code formatting
+- **Husky** - Git hooks for quality gates
+- **Jest** - JavaScript testing framework
+- **Supertest** - HTTP assertion testing
+- **Joi** - Object schema validation
+
+## Enhanced Data Architecture
+
+### Core Collections with Relationships
 
 ```mermaid
 erDiagram
@@ -256,8 +384,10 @@ erDiagram
         string email UK
         string password
         enum role
+        object profile
         boolean isActive
         date lastLogin
+        array permissions
         date createdAt
         date updatedAt
     }
@@ -269,14 +399,15 @@ erDiagram
         string sku UK
         string barcode UK
         ObjectId categoryId FK
-        number price
-        number costPrice
-        number quantity
-        number reorderLevel
-        number maxStockLevel
+        ObjectId brandId FK
+        object pricing
+        object stock
+        object stockByBranch
         string supplier
         date expiryDate
-        number gstRate
+        boolean isPerishable
+        array tags
+        string images
         boolean isActive
         ObjectId createdBy FK
         date createdAt
@@ -288,7 +419,20 @@ erDiagram
         string name UK
         string description
         ObjectId parentId FK
+        string slug UK
         string image
+        number sortOrder
+        boolean isActive
+        date createdAt
+        date updatedAt
+    }
+
+    Brand {
+        ObjectId _id PK
+        string name UK
+        string description
+        string logo
+        object contact
         boolean isActive
         date createdAt
         date updatedAt
@@ -301,104 +445,264 @@ erDiagram
         object customer
         object totals
         object payment
+        object taxes
         ObjectId cashierId FK
+        ObjectId branchId FK
         string notes
         enum status
         date createdAt
         date updatedAt
     }
 
-    SaleItem {
-        ObjectId productId FK
-        string productName
-        string sku
-        number quantity
-        number price
-        number totalPrice
-        number discountAmount
-        number taxAmount
+    Invoice {
+        ObjectId _id PK
+        string invoiceNumber UK
+        ObjectId supplierId FK
+        array items
+        object totals
+        enum status
+        date dueDate
+        date paidDate
+        ObjectId createdBy FK
+        date createdAt
+        date updatedAt
     }
 
-    Alert {
+    Transfer {
         ObjectId _id PK
-        enum type
-        string message
-        ObjectId productId FK
+        string transferNumber UK
+        ObjectId fromBranch FK
+        ObjectId toBranch FK
+        array items
+        enum status
+        ObjectId requestedBy FK
+        ObjectId approvedBy FK
+        date requestDate
+        date approvalDate
+        date completedDate
+    }
+
+    AuditLog {
+        ObjectId _id PK
+        string action
+        string collection
+        ObjectId documentId
         ObjectId userId FK
-        boolean isRead
-        enum priority
-        date createdAt
-        date resolvedAt
-    }
-
-    Report {
-        ObjectId _id PK
-        enum type
-        object period
-        object filters
-        object data
-        string fileUrl
-        ObjectId generatedBy FK
-        date createdAt
+        object changes
+        string ipAddress
+        string userAgent
+        date timestamp
     }
 
     User ||--o{ Product : creates
     User ||--o{ Sale : processes
-    User ||--o{ Alert : receives
-    User ||--o{ Report : generates
-    Category ||--o{ Product : contains
+    User ||--o{ Invoice : manages
+    User ||--o{ Transfer : requests
+    User ||--o{ AuditLog : performs
+    Category ||--o{ Product : categorizes
+    Brand ||--o{ Product : brands
     Category ||--o{ Category : parent
-    Product ||--o{ SaleItem : sold_in
+    Product ||--o{ Sale : sold_in
     Sale ||--o{ SaleItem : contains
-    Product ||--o{ Alert : triggers
+    Product ||--o{ TransferItem : transferred
+    Transfer ||--o{ TransferItem : contains
 ```
 
-## Security Architecture
+## Security Architecture Details
 
-### Authentication Flow
-1. User submits credentials
-2. Server validates against database
-3. JWT token generated with user payload
-4. Token stored in client (httpOnly cookie recommended)
-5. Token validated on protected routes
-6. Refresh token for session management
+### Authentication & Authorization Flow
 
-### Authorization Levels
-- **Cashier**: Sales operations, basic inventory view
-- **Manager**: Full inventory management, reports
-- **Admin**: User management, system configuration
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant API as API Gateway
+    participant Auth as Auth Service
+    participant Cache as Redis Cache
+    participant DB as MongoDB
 
-### Security Measures
-- Password hashing with bcrypt
-- JWT token expiration
-- Rate limiting on API endpoints
-- CORS configuration
-- Input validation and sanitization
-- SQL injection prevention via Mongoose
+    C->>API: Login Request
+    API->>Auth: Validate Credentials
+    Auth->>DB: Check User
+    DB-->>Auth: User Data
+    Auth->>Cache: Store Session
+    Auth-->>API: JWT + Refresh Token
+    API-->>C: Tokens + User Data
+    
+    C->>API: Protected Request + JWT
+    API->>Cache: Validate Token
+    Cache-->>API: Token Valid
+    API->>API: Check Permissions
+    API-->>C: Authorized Response
+```
+
+### Role-Based Access Control Matrix
+
+| Resource | Admin | Manager | Cashier | Viewer |
+|----------|-------|---------|---------|--------|
+| Users | CRUD | R | - | - |
+| Products | CRUD | CRUD | R | R |
+| Categories | CRUD | CRUD | R | R |
+| Sales | CRUD | CRUD | CR | R |
+| Reports | CRUD | CRUD | R | R |
+| Settings | CRUD | R | - | - |
+| Cache | CRUD | R | - | - |
+| Email | CRUD | CRU | - | - |
+
+### Security Measures Implementation
+
+1. **Password Security**
+   - bcrypt hashing with salt rounds
+   - Minimum password requirements
+   - Password history tracking
+   - Account lockout after failed attempts
+
+2. **Token Security**
+   - JWT with expiration (24h access, 7d refresh)
+   - Secure token storage recommendations
+   - Token blacklisting on logout
+   - Refresh token rotation
+
+3. **API Security**
+   - Rate limiting (100 req/15min)
+   - Request validation with Joi schemas
+   - Input sanitization (XSS prevention)
+   - CORS configuration
+   - Helmet security headers
+
+## Performance Architecture
+
+### Caching Strategy
+
+```mermaid
+graph LR
+    Client[Client Request] --> API[API Gateway]
+    API --> Cache{Cache Check}
+    Cache -->|Hit| Return[Return Cached]
+    Cache -->|Miss| DB[Database Query]
+    DB --> Process[Process & Cache]
+    Process --> Return
+    
+    subgraph "Cache Layer"
+        Redis[(Redis Cloud)]
+        Memory[(Node Cache)]
+        Redis -.->|Failover| Memory
+    end
+```
+
+### Database Optimization
+
+1. **Indexing Strategy**
+   - Compound indexes for complex queries
+   - Text indexes for search functionality
+   - TTL indexes for temporary data
+   - Sparse indexes for optional fields
+
+2. **Query Optimization**
+   - Aggregation pipelines for analytics
+   - Projection to limit returned fields
+   - Population strategies for references
+   - Connection pooling (10 max, 5 min)
+
+### Performance Monitoring
+
+1. **Response Time Metrics**
+   - API endpoint performance tracking
+   - Database query performance
+   - Cache hit rate monitoring
+   - Email delivery tracking
+
+2. **Health Checks**
+   - Database connection status
+   - Redis connection status
+   - Email service availability
+   - System resource monitoring
 
 ## Deployment Architecture
 
-### Development
+### Development Environment
 ```
-Frontend (localhost:3000) → Backend (localhost:5000) → MongoDB Atlas
+Local Frontend (Vite:5173) 
+    ↓ HTTP
+Local Backend (Node:5000)
+    ↓ Atlas Connection
+MongoDB Atlas (Cloud)
+    ↓ Redis Connection  
+Redis Cloud (Cache)
+    ↓ SMTP
+Gmail (Email Service)
 ```
 
-### Production
+### Production Environment
 ```
-Vercel (Frontend) → Render/Heroku (Backend) → MongoDB Atlas
+Vercel CDN (Frontend)
+    ↓ HTTPS
+Render (Backend Container)
+    ↓ Atlas Connection
+MongoDB Atlas (Production)
+    ↓ Redis Connection
+Redis Cloud (Production)
+    ↓ SMTP
+Gmail (Production Email)
 ```
 
-## Performance Considerations
+### CI/CD Pipeline
 
-### Database Optimization
-- Indexing on frequently queried fields
-- Aggregation pipelines for complex queries
-- Connection pooling
-- Query optimization
+1. **Development Workflow**
+   - Feature branch creation
+   - Local development and testing
+   - Pull request with automated checks
+   - Code review and approval
+   - Merge to main branch
 
-### Frontend Optimization
-- Code splitting and lazy loading
-- Image optimization
+2. **Automated Deployment**
+   - GitHub Actions triggers
+   - Backend deployment to Render
+   - Frontend deployment to Vercel
+   - Environment variable management
+   - Health check verification
+
+## Scalability Considerations
+
+### Horizontal Scaling Strategies
+
+1. **Database Scaling**
+   - MongoDB Atlas auto-scaling
+   - Read replicas for read-heavy workloads
+   - Sharding for large datasets
+   - Connection pooling optimization
+
+2. **Application Scaling**
+   - Stateless API design
+   - Redis session storage
+   - Load balancer configuration
+   - Microservices architecture preparation
+
+3. **Performance Optimization**
+   - CDN for static assets
+   - Image optimization and compression
+   - API response caching
+   - Database query optimization
+
+### Monitoring & Observability
+
+1. **Application Monitoring**
+   - Error tracking and alerting
+   - Performance metrics collection
+   - User behavior analytics
+   - Business metrics tracking
+
+2. **Infrastructure Monitoring**
+   - Server resource utilization
+   - Database performance metrics
+   - Cache performance analytics
+   - Network latency monitoring
+
+---
+
+**Architecture Documentation**
+
+*Last updated: September 23, 2025*
+*System Status: Production Ready with Advanced Features*
 - Bundle size optimization
 - Caching strategies
 

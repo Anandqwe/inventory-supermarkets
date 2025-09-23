@@ -266,7 +266,7 @@ function Products() {
       header: 'Category',
       cell: ({ row }) => (
         <Badge variant="outline" className="capitalize">
-          {row.original.category}
+          {row.original.category?.name || row.original.category || 'N/A'}
         </Badge>
       ),
     },
@@ -275,7 +275,7 @@ function Products() {
       header: 'Price',
       cell: ({ row }) => (
         <div className="font-medium">
-          ₹{row.original.price.toLocaleString('en-IN')}
+          ₹{(row.original.price || 0).toLocaleString('en-IN')}
         </div>
       ),
     },
@@ -312,7 +312,7 @@ function Products() {
       header: 'Supplier',
       cell: ({ row }) => (
         <span className="text-sm text-surface-600 dark:text-surface-400">
-          {row.original.supplier || 'N/A'}
+          {row.original.supplier?.name || row.original.supplier || 'N/A'}
         </span>
       ),
     },
@@ -405,10 +405,10 @@ function Products() {
         `"${product.name}"`,
         product.sku || '',
         product.barcode || '',
-        product.category || '',
+        product.category?.name || product.category || '',
         product.price || 0,
         product.stock || 0,
-        `"${product.supplier || ''}"`
+        `"${product.supplier?.name || product.supplier || ''}"`
       ].join(','))
     ].join('\n');
 
