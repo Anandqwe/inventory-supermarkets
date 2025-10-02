@@ -4,6 +4,7 @@ const Sale = require('../models/Sale');
 const Branch = require('../models/Branch');
 const User = require('../models/User');
 const Category = require('../models/Category');
+const Customer = require('../models/Customer');
 const ResponseUtils = require('../utils/responseUtils');
 const mongoose = require('mongoose');
 
@@ -96,7 +97,7 @@ class DashboardController {
             sku: 1,
             category: 1,
             quantity: 1,
-            price: 1,
+            price: '$pricing.sellingPrice',
             lowStockBranches: 1
           }
         }
@@ -125,7 +126,7 @@ class DashboardController {
           $group: {
             _id: '$product.category',
             totalSales: { $sum: '$items.quantity' },
-            totalRevenue: { $sum: { $multiply: ['$items.quantity', '$items.price'] } }
+            totalRevenue: { $sum: { $multiply: ['$items.quantity', '$items.unitPrice'] } }
           }
         },
         {
@@ -167,7 +168,7 @@ class DashboardController {
           $group: {
             _id: '$items.product',
             totalQuantity: { $sum: '$items.quantity' },
-            totalRevenue: { $sum: { $multiply: ['$items.quantity', '$items.price'] } }
+            totalRevenue: { $sum: { $multiply: ['$items.quantity', '$items.unitPrice'] } }
           }
         },
         {
@@ -439,8 +440,8 @@ class DashboardController {
             currentStock: 1,
             minStockLevel: 1,
             maxStockLevel: 1,
-            price: 1,
-            costPrice: 1,
+            price: '$pricing.sellingPrice',
+            costPrice: '$pricing.costPrice',
             stockStatus: {
               $cond: {
                 if: { $lte: ["$currentStock", 5] },
@@ -579,7 +580,7 @@ class DashboardController {
             sku: 1,
             category: 1,
             currentStock: 1,
-            price: 1,
+            price: '$pricing.sellingPrice',
             inventoryValue: { $round: ['$inventoryValue', 2] }
           }
         },

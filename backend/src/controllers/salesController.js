@@ -62,7 +62,7 @@ class SalesController {
         }
 
         // Find branch stock
-        const branchStock = product.branchStocks.find(
+        const branchStock = product.stockByBranch.find(
           stock => stock.branch.toString() === targetBranchId.toString()
         );
 
@@ -136,10 +136,10 @@ class SalesController {
         await Product.updateOne(
           { 
             _id: update.productId,
-            'branchStocks.branch': update.branchId
+            'stockByBranch.branch': update.branchId
           },
           { 
-            $set: { 'branchStocks.$.quantity': update.newQuantity }
+            $set: { 'stockByBranch.$.quantity': update.newQuantity }
           },
           { session }
         );
@@ -443,10 +443,10 @@ class SalesController {
         await Product.updateOne(
           { 
             _id: item.product,
-            'branchStocks.branch': sale.branch
+            'stockByBranch.branch': sale.branch
           },
           { 
-            $inc: { 'branchStocks.$.quantity': item.quantity }
+            $inc: { 'stockByBranch.$.quantity': item.quantity }
           },
           { session }
         );
@@ -630,10 +630,10 @@ class SalesController {
             await Product.updateOne(
               { 
                 _id: refundItem.productId,
-                'branchStocks.branch': sale.branch
+                'stockByBranch.branch': sale.branch
               },
               { 
-                $inc: { 'branchStocks.$.quantity': refundItem.quantity }
+                $inc: { 'stockByBranch.$.quantity': refundItem.quantity }
               },
               { session }
             );
@@ -645,10 +645,10 @@ class SalesController {
           await Product.updateOne(
             { 
               _id: item.product._id,
-              'branchStocks.branch': sale.branch
+              'stockByBranch.branch': sale.branch
             },
             { 
-              $inc: { 'branchStocks.$.quantity': item.quantity }
+              $inc: { 'stockByBranch.$.quantity': item.quantity }
             },
             { session }
           );

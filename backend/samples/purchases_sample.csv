@@ -1,0 +1,11 @@
+Date,Purchase Order ID,Supplier,Product,Quantity Ordered,Unit Cost,Total Cost,GST Amount,Status,Branch,Received Date
+2024-01-10,PO-240110-001,Amul Dairy,"Amul Fresh Milk 500ml",200,25.00,5000.00,238.10,Completed,Main Store,2024-01-12
+2024-01-10,PO-240110-002,Tata Consumer,"Tata Salt 1kg",500,18.00,9000.00,428.57,Completed,Main Store,2024-01-12
+2024-01-11,PO-240111-001,Nestle India,"Maggi Noodles 70g",300,12.50,3750.00,450.00,Completed,Branch A,2024-01-13
+2024-01-11,PO-240111-002,Tata Consumer,"Basmati Rice 1kg",150,72.00,10800.00,514.29,Completed,Main Store,2024-01-13
+2024-01-12,PO-240112-001,Britannia Industries,"Britannia Good Day 100g",120,29.50,3540.00,424.80,Completed,Branch B,2024-01-14
+2024-01-12,PO-240112-002,Patanjali Ayurved,"Patanjali Honey 500g",60,152.00,9120.00,434.29,Completed,Main Store,2024-01-14
+2024-01-13,PO-240113-001,PepsiCo India,"Pepsi 600ml",200,22.00,4400.00,1025.58,Completed,Branch A,2024-01-15
+2024-01-13,PO-240113-002,Himalaya Drug Company,"Himalaya Face Wash 100ml",80,76.27,6101.60,1098.29,Completed,Branch C,2024-01-15
+2024-01-14,PO-240114-001,Hindustan Unilever,"Closeup Toothpaste 150g",100,52.54,5254.00,946.72,Completed,Main Store,2024-01-16
+2024-01-14,PO-240114-002,Hindustan Unilever,"Surf Excel 1kg",60,169.49,10169.40,1830.49,Completed,Branch A,2024-01-16

@@ -484,7 +484,7 @@ class PurchaseController {
 
             // Update product stock in branch
             const product = await Product.findById(receivedItem.product);
-            const branchStock = product.branchStocks.find(
+            const branchStock = product.stockByBranch.find(
               stock => stock.branch.toString() === purchase.branch.toString()
             );
 
@@ -493,11 +493,11 @@ class PurchaseController {
               await Product.updateOne(
                 {
                   _id: receivedItem.product,
-                  'branchStocks.branch': purchase.branch
+                  'stockByBranch.branch': purchase.branch
                 },
                 {
-                  $inc: { 'branchStocks.$.quantity': receivedItem.quantity },
-                  $set: { 'branchStocks.$.lastUpdated': new Date() }
+                  $inc: { 'stockByBranch.$.quantity': receivedItem.quantity },
+                  $set: { 'stockByBranch.$.lastUpdated': new Date() }
                 },
                 { session }
               );
@@ -507,7 +507,7 @@ class PurchaseController {
                 { _id: receivedItem.product },
                 {
                   $push: {
-                    branchStocks: {
+                    stockByBranch: {
                       branch: purchase.branch,
                       quantity: receivedItem.quantity,
                       minLevel: 0,
@@ -583,25 +583,25 @@ class PurchaseController {
 
       const pipeline = [
         { $match: filter },
-        { $unwind: '$branchStocks' }
+        { $unwind: '$stockByBranch' }
       ];
 
       if (branchFilter) {
-        pipeline.push({ $match: { 'branchStocks.branch': branchFilter } });
+        pipeline.push({ $match: { 'stockByBranch.branch': branchFilter } });
       }
 
       pipeline.push(
         {
           $match: {
             $expr: {
-              $lt: ['$branchStocks.quantity', '$branchStocks.minLevel']
+              $lt: ['$stockByBranch.quantity', '$stockByBranch.minLevel']
             }
           }
         },
         {
           $lookup: {
             from: 'branches',
-            localField: 'branchStocks.branch',
+            localField: 'stockByBranch.branch',
             foreignField: '_id',
             as: 'branchInfo'
           }
@@ -627,7 +627,7 @@ class PurchaseController {
             name: 1,
             sku: 1,
             branch: {
-              _id: '$branchStocks.branch',
+              _id: '$stockByBranch.branch',
               name: { $arrayElemAt: ['$branchInfo.name', 0] },
               code: { $arrayElemAt: ['$branchInfo.code', 0] }
             },
@@ -639,13 +639,13 @@ class PurchaseController {
             category: {
               name: { $arrayElemAt: ['$categoryInfo.name', 0] }
             },
-            currentStock: '$branchStocks.quantity',
-            minLevel: '$branchStocks.minLevel',
-            maxLevel: '$branchStocks.maxLevel',
+            currentStock: '$stockByBranch.quantity',
+            minLevel: '$stockByBranch.minLevel',
+            maxLevel: '$stockByBranch.maxLevel',
             suggestedQuantity: {
-              $subtract: ['$branchStocks.maxLevel', '$branchStocks.quantity']
+              $subtract: ['$stockByBranch.maxLevel', '$stockByBranch.quantity']
             },
-            lastUpdated: '$branchStocks.lastUpdated'
+            lastUpdated: '$stockByBranch.lastUpdated'
           }
         },
         {

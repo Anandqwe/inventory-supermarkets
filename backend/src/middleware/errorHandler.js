@@ -481,26 +481,41 @@ const securityHeaders = (req, res, next) => {
 };
 
 /**
- * Enhanced CORS configuration with security features
+ * Enhanced CORS configuration with security features and demo mode support
  */
+const DEMO_CONFIG = require('../config/demo');
+
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, postman, etc.) only in development
-    if (!origin && process.env.NODE_ENV === 'development') {
-      return callback(null, true);
+    // In demo mode or development, be more permissive
+    if (DEMO_CONFIG.demoMode || process.env.NODE_ENV === 'development') {
+      // Allow requests with no origin (mobile apps, postman, etc.)
+      if (!origin) {
+        return callback(null, true);
+      }
     }
     
+    // Combine configured origins with demo origins
     const allowedOrigins = [
       'http://localhost:3000',
       'http://localhost:5173',
       'http://localhost:4200',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:5173',
+      'http://127.0.0.1:4200',
       'https://your-frontend-domain.vercel.app',
-      process.env.FRONTEND_URL
+      process.env.FRONTEND_URL,
+      ...(DEMO_CONFIG.frontend?.corsOrigins || [])
     ].filter(Boolean); // Remove undefined values
     
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
+      // In demo mode, allow any localhost/127.0.0.1 origin
+      if (DEMO_CONFIG.demoMode && origin && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
+        return callback(null, true);
+      }
+      
       // Log unauthorized CORS attempts
       console.warn(`CORS blocked request from origin: ${origin}`);
       callback(new Error('Not allowed by CORS'));

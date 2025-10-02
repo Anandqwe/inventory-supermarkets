@@ -156,7 +156,7 @@ class ProductController {
       .populate('brand', 'name')
       .populate('unit', 'name symbol')
       .populate('supplier', 'name')
-      .populate('branchStocks.branch', 'name code');
+      .populate('stockByBranch.branch', 'name code');
 
     res.status(201).json(
       ResponseUtils.success('Product created successfully', populatedProduct, 201)
@@ -205,7 +205,7 @@ class ProductController {
 
     // Branch access filter for non-admin users
     if (req.user.role !== 'admin' && req.user.branch) {
-      filter['branchStocks.branch'] = req.user.branch;
+      filter['stockByBranch.branch'] = req.user.branch;
     }
 
     const pageNum = parseInt(page);
@@ -224,7 +224,7 @@ class ProductController {
           $expr: {
             $anyElementTrue: {
               $map: {
-                input: "$branchStocks",
+                input: "$stockByBranch",
                 as: "stock",
                 in: { $lte: ["$$stock.quantity", "$$stock.reorderLevel"] }
               }
@@ -238,7 +238,7 @@ class ProductController {
     if (branch) {
       pipeline.push({
         $match: {
-          'branchStocks.branch': mongoose.Types.ObjectId(branch)
+          'stockByBranch.branch': mongoose.Types.ObjectId(branch)
         }
       });
     }
@@ -280,7 +280,7 @@ class ProductController {
       {
         $lookup: {
           from: 'branches',
-          localField: 'branchStocks.branch',
+          localField: 'stockByBranch.branch',
           foreignField: '_id',
           as: 'branchData'
         }
@@ -294,6 +294,71 @@ class ProductController {
       { $unwind: { path: '$unit', preserveNullAndEmptyArrays: true } },
       { $unwind: { path: '$supplier', preserveNullAndEmptyArrays: true } }
     );
+
+    // Add computed fields for frontend compatibility
+    pipeline.push({
+      $addFields: {
+        // Flatten pricing
+        price: '$pricing.sellingPrice',
+        costPrice: '$pricing.costPrice',
+        mrp: '$pricing.mrp',
+        
+        // Calculate total stock across branches
+        stock: {
+          $sum: {
+            $map: {
+              input: '$stockByBranch',
+              as: 'branchStock',
+              in: '$$branchStock.quantity'
+            }
+          }
+        },
+        
+        // Calculate minimum stock level
+        minStockLevel: {
+          $sum: {
+            $map: {
+              input: '$stockByBranch',
+              as: 'branchStock', 
+              in: '$$branchStock.reorderLevel'
+            }
+          }
+        },
+        
+        // Get primary image
+        image: {
+          $let: {
+            vars: {
+              primaryImage: {
+                $arrayElemAt: [
+                  {
+                    $filter: {
+                      input: '$images',
+                      as: 'img',
+                      cond: { $eq: ['$$img.isPrimary', true] }
+                    }
+                  },
+                  0
+                ]
+              }
+            },
+            in: {
+              $cond: {
+                if: { $ne: ['$$primaryImage', null] },
+                then: '$$primaryImage.url',
+                else: {
+                  $cond: {
+                    if: { $gt: [{ $size: { $ifNull: ['$images', []] } }, 0] },
+                    then: { $arrayElemAt: ['$images.url', 0] },
+                    else: null
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
 
     // Add sorting
     const sortDirection = sortOrder === 'desc' ? -1 : 1;
@@ -341,7 +406,7 @@ class ProductController {
       .populate('brand', 'name')
       .populate('unit', 'name symbol')
       .populate('supplier', 'name contact')
-      .populate('branchStocks.branch', 'name code')
+      .populate('stockByBranch.branch', 'name code')
       .populate('createdBy', 'firstName lastName');
 
     if (!product) {
@@ -350,8 +415,19 @@ class ProductController {
       );
     }
 
+    // Add computed fields for frontend compatibility
+    const productWithComputedFields = {
+      ...product.toObject(),
+      price: product.pricing?.sellingPrice || 0,
+      costPrice: product.pricing?.costPrice || 0,
+      mrp: product.pricing?.mrp || 0,
+      stock: product.stockByBranch?.reduce((total, stock) => total + stock.quantity, 0) || 0,
+      minStockLevel: product.stockByBranch?.reduce((total, stock) => total + stock.reorderLevel, 0) || 0,
+      image: product.images?.find(img => img.isPrimary)?.url || product.images?.[0]?.url || null
+    };
+
     res.json(
-      ResponseUtils.success('Product retrieved successfully', product)
+      ResponseUtils.success('Product retrieved successfully', productWithComputedFields)
     );
   });
 
@@ -409,7 +485,7 @@ class ProductController {
      .populate('brand', 'name')
      .populate('unit', 'name symbol')
      .populate('supplier', 'name')
-     .populate('branchStocks.branch', 'name code');
+     .populate('stockByBranch.branch', 'name code');
 
     // Create audit log
     await AuditLog.create({
@@ -483,7 +559,7 @@ class ProductController {
 
       // Apply filters
       if (branch) {
-        filter['branchStocks.branch'] = branch;
+        filter['stockByBranch.branch'] = branch;
       }
       if (category) {
         filter.category = category;
@@ -491,7 +567,7 @@ class ProductController {
 
       // Branch access filter for non-admin users
       if (req.user.role !== 'admin' && req.user.branch) {
-        filter['branchStocks.branch'] = req.user.branch;
+        filter['stockByBranch.branch'] = req.user.branch;
       }
 
       const products = await Product.find(filter)
@@ -499,13 +575,13 @@ class ProductController {
         .populate('brand', 'name')
         .populate('unit', 'name symbol')
         .populate('supplier', 'name')
-        .populate('branchStocks.branch', 'name code')
+        .populate('stockByBranch.branch', 'name code')
         .lean();
 
       if (format === 'csv') {
         // Generate CSV
         const csvData = products.map(product => {
-          const branchStock = product.branchStocks.find(
+          const branchStock = product.stockByBranch.find(
             stock => !branch || stock.branch._id.toString() === branch
           );
 
@@ -762,7 +838,7 @@ class ProductController {
               const updateData = { ...productData, updatedBy: req.user.userId };
               
               // Update branch stock if exists, otherwise add
-              const stockIndex = existingProduct.branchStocks.findIndex(
+              const stockIndex = existingProduct.stockByBranch.findIndex(
                 stock => stock.branch.toString() === targetBranch._id.toString()
               );
 
@@ -784,7 +860,7 @@ class ProductController {
 
             } else {
               // Create new product
-              productData.branchStocks = [branchStock];
+              productData.stockByBranch = [branchStock];
               const product = new Product(productData);
               await product.save();
 
@@ -869,18 +945,18 @@ class ProductController {
     // Additional filters
     if (category) filter.category = category;
     if (brand) filter.brand = brand;
-    if (branch) filter['branchStocks.branch'] = branch;
+    if (branch) filter['stockByBranch.branch'] = branch;
 
     // Branch access filter for non-admin users
     if (req.user.role !== 'admin' && req.user.branch) {
-      filter['branchStocks.branch'] = req.user.branch;
+      filter['stockByBranch.branch'] = req.user.branch;
     }
 
     const products = await Product.find(filter)
       .populate('category', 'name')
       .populate('brand', 'name')
       .populate('unit', 'name symbol')
-      .populate('branchStocks.branch', 'name code')
+      .populate('stockByBranch.branch', 'name code')
       .limit(parseInt(limit))
       .sort({ name: 1 });
 
@@ -921,9 +997,9 @@ class ProductController {
 
     // Branch filter
     if (branch) {
-      filter['branchStocks.branch'] = branch;
+      filter['stockByBranch.branch'] = branch;
     } else if (req.user.role !== 'admin' && req.user.branch) {
-      filter['branchStocks.branch'] = req.user.branch;
+      filter['stockByBranch.branch'] = req.user.branch;
     }
 
     // Find products where any branch stock is at or below reorder level
@@ -933,7 +1009,7 @@ class ProductController {
         $addFields: {
           lowStockBranches: {
             $filter: {
-              input: '$branchStocks',
+              input: '$stockByBranch',
               cond: { $lte: ['$$this.quantity', '$$this.reorderLevel'] }
             }
           }
@@ -1016,12 +1092,12 @@ class ProductController {
     }
 
     // Find or create branch stock
-    const branchStockIndex = product.branchStocks.findIndex(
+    const branchStockIndex = product.stockByBranch.findIndex(
       stock => stock.branch.toString() === targetBranchId.toString()
     );
 
     let newQuantity;
-    const currentQuantity = branchStockIndex >= 0 ? product.branchStocks[branchStockIndex].quantity : 0;
+    const currentQuantity = branchStockIndex >= 0 ? product.stockByBranch[branchStockIndex].quantity : 0;
 
     switch (operation) {
       case 'add':
@@ -1047,8 +1123,8 @@ class ProductController {
       if (branchStockIndex >= 0) {
         // Update existing branch stock
         await Product.updateOne(
-          { _id: id, 'branchStocks.branch': targetBranchId },
-          { $set: { 'branchStocks.$.quantity': newQuantity } },
+          { _id: id, 'stockByBranch.branch': targetBranchId },
+          { $set: { 'stockByBranch.$.quantity': newQuantity } },
           { session }
         );
       } else {
@@ -1093,7 +1169,7 @@ class ProductController {
 
       // Get updated product
       const updatedProduct = await Product.findById(id)
-        .populate('branchStocks.branch', 'name code');
+        .populate('stockByBranch.branch', 'name code');
 
       res.json(
         ResponseUtils.success('Stock updated successfully', {

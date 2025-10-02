@@ -184,28 +184,108 @@ export const purchaseAPI = {
 
 // Master Data API
 export const masterDataAPI = {
-  getSuppliers: async () => {
-    const response = await api.get('/master-data/suppliers');
+  // Categories
+  getCategories: async (params = {}) => {
+    const response = await api.get('/master-data/categories', { params });
     return response.data;
   },
-
-  getBranches: async () => {
-    const response = await api.get('/master-data/branches');
+  
+  createCategory: async (data) => {
+    const response = await api.post('/master-data/categories', data);
     return response.data;
   },
-
-  getCategories: async () => {
-    const response = await api.get('/master-data/categories');
+  
+  updateCategory: async (id, data) => {
+    const response = await api.put(`/master-data/categories/${id}`, data);
     return response.data;
   },
-
-  getBrands: async () => {
-    const response = await api.get('/master-data/brands');
+  
+  deleteCategory: async (id) => {
+    const response = await api.delete(`/master-data/categories/${id}`);
     return response.data;
   },
-
-  getUnits: async () => {
-    const response = await api.get('/master-data/units');
+  
+  // Brands
+  getBrands: async (params = {}) => {
+    const response = await api.get('/master-data/brands', { params });
+    return response.data;
+  },
+  
+  createBrand: async (data) => {
+    const response = await api.post('/master-data/brands', data);
+    return response.data;
+  },
+  
+  updateBrand: async (id, data) => {
+    const response = await api.put(`/master-data/brands/${id}`, data);
+    return response.data;
+  },
+  
+  deleteBrand: async (id) => {
+    const response = await api.delete(`/master-data/brands/${id}`);
+    return response.data;
+  },
+  
+  // Units
+  getUnits: async (params = {}) => {
+    const response = await api.get('/master-data/units', { params });
+    return response.data;
+  },
+  
+  createUnit: async (data) => {
+    const response = await api.post('/master-data/units', data);
+    return response.data;
+  },
+  
+  updateUnit: async (id, data) => {
+    const response = await api.put(`/master-data/units/${id}`, data);
+    return response.data;
+  },
+  
+  deleteUnit: async (id) => {
+    const response = await api.delete(`/master-data/units/${id}`);
+    return response.data;
+  },
+  
+  // Suppliers
+  getSuppliers: async (params = {}) => {
+    const response = await api.get('/master-data/suppliers', { params });
+    return response.data;
+  },
+  
+  createSupplier: async (data) => {
+    const response = await api.post('/master-data/suppliers', data);
+    return response.data;
+  },
+  
+  updateSupplier: async (id, data) => {
+    const response = await api.put(`/master-data/suppliers/${id}`, data);
+    return response.data;
+  },
+  
+  deleteSupplier: async (id) => {
+    const response = await api.delete(`/master-data/suppliers/${id}`);
+    return response.data;
+  },
+  
+  // Branches
+  getBranches: async (params = {}) => {
+    const response = await api.get('/master-data/branches', { params });
+    return response.data;
+  },
+  
+  createBranch: async (data) => {
+    const response = await api.post('/master-data/branches', data);
+    return response.data;
+  },
+  
+  updateBranch: async (id, data) => {
+    const response = await api.put(`/master-data/branches/${id}`, data);
+    return response.data;
+  },
+  
+  deleteBranch: async (id) => {
+    const response = await api.delete(`/master-data/branches/${id}`);
     return response.data;
   }
 };
@@ -225,33 +305,60 @@ export const dashboardAPI = {
 
 // Reports API
 export const reportsAPI = {
-  getDailyReport: async (date) => {
-    const response = await api.get(`/reports/daily?date=${date}`);
+  getDailyReport: async (params = {}) => {
+    const response = await api.get('/reports/daily', { params });
     return response.data;
   },
   
-  getDateRangeReport: async (startDate, endDate, category = '') => {
-    const url = `/reports/daterange?startDate=${startDate}&endDate=${endDate}${category ? `&category=${category}` : ''}`;
-    const response = await api.get(url);
+  getSalesReport: async (params = {}) => {
+    const response = await api.get('/reports/sales', { params });
     return response.data;
   },
   
-  getProductReport: async (startDate, endDate, category = '') => {
-    const url = `/reports/products?startDate=${startDate}&endDate=${endDate}${category ? `&category=${category}` : ''}`;
-    const response = await api.get(url);
+  getProductReport: async (params = {}) => {
+    const response = await api.get('/reports/products', { params });
+    return response.data;
+  },
+  
+  getInventoryReport: async (params = {}) => {
+    const response = await api.get('/reports/inventory', { params });
+    return response.data;
+  },
+  
+  getProfitAnalysis: async (params = {}) => {
+    const response = await api.get('/reports/profit-analysis', { params });
+    return response.data;
+  },
+  
+  getCustomerAnalysis: async (params = {}) => {
+    const response = await api.get('/reports/customer-analysis', { params });
     return response.data;
   },
   
   getAllCategories: async () => {
-    // Fetch all products to extract unique categories
-    const response = await api.get('/products?fields=category');
-    if (response.data && response.data.data) {
-      // Extract unique categories
-      const categories = [...new Set(response.data.data.map(product => product.category))];
-      return categories.filter(Boolean); // Filter out any null/undefined categories
-    }
-    return [];
+    const response = await api.get('/products/categories');
+    return response.data;
   }
 };
+
+// Settings & Profile API
+export const settingsAPI = {
+  getUserProfile: async () => {
+    const response = await api.get('/auth/profile');
+    return response.data;
+  },
+  
+  updateUserProfile: async (data) => {
+    const response = await api.put('/auth/profile', data);
+    return response.data;
+  },
+  
+  changePassword: async (data) => {
+    const response = await api.put('/auth/change-password', data);
+    return response.data;
+  }
+};
+
+
 
 export default api;

@@ -1,0 +1,11 @@
+Date,Adjustment ID,Product,Branch,Adjustment Type,Quantity,Reason,Unit Cost,Total Value,Adjusted By,Approved By,Notes
+2024-01-15,ADJ-240115-001,"Amul Fresh Milk 500ml",Main Store,Decrease,-5,Expired,25.00,-125.00,Rahul Sharma,Ravi Kumar,"Milk expired - removed from inventory"
+2024-01-16,ADJ-240116-001,"Tata Salt 1kg",Branch A,Increase,3,Found Stock,18.00,54.00,Anjali Singh,Ravi Kumar,"Stock found during audit"
+2024-01-16,ADJ-240116-002,"Maggi Noodles 70g",Branch B,Decrease,-8,Damaged,12.50,-100.00,Vikram Joshi,Ravi Kumar,"Damaged packaging during handling"
+2024-01-17,ADJ-240117-001,"Basmati Rice 1kg",Main Store,Decrease,-2,Theft,72.00,-144.00,Rahul Sharma,Ravi Kumar,"Stock discrepancy - possible theft"
+2024-01-17,ADJ-240117-002,"Britannia Good Day 100g",Branch C,Increase,5,Found Stock,29.50,147.50,Pooja Nair,Ravi Kumar,"Stock found in storage area"
+2024-01-18,ADJ-240118-001,"Patanjali Honey 500g",Main Store,Decrease,-1,Damaged,152.00,-152.00,Rahul Sharma,Ravi Kumar,"Container leaked - product damaged"
+2024-01-18,ADJ-240118-002,"Pepsi 600ml",Branch A,Decrease,-12,Expired,22.00,-264.00,Anjali Singh,Ravi Kumar,"Past expiry date - disposed"
+2024-01-19,ADJ-240119-001,"Himalaya Face Wash 100ml",Branch B,Increase,2,Supplier Bonus,76.27,152.54,Vikram Joshi,Ravi Kumar,"Supplier provided bonus stock"
+2024-01-19,ADJ-240119-002,"Closeup Toothpaste 150g",Branch C,Decrease,-6,Damaged,52.54,-315.24,Pooja Nair,Ravi Kumar,"Tubes punctured during transport"
+2024-01-20,ADJ-240120-001,"Surf Excel 1kg",Main Store,Decrease,-1,Expired,169.49,-169.49,Rahul Sharma,Ravi Kumar,"Powder caked due to moisture"

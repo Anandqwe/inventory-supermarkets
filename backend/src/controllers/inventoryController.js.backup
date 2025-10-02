@@ -63,7 +63,7 @@ class InventoryController {
       }
 
       // Get current branch stock
-      const branchStock = product.stockByBranch.find(
+      const branchStock = product.branchStocks.find(
         stock => stock.branch.toString() === branch._id.toString()
       );
 
@@ -129,12 +129,12 @@ class InventoryController {
             await Product.updateOne(
               {
                 _id: product._id,
-                'stockByBranch.branch': branch._id
+                'branchStocks.branch': branch._id
               },
               {
                 $set: {
-                  'stockByBranch.$.quantity': newQuantity,
-                  'stockByBranch.$.lastUpdated': new Date()
+                  'branchStocks.$.quantity': newQuantity,
+                  'branchStocks.$.lastUpdated': new Date()
                 }
               },
               { session }
@@ -145,7 +145,7 @@ class InventoryController {
               { _id: product._id },
               {
                 $push: {
-                  stockByBranch: {
+                  branchStocks: {
                     branch: branch._id,
                     quantity: newQuantity,
                     minLevel: 0,
@@ -380,7 +380,7 @@ class InventoryController {
         }
 
         // Check stock availability in source branch
-        const fromBranchStock = product.stockByBranch.find(
+        const fromBranchStock = product.branchStocks.find(
           stock => stock.branch.toString() === fromBranchId
         );
 
@@ -502,11 +502,11 @@ class InventoryController {
                 await Product.updateOne(
                   {
                     _id: item.product,
-                    'stockByBranch.branch': transfer.fromBranch
+                    'branchStocks.branch': transfer.fromBranch
                   },
                   {
-                    $inc: { 'stockByBranch.$.quantity': -item.quantity },
-                    $set: { 'stockByBranch.$.lastUpdated': new Date() }
+                    $inc: { 'branchStocks.$.quantity': -item.quantity },
+                    $set: { 'branchStocks.$.lastUpdated': new Date() }
                   },
                   { session }
                 );
@@ -521,7 +521,7 @@ class InventoryController {
               // Add stock to destination branch
               for (const item of transfer.receivedItems) {
                 const product = await Product.findById(item.product);
-                const toBranchStock = product.stockByBranch.find(
+                const toBranchStock = product.branchStocks.find(
                   stock => stock.branch.toString() === transfer.toBranch.toString()
                 );
 
@@ -530,11 +530,11 @@ class InventoryController {
                   await Product.updateOne(
                     {
                       _id: item.product,
-                      'stockByBranch.branch': transfer.toBranch
+                      'branchStocks.branch': transfer.toBranch
                     },
                     {
-                      $inc: { 'stockByBranch.$.quantity': item.quantity },
-                      $set: { 'stockByBranch.$.lastUpdated': new Date() }
+                      $inc: { 'branchStocks.$.quantity': item.quantity },
+                      $set: { 'branchStocks.$.lastUpdated': new Date() }
                     },
                     { session }
                   );
@@ -544,7 +544,7 @@ class InventoryController {
                     { _id: item.product },
                     {
                       $push: {
-                        stockByBranch: {
+                        branchStocks: {
                           branch: transfer.toBranch,
                           quantity: item.quantity,
                           minLevel: 0,
@@ -569,11 +569,11 @@ class InventoryController {
                   await Product.updateOne(
                     {
                       _id: item.product,
-                      'stockByBranch.branch': transfer.fromBranch
+                      'branchStocks.branch': transfer.fromBranch
                     },
                     {
-                      $inc: { 'stockByBranch.$.quantity': item.quantity },
-                      $set: { 'stockByBranch.$.lastUpdated': new Date() }
+                      $inc: { 'branchStocks.$.quantity': item.quantity },
+                      $set: { 'branchStocks.$.lastUpdated': new Date() }
                     },
                     { session }
                   );
@@ -738,18 +738,18 @@ class InventoryController {
 
       const pipeline = [
         { $match: filter },
-        { $unwind: '$stockByBranch' }
+        { $unwind: '$branchStocks' }
       ];
 
       if (branchFilter) {
-        pipeline.push({ $match: { 'stockByBranch.branch': branchFilter } });
+        pipeline.push({ $match: { 'branchStocks.branch': branchFilter } });
       }
 
       pipeline.push(
         {
           $lookup: {
             from: 'branches',
-            localField: 'stockByBranch.branch',
+            localField: 'branchStocks.branch',
             foreignField: '_id',
             as: 'branchInfo'
           }
@@ -765,17 +765,17 @@ class InventoryController {
         {
           $group: {
             _id: {
-              branch: '$stockByBranch.branch',
+              branch: '$branchStocks.branch',
               category: '$category'
             },
             branchName: { $first: { $arrayElemAt: ['$branchInfo.name', 0] } },
             categoryName: { $first: { $arrayElemAt: ['$categoryInfo.name', 0] } },
             totalProducts: { $sum: 1 },
-            totalStock: { $sum: '$stockByBranch.quantity' },
+            totalStock: { $sum: '$branchStocks.quantity' },
             lowStockItems: {
               $sum: {
                 $cond: [
-                  { $lt: ['$stockByBranch.quantity', '$stockByBranch.minLevel'] },
+                  { $lt: ['$branchStocks.quantity', '$branchStocks.minLevel'] },
                   1,
                   0
                 ]
@@ -784,7 +784,7 @@ class InventoryController {
             outOfStockItems: {
               $sum: {
                 $cond: [
-                  { $eq: ['$stockByBranch.quantity', 0] },
+                  { $eq: ['$branchStocks.quantity', 0] },
                   1,
                   0
                 ]
@@ -860,9 +860,9 @@ class InventoryController {
 
       // Branch filter for RBAC
       if (req.user.role !== 'admin' && req.user.branch) {
-        filter['stockByBranch.branch'] = req.user.branch._id;
+        filter['branchStocks.branch'] = req.user.branch._id;
       } else if (branch) {
-        filter['stockByBranch.branch'] = branch;
+        filter['branchStocks.branch'] = branch;
       }
 
       // Build sort object

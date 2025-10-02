@@ -41,9 +41,10 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
 import { PageHeader } from '../components/shell/PageHeader';
 import { useAuth } from '../contexts/AuthContext';
+import { settingsAPI, masterDataAPI } from '../utils/api';
 
-// Mock API functions - replace with actual API calls
-const settingsAPI = {
+// Legacy mock API functions - TODO: Remove after full migration  
+const legacySettingsAPI = {
   getUserProfile: async () => {
     await new Promise(resolve => setTimeout(resolve, 500));
     return {
@@ -211,19 +212,19 @@ function Settings() {
 
   const { data: systemSettings, isLoading: systemLoading } = useQuery({
     queryKey: ['system-settings'],
-    queryFn: settingsAPI.getSystemSettings,
+    queryFn: legacySettingsAPI.getSystemSettings, // TODO: Create real system settings API
     enabled: activeTab === 'system' || activeTab === 'tax'
   });
 
   const { data: branches, isLoading: branchesLoading } = useQuery({
     queryKey: ['branches'],
-    queryFn: settingsAPI.getBranches,
+    queryFn: masterDataAPI.getBranches,
     enabled: activeTab === 'branches'
   });
 
   const { data: users, isLoading: usersLoading } = useQuery({
     queryKey: ['users'],
-    queryFn: settingsAPI.getUsers,
+    queryFn: legacySettingsAPI.getUsers, // TODO: Create user management API
     enabled: activeTab === 'users'
   });
 
@@ -240,7 +241,7 @@ function Settings() {
   });
 
   const updateSystemMutation = useMutation({
-    mutationFn: settingsAPI.updateSystemSettings,
+    mutationFn: legacySettingsAPI.updateSystemSettings, // TODO: Create real system settings API
     onSuccess: () => {
       queryClient.invalidateQueries(['system-settings']);
       setToast({ type: 'success', message: 'Settings updated successfully' });
@@ -251,7 +252,7 @@ function Settings() {
   });
 
   const createBranchMutation = useMutation({
-    mutationFn: settingsAPI.createBranch,
+    mutationFn: masterDataAPI.createBranch,
     onSuccess: () => {
       queryClient.invalidateQueries(['branches']);
       setShowBranchModal(false);

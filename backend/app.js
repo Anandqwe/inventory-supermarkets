@@ -9,6 +9,9 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
+// Import demo configuration
+const DEMO_CONFIG = require('./src/config/demo');
+
 // Import middleware
 const { 
   errorHandler, 
@@ -58,34 +61,42 @@ app.use(helmet({
 // Custom security headers
 app.use(securityHeaders);
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  message: {
-    success: false,
-    message: 'Too many requests from this IP, please try again later.',
-    timestamp: new Date().toISOString()
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+// Rate limiting (disabled in demo mode for better UX)
+if (!DEMO_CONFIG.demoMode && DEMO_CONFIG.performance.rateLimitEnabled !== false) {
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // Limit each IP to 100 requests per windowMs
+    message: {
+      success: false,
+      message: 'Too many requests from this IP, please try again later.',
+      timestamp: new Date().toISOString()
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
 
-app.use('/api/', limiter);
+  app.use('/api/', limiter);
+} else {
+  console.log('🔓 Rate limiting disabled for demo mode');
+}
 
-// Stricter rate limiting for auth endpoints
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 login requests per windowMs
-  message: {
-    success: false,
-    message: 'Too many login attempts, please try again later.',
-    timestamp: new Date().toISOString()
-  },
-  skipSuccessfulRequests: true,
-});
+// Stricter rate limiting for auth endpoints (also disabled in demo mode)
+if (!DEMO_CONFIG.demoMode && DEMO_CONFIG.performance.rateLimitEnabled !== false) {
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5, // Limit each IP to 5 login requests per windowMs
+    message: {
+      success: false,
+      message: 'Too many login attempts, please try again later.',
+      timestamp: new Date().toISOString()
+    },
+    skipSuccessfulRequests: true,
+  });
 
-app.use('/api/auth/login', authLimiter);
+  app.use('/api/auth/login', authLimiter);
+} else {
+  console.log('🔓 Auth rate limiting disabled for demo mode');
+}
 
 // CORS configuration
 app.use(cors(corsOptions));
@@ -109,7 +120,33 @@ app.get('/health', (req, res) => {
     message: 'Server is running',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
-    version: process.env.npm_package_version || '1.0.0'
+    version: process.env.npm_package_version || '1.0.0',
+    demoMode: DEMO_CONFIG.demoMode
+  });
+});
+
+// Demo configuration endpoint for frontend
+app.get('/api/demo/config', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'Demo configuration retrieved',
+    data: {
+      demoMode: DEMO_CONFIG.demoMode,
+      features: DEMO_CONFIG.features,
+      sampleData: {
+        enabled: DEMO_CONFIG.sampleData.enabled,
+        productCount: DEMO_CONFIG.sampleData.productCount,
+        transactionDays: DEMO_CONFIG.sampleData.transactionDays
+      },
+      demoUsers: DEMO_CONFIG.demoUsers.map(user => ({
+        email: user.email,
+        role: user.role,
+        name: user.name
+        // Don't expose passwords
+      })),
+      api: DEMO_CONFIG.api
+    },
+    timestamp: new Date().toISOString()
   });
 });
 
