@@ -232,7 +232,7 @@ graph TB
 
 1. **Advanced Inventory**
    - CSV import/export functionality
-   - Barcode scanning integration
+   - Barcode data entry support
    - Inventory movement tracking
    - Supplier management
 
@@ -324,7 +324,7 @@ graph TB
 2. **Integration & APIs**
    - Third-party POS integration
    - Accounting system APIs
-   - Barcode scanner integration
+   - Barcode data management
    - External reporting tools
 
 3. **Advanced Security**
@@ -742,7 +742,7 @@ Gmail (Production Email)
 
 3. **Mobile Applications**
    - React Native app
-   - Barcode scanning
+   - Barcode data support
    - Offline capabilities
    - Push notifications
 

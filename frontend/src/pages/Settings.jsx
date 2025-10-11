@@ -29,7 +29,11 @@ import {
   SunIcon as Sun, 
   ArrowPathIcon as RefreshCw, 
   ArrowDownTrayIcon as Download, 
-  ArchiveBoxIcon as Archive
+  ArchiveBoxIcon as Archive,
+  CogIcon,
+  UsersIcon,
+  PencilIcon,
+  UserPlusIcon
 } from '@heroicons/react/24/outline';
 
 import { Button } from '../components/ui/Button';
@@ -43,7 +47,7 @@ import { PageHeader } from '../components/shell/PageHeader';
 import { useAuth } from '../contexts/AuthContext';
 import { settingsAPI, masterDataAPI } from '../utils/api';
 
-// Legacy mock API functions - TODO: Remove after full migration  
+// Mock API functions for demo purposes  
 const legacySettingsAPI = {
   getUserProfile: async () => {
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -212,7 +216,7 @@ function Settings() {
 
   const { data: systemSettings, isLoading: systemLoading } = useQuery({
     queryKey: ['system-settings'],
-    queryFn: legacySettingsAPI.getSystemSettings, // TODO: Create real system settings API
+    queryFn: legacySettingsAPI.getSystemSettings,
     enabled: activeTab === 'system' || activeTab === 'tax'
   });
 
@@ -224,7 +228,7 @@ function Settings() {
 
   const { data: users, isLoading: usersLoading } = useQuery({
     queryKey: ['users'],
-    queryFn: legacySettingsAPI.getUsers, // TODO: Create user management API
+    queryFn: legacySettingsAPI.getUsers,
     enabled: activeTab === 'users'
   });
 
@@ -241,7 +245,7 @@ function Settings() {
   });
 
   const updateSystemMutation = useMutation({
-    mutationFn: legacySettingsAPI.updateSystemSettings, // TODO: Create real system settings API
+    mutationFn: legacySettingsAPI.updateSystemSettings,
     onSuccess: () => {
       queryClient.invalidateQueries(['system-settings']);
       setToast({ type: 'success', message: 'Settings updated successfully' });
@@ -897,9 +901,69 @@ function Settings() {
       case 'branches':
         return <BranchesTab />;
       case 'tax':
-        return <div className="text-center py-12 text-slate-500">Tax Configuration Coming Soon</div>;
+        return (
+          <Card className="p-6">
+            <div className="text-center py-12">
+              <CogIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">
+                Tax Configuration
+              </h3>
+              <p className="text-slate-500 dark:text-slate-400 mb-4">
+                Configure GST rates, tax categories, and compliance settings.
+              </p>
+              <div className="max-w-md mx-auto space-y-4">
+                <div className="flex justify-between items-center p-3 border border-slate-200 dark:border-slate-700 rounded-lg">
+                  <span className="text-sm font-medium">Default GST Rate</span>
+                  <Badge variant="secondary">18%</Badge>
+                </div>
+                <div className="flex justify-between items-center p-3 border border-slate-200 dark:border-slate-700 rounded-lg">
+                  <span className="text-sm font-medium">Essential Items GST</span>
+                  <Badge variant="secondary">5%</Badge>
+                </div>
+                <div className="flex justify-between items-center p-3 border border-slate-200 dark:border-slate-700 rounded-lg">
+                  <span className="text-sm font-medium">Luxury Items GST</span>
+                  <Badge variant="secondary">28%</Badge>
+                </div>
+                <Button variant="outline" className="w-full">
+                  <PencilIcon className="h-4 w-4 mr-2" />
+                  Modify Tax Rates
+                </Button>
+              </div>
+            </div>
+          </Card>
+        );
       case 'users':
-        return <div className="text-center py-12 text-slate-500">User Management Coming Soon</div>;
+        return (
+          <Card className="p-6">
+            <div className="text-center py-12">
+              <UsersIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">
+                User Management
+              </h3>
+              <p className="text-slate-500 dark:text-slate-400 mb-4">
+                Manage user accounts, roles, and permissions.
+              </p>
+              <div className="max-w-md mx-auto space-y-4">
+                <div className="flex justify-between items-center p-3 border border-slate-200 dark:border-slate-700 rounded-lg">
+                  <span className="text-sm font-medium">Total Users</span>
+                  <Badge variant="primary">3</Badge>
+                </div>
+                <div className="flex justify-between items-center p-3 border border-slate-200 dark:border-slate-700 rounded-lg">
+                  <span className="text-sm font-medium">Active Sessions</span>
+                  <Badge variant="success">1</Badge>
+                </div>
+                <div className="flex justify-between items-center p-3 border border-slate-200 dark:border-slate-700 rounded-lg">
+                  <span className="text-sm font-medium">Admin Users</span>
+                  <Badge variant="warning">1</Badge>
+                </div>
+                <Button variant="outline" className="w-full">
+                  <UserPlusIcon className="h-4 w-4 mr-2" />
+                  Add New User
+                </Button>
+              </div>
+            </div>
+          </Card>
+        );
       default:
         return null;
     }

@@ -50,18 +50,14 @@ class ProductController {
     // Check if SKU already exists
     const existingProduct = await Product.findOne({ sku });
     if (existingProduct) {
-      return res.status(409).json(
-        ResponseUtils.error('Product with this SKU already exists', 409)
-      );
+      return ResponseUtils.error(res, 'Product with this SKU already exists', 409);
     }
 
     // Check if barcode already exists (if provided)
     if (barcode) {
       const existingBarcode = await Product.findOne({ barcode });
       if (existingBarcode) {
-        return res.status(409).json(
-          ResponseUtils.error('Product with this barcode already exists', 409)
-        );
+        return ResponseUtils.error(res, 'Product with this barcode already exists', 409);
       }
     }
 
@@ -72,33 +68,25 @@ class ProductController {
     ]);
 
     if (!category) {
-      return res.status(400).json(
-        ResponseUtils.error('Invalid category', 400)
-      );
+      return ResponseUtils.error(res, 'Invalid category', 400);
     }
 
     if (!unit) {
-      return res.status(400).json(
-        ResponseUtils.error('Invalid unit', 400)
-      );
+      return ResponseUtils.error(res, 'Invalid unit', 400);
     }
 
     // Validate optional references
     if (brandId) {
       const brand = await Brand.findById(brandId);
       if (!brand) {
-        return res.status(400).json(
-          ResponseUtils.error('Invalid brand', 400)
-        );
+        return ResponseUtils.error(res, 'Invalid brand', 400);
       }
     }
 
     if (supplierId) {
       const supplier = await Supplier.findById(supplierId);
       if (!supplier) {
-        return res.status(400).json(
-          ResponseUtils.error('Invalid supplier', 400)
-        );
+        return ResponseUtils.error(res, 'Invalid supplier', 400);
       }
     }
 
@@ -115,40 +103,39 @@ class ProductController {
         costPrice: pricing?.costPrice || 0,
         sellingPrice: pricing?.sellingPrice || 0,
         mrp: pricing?.mrp || pricing?.sellingPrice || 0,
-        margin: pricing?.margin || 0
+        taxRate: pricing?.taxRate || 18
       },
-      branchStocks: branchStocks.map(stock => ({
+      stockByBranch: branchStocks.map(stock => ({
         branch: stock.branchId,
         quantity: stock.quantity || 0,
         reorderLevel: stock.reorderLevel || 10,
         maxStockLevel: stock.maxStockLevel || 1000,
         location: stock.location
       })),
-      taxSettings: {
-        taxCategory: taxSettings?.taxCategory || 'standard',
-        gstRate: taxSettings?.gstRate || 18,
-        isExempt: taxSettings?.isExempt || false
-      },
       isActive,
-      createdBy: req.user.userId
+      createdBy: req.user.id
     });
 
     await product.save();
 
     // Create audit log
     await AuditLog.create({
-      action: 'CREATE_PRODUCT',
-      resource: 'Product',
-      resourceId: product._id,
-      details: {
+      action: 'product_create',
+      resourceType: 'product',
+      resourceId: product._id.toString(),
+      resourceName: product.name,
+      description: `Created product: ${product.name} (SKU: ${product.sku})`,
+      userId: req.user.id,
+      userEmail: req.user.email,
+      userRole: req.user.role,
+      ipAddress: req.ip || '127.0.0.1',
+      userAgent: req.get('User-Agent'),
+      status: 'success',
+      newValues: {
         name: product.name,
         sku: product.sku,
         category: categoryId
-      },
-      userId: req.user.userId,
-      userEmail: req.user.email,
-      ipAddress: req.ip,
-      userAgent: req.get('User-Agent')
+      }
     });
 
     const populatedProduct = await Product.findById(product._id)
@@ -158,9 +145,148 @@ class ProductController {
       .populate('supplier', 'name')
       .populate('stockByBranch.branch', 'name code');
 
-    res.status(201).json(
-      ResponseUtils.success('Product created successfully', populatedProduct, 201)
-    );
+    ResponseUtils.success(res, populatedProduct, 'Product created successfully', 201);
+  });
+
+  static createProductsBulk = asyncHandler(async (req, res) => {
+    const { products } = req.body;
+
+    if (!products || !Array.isArray(products) || products.length === 0) {
+      return ResponseUtils.error(res, 'Products array is required', 400);
+    }
+
+    const results = {
+      created: 0,
+      failed: 0,
+      errors: []
+    };
+
+    // Only use transactions in non-test environments
+    const session = process.env.NODE_ENV !== 'test' ? await mongoose.startSession() : null;
+    if (session) {
+      session.startTransaction();
+    }
+
+    try {
+      for (let i = 0; i < products.length; i++) {
+        const productData = products[i];
+        
+        try {
+          // Check if SKU already exists
+          const existingProduct = session 
+            ? await Product.findOne({ sku: productData.sku }).session(session)
+            : await Product.findOne({ sku: productData.sku });
+          if (existingProduct) {
+            results.failed++;
+            results.errors.push(`Product ${i + 1}: SKU '${productData.sku}' already exists`);
+            continue;
+          }
+
+          // Validate required references
+          const [category, unit] = await Promise.all([
+            session 
+              ? Category.findById(productData.category).session(session)
+              : Category.findById(productData.category),
+            session 
+              ? Unit.findById(productData.unit).session(session)
+              : Unit.findById(productData.unit)
+          ]);
+
+          if (!category) {
+            results.failed++;
+            results.errors.push(`Product ${i + 1}: Invalid category`);
+            continue;
+          }
+
+          if (!unit) {
+            results.failed++;
+            results.errors.push(`Product ${i + 1}: Invalid unit`);
+            continue;
+          }
+
+          const product = new Product({
+            name: productData.name,
+            sku: productData.sku.toUpperCase(),
+            barcode: productData.barcode,
+            description: productData.description,
+            category: productData.category,
+            brand: productData.brand,
+            unit: productData.unit,
+            supplier: productData.supplier,
+            pricing: {
+              costPrice: productData.pricing?.costPrice || 0,
+              sellingPrice: productData.pricing?.sellingPrice || 0,
+              mrp: productData.pricing?.mrp || productData.pricing?.sellingPrice || 0,
+              taxRate: productData.pricing?.taxRate || 18
+            },
+            stockByBranch: productData.branchStocks?.map(stock => ({
+              branch: stock.branchId,
+              quantity: stock.quantity || 0,
+              reorderLevel: stock.reorderLevel || 10,
+              maxStockLevel: stock.maxStockLevel || 1000,
+              location: stock.location
+            })) || [],
+            isActive: productData.isActive !== undefined ? productData.isActive : true,
+            createdBy: req.user.id
+          });
+
+          if (session) {
+            await product.save({ session });
+          } else {
+            await product.save();
+          }
+
+          // Create audit log
+          const auditData = {
+            action: 'product_create',
+            resourceType: 'product',
+            resourceId: product._id.toString(),
+            resourceName: product.name,
+            description: `Bulk created product: ${product.name} (SKU: ${product.sku})`,
+            userId: req.user.id,
+            userEmail: req.user.email,
+            userRole: req.user.role,
+            ipAddress: req.ip || '127.0.0.1',
+            userAgent: req.get('User-Agent'),
+            status: 'success',
+            newValues: {
+              name: product.name,
+              sku: product.sku,
+              category: productData.category
+            }
+          };
+
+          if (session) {
+            await AuditLog.create([auditData], { session });
+          } else {
+            await AuditLog.create(auditData);
+          }
+
+          results.created++;
+        } catch (error) {
+          results.failed++;
+          results.errors.push(`Product ${i + 1}: ${error.message}`);
+        }
+      }
+
+      if (session) {
+        await session.commitTransaction();
+      }
+
+      const statusCode = results.created > 0 ? (results.failed > 0 ? 200 : 201) : 400;
+      
+      return ResponseUtils.success(res, results, 'Bulk product creation completed', statusCode);
+
+    } catch (error) {
+      if (session) {
+        await session.abortTransaction();
+      }
+      return ResponseUtils.error(res, 'Bulk product creation failed', 500);
+    } finally {
+      if (session) {
+        session.endSession();
+      }
+    }
   });
 
   static getAllProducts = asyncHandler(async (req, res) => {
@@ -396,9 +522,7 @@ class ProductController {
     const { id } = req.params;
 
     if (!ValidationUtils.isValidObjectId(id)) {
-      return res.status(400).json(
-        ResponseUtils.error('Invalid product ID', 400)
-      );
+      return ResponseUtils.error(res, 'Invalid product ID', 400);
     }
 
     const product = await Product.findById(id)
@@ -410,9 +534,7 @@ class ProductController {
       .populate('createdBy', 'firstName lastName');
 
     if (!product) {
-      return res.status(404).json(
-        ResponseUtils.error('Product not found', 404)
-      );
+      return ResponseUtils.error(res, 'Product not found', 404);
     }
 
     // Add computed fields for frontend compatibility
@@ -426,34 +548,26 @@ class ProductController {
       image: product.images?.find(img => img.isPrimary)?.url || product.images?.[0]?.url || null
     };
 
-    res.json(
-      ResponseUtils.success('Product retrieved successfully', productWithComputedFields)
-    );
+    return ResponseUtils.success(res, productWithComputedFields, 'Product retrieved successfully');
   });
 
   static updateProduct = asyncHandler(async (req, res) => {
     const { id } = req.params;
 
     if (!ValidationUtils.isValidObjectId(id)) {
-      return res.status(400).json(
-        ResponseUtils.error('Invalid product ID', 400)
-      );
+      return ResponseUtils.error(res, 'Invalid product ID', 400);
     }
 
     const existingProduct = await Product.findById(id);
     if (!existingProduct) {
-      return res.status(404).json(
-        ResponseUtils.error('Product not found', 404)
-      );
+      return ResponseUtils.error(res, 'Product not found', 404);
     }
 
     // Check if SKU is being changed and if it already exists
     if (req.body.sku && req.body.sku !== existingProduct.sku) {
       const skuExists = await Product.findOne({ sku: req.body.sku, _id: { $ne: id } });
       if (skuExists) {
-        return res.status(409).json(
-          ResponseUtils.error('Product with this SKU already exists', 409)
-        );
+        return ResponseUtils.error(res, 'Product with this SKU already exists', 409);
       }
     }
 
@@ -461,15 +575,13 @@ class ProductController {
     if (req.body.barcode && req.body.barcode !== existingProduct.barcode) {
       const barcodeExists = await Product.findOne({ barcode: req.body.barcode, _id: { $ne: id } });
       if (barcodeExists) {
-        return res.status(409).json(
-          ResponseUtils.error('Product with this barcode already exists', 409)
-        );
+        return ResponseUtils.error(res, 'Product with this barcode already exists', 409);
       }
     }
 
     const updateData = {
       ...req.body,
-      updatedBy: req.user.userId,
+      updatedBy: req.user.id,
       updatedAt: new Date()
     };
 
@@ -489,39 +601,37 @@ class ProductController {
 
     // Create audit log
     await AuditLog.create({
-      action: 'UPDATE_PRODUCT',
-      resource: 'Product',
-      resourceId: product._id,
-      details: {
+      action: 'product_update',
+      resourceType: 'product',
+      resourceId: product._id.toString(),
+      resourceName: product.name,
+      description: `Updated product: ${product.name} (SKU: ${product.sku})`,
+      userId: req.user.id,
+      userEmail: req.user.email,
+      userRole: req.user.role,
+      ipAddress: req.ip || '127.0.0.1',
+      userAgent: req.get('User-Agent'),
+      status: 'success',
+      newValues: {
         name: product.name,
         sku: product.sku,
         changes: Object.keys(req.body)
-      },
-      userId: req.user.userId,
-      userEmail: req.user.email,
-      ipAddress: req.ip,
-      userAgent: req.get('User-Agent')
+      }
     });
 
-    res.json(
-      ResponseUtils.success('Product updated successfully', product)
-    );
+    return ResponseUtils.success(res, product, 'Product updated successfully');
   });
 
   static deleteProduct = asyncHandler(async (req, res) => {
     const { id } = req.params;
 
     if (!ValidationUtils.isValidObjectId(id)) {
-      return res.status(400).json(
-        ResponseUtils.error('Invalid product ID', 400)
-      );
+      return ResponseUtils.error(res, 'Invalid product ID', 400);
     }
 
     const product = await Product.findById(id);
     if (!product) {
-      return res.status(404).json(
-        ResponseUtils.error('Product not found', 404)
-      );
+      return ResponseUtils.error(res, 'Product not found', 404);
     }
 
     // Soft delete instead of hard delete
@@ -533,22 +643,24 @@ class ProductController {
 
     // Create audit log
     await AuditLog.create({
-      action: 'DELETE_PRODUCT',
-      resource: 'Product',
-      resourceId: product._id,
-      details: {
+      action: 'product_delete',
+      resourceType: 'product',
+      resourceId: product._id.toString(),
+      resourceName: product.name,
+      description: `Deleted product: ${product.name} (SKU: ${product.sku})`,
+      userId: req.user.id,
+      userEmail: req.user.email,
+      userRole: req.user.role,
+      ipAddress: req.ip || '127.0.0.1',
+      userAgent: req.get('User-Agent'),
+      status: 'success',
+      oldValues: {
         name: product.name,
         sku: product.sku
-      },
-      userId: req.user.userId,
-      userEmail: req.user.email,
-      ipAddress: req.ip,
-      userAgent: req.get('User-Agent')
+      }
     });
 
-    res.json(
-      ResponseUtils.success('Product deleted successfully')
-    );
+    ResponseUtils.success(res, null, 'Product deleted successfully');
   });
 
   // CSV Export functionality
@@ -635,17 +747,22 @@ class ProductController {
 
         // Create audit log
         await AuditLog.create({
-          action: 'EXPORT_PRODUCTS',
-          resource: 'Product',
-          details: {
+          action: 'product_export',
+          resourceType: 'product',
+          resourceId: 'bulk',
+          resourceName: 'Product Export',
+          description: `Exported ${products.length} products to CSV`,
+          userId: req.user.id,
+          userEmail: req.user.email,
+          userRole: req.user.role,
+          ipAddress: req.ip || '127.0.0.1',
+          userAgent: req.get('User-Agent'),
+          status: 'success',
+          newValues: {
             format: 'csv',
             count: products.length,
             filters: { branch, category }
-          },
-          userId: req.user.userId,
-          userEmail: req.user.email,
-          ipAddress: req.ip,
-          userAgent: req.get('User-Agent')
+          }
         });
 
         res.download(csvFilePath, `products_${new Date().toISOString().split('T')[0]}.csv`, (err) => {
@@ -656,20 +773,16 @@ class ProductController {
         });
       } else {
         // Return JSON for other formats
-        res.json(
-          ResponseUtils.success('Products exported successfully', {
-            products: products,
-            count: products.length,
-            exportedAt: new Date().toISOString()
-          })
-        );
+        ResponseUtils.success(res, {
+          products: products,
+          count: products.length,
+          exportedAt: new Date().toISOString()
+        }, 'Products exported successfully');
       }
 
     } catch (error) {
       console.error('Export products error:', error);
-      res.status(500).json(
-        ResponseUtils.error('Failed to export products', 500)
-      );
+      ResponseUtils.error(res, 'Failed to export products', 500);
     }
   });
 
@@ -679,9 +792,7 @@ class ProductController {
     asyncHandler(async (req, res) => {
       try {
         if (!req.file) {
-          return res.status(400).json(
-            ResponseUtils.error('CSV file is required', 400)
-          );
+          return ResponseUtils.error(res, 'CSV file is required', 400);
         }
 
         const { branchId, updateExisting = false } = req.body;
@@ -703,18 +814,14 @@ class ProductController {
         if (branchId) {
           targetBranch = await Branch.findById(branchId);
           if (!targetBranch) {
-            return res.status(400).json(
-              ResponseUtils.error('Invalid branch ID', 400)
-            );
+            return ResponseUtils.error(res, 'Invalid branch ID', 400);
           }
         } else if (req.user.branch) {
           targetBranch = await Branch.findById(req.user.branch);
         }
 
         if (!targetBranch) {
-          return res.status(400).json(
-            ResponseUtils.error('Branch is required', 400)
-          );
+          return ResponseUtils.error(res, 'Branch is required', 400);
         }
 
         // Get lookup data for validation
@@ -889,22 +996,25 @@ class ProductController {
 
         // Create audit log
         await AuditLog.create({
-          action: 'IMPORT_PRODUCTS',
-          resource: 'Product',
-          details: {
+          action: 'product_import',
+          resourceType: 'product',
+          resourceId: 'bulk',
+          resourceName: 'Product Import',
+          description: `Imported products from CSV: ${req.file.originalname} (${results.summary.created} created, ${results.summary.updated} updated, ${results.summary.errors} errors)`,
+          userId: req.user.id,
+          userEmail: req.user.email,
+          userRole: req.user.role,
+          ipAddress: req.ip || '127.0.0.1',
+          userAgent: req.get('User-Agent'),
+          status: 'success',
+          newValues: {
             filename: req.file.originalname,
             summary: results.summary,
             branch: targetBranch._id
-          },
-          userId: req.user.userId,
-          userEmail: req.user.email,
-          ipAddress: req.ip,
-          userAgent: req.get('User-Agent')
+          }
         });
 
-        res.json(
-          ResponseUtils.success('CSV import completed', results)
-        );
+        ResponseUtils.success(res, results, 'CSV import completed');
 
       } catch (error) {
         console.error('Import products error:', error);
@@ -914,9 +1024,7 @@ class ProductController {
           fs.unlink(req.file.path, () => {});
         }
 
-        res.status(500).json(
-          ResponseUtils.error('Failed to import products', 500)
-        );
+        ResponseUtils.error(res, 'Failed to import products', 500);
       }
     })
   ];
@@ -927,9 +1035,7 @@ class ProductController {
     const { limit = 20, category, brand, branch } = req.query;
 
     if (!query || query.length < 2) {
-      return res.status(400).json(
-        ResponseUtils.error('Search query must be at least 2 characters', 400)
-      );
+      return ResponseUtils.error(res, 'Search query must be at least 2 characters', 400);
     }
 
     const filter = {
@@ -960,13 +1066,11 @@ class ProductController {
       .limit(parseInt(limit))
       .sort({ name: 1 });
 
-    res.json(
-      ResponseUtils.success('Product search completed', {
-        products,
-        query,
-        count: products.length
-      })
-    );
+    ResponseUtils.success(res, {
+      products,
+      query,
+      count: products.length
+    }, 'Product search completed');
   });
 
   static getCategories = asyncHandler(async (req, res) => {
@@ -1048,12 +1152,10 @@ class ProductController {
       { $sort: { name: 1 } }
     ]);
 
-    res.json(
-      ResponseUtils.success('Low stock products retrieved successfully', {
-        products: lowStockProducts,
-        count: lowStockProducts.length
-      })
-    );
+    ResponseUtils.success(res, {
+      products: lowStockProducts,
+      count: lowStockProducts.length
+    }, 'Low stock products retrieved successfully');
   });
 
   static updateStock = asyncHandler(async (req, res) => {
@@ -1061,33 +1163,25 @@ class ProductController {
     const { branchId, quantity, operation = 'set' } = req.body;
 
     if (!ValidationUtils.isValidObjectId(id)) {
-      return res.status(400).json(
-        ResponseUtils.error('Invalid product ID', 400)
-      );
+      return ResponseUtils.error(res, 'Invalid product ID', 400);
     }
 
     const product = await Product.findById(id);
     if (!product) {
-      return res.status(404).json(
-        ResponseUtils.error('Product not found', 404)
-      );
+      return ResponseUtils.error(res, 'Product not found', 404);
     }
 
     // Validate branch
     const targetBranchId = branchId || req.user.branch;
     const branch = await Branch.findById(targetBranchId);
     if (!branch) {
-      return res.status(400).json(
-        ResponseUtils.error('Invalid branch', 400)
-      );
+      return ResponseUtils.error(res, 'Invalid branch', 400);
     }
 
     // Check branch access for non-admin users
     if (req.user.role !== 'admin' && req.user.branch) {
       if (req.user.branch.toString() !== targetBranchId.toString()) {
-        return res.status(403).json(
-          ResponseUtils.error('Access denied - Can only update stock for your assigned branch', 403)
-        );
+        return ResponseUtils.error(res, 'Access denied - Can only update stock for your assigned branch', 403);
       }
     }
 
@@ -1147,22 +1241,28 @@ class ProductController {
 
       // Create audit log
       await AuditLog.create([{
-        action: 'UPDATE_STOCK',
-        resource: 'Product',
-        resourceId: product._id,
-        details: {
+        action: 'product_stock_update',
+        resourceType: 'product',
+        resourceId: product._id.toString(),
+        resourceName: product.name,
+        description: `Updated stock for ${product.name}: ${operation} ${quantity} (${currentQuantity} → ${newQuantity})`,
+        userId: req.user.id,
+        userEmail: req.user.email,
+        userRole: req.user.role,
+        ipAddress: req.ip || '127.0.0.1',
+        userAgent: req.get('User-Agent'),
+        status: 'success',
+        oldValues: {
+          quantity: currentQuantity
+        },
+        newValues: {
           productName: product.name,
           sku: product.sku,
           branch: targetBranchId,
           operation,
-          previousQuantity: currentQuantity,
           newQuantity,
           quantityChange: quantity
-        },
-        userId: req.user.userId,
-        userEmail: req.user.email,
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent')
+        }
       }], { session });
 
       await session.commitTransaction();
@@ -1171,18 +1271,16 @@ class ProductController {
       const updatedProduct = await Product.findById(id)
         .populate('stockByBranch.branch', 'name code');
 
-      res.json(
-        ResponseUtils.success('Stock updated successfully', {
-          product: updatedProduct,
-          stockUpdate: {
-            branch: targetBranchId,
-            operation,
-            previousQuantity: currentQuantity,
-            newQuantity,
-            quantityChange: quantity
-          }
-        })
-      );
+      ResponseUtils.success(res, {
+        product: updatedProduct,
+        stockUpdate: {
+          branch: targetBranchId,
+          operation,
+          previousQuantity: currentQuantity,
+          newQuantity,
+          quantityChange: quantity
+        }
+      }, 'Stock updated successfully');
 
     } catch (error) {
       await session.abortTransaction();

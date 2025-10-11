@@ -25,7 +25,7 @@ A comprehensive, production-ready inventory and sales management solution design
 - **Complete CRUD Operations** with advanced search and filtering
 - **Category & Brand Management** with hierarchical organization
 - **Stock Tracking** with real-time updates and automated alerts
-- **Barcode Support** and SKU management
+- **Barcode Data Support** and SKU management
 - **Bulk Operations** for efficient inventory management
 - **Expiry Date Tracking** for perishable items
 

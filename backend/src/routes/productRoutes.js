@@ -22,6 +22,9 @@ router.get('/low-stock', requirePermission('products.read'), ProductController.g
 router.get('/export', requirePermission('products.export'), ProductController.exportProducts);
 router.post('/import', requirePermission('products.create'), ProductController.importProducts);
 
+// Bulk operations
+router.post('/bulk', requirePermission('products.create'), ProductController.createProductsBulk);
+
 // Individual product routes
 router.get('/:id', requirePermission('products.read'), ProductController.getProductById);
 router.put('/:id', requirePermission('products.update'), ProductController.updateProduct);

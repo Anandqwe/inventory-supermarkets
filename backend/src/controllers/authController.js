@@ -15,7 +15,7 @@ class AuthController {
    * Register new user (Admin only)
    */
   static register = asyncHandler(async (req, res) => {
-    const { email, password, firstName, lastName, phone, role = 'cashier' } = req.body;
+    const { email, password, firstName, lastName, phone, role = 'cashier', branch } = req.body;
 
     // Validate required fields
     const validation = ValidationUtils.validateRequiredFields(req.body, ['email', 'password', 'firstName', 'lastName']);
@@ -50,6 +50,11 @@ class AuthController {
       return ResponseUtils.forbidden(res, 'Only admins can create admin accounts');
     }
 
+    // Validate branch requirement for non-Admin users
+    if (role !== 'Admin' && !branch) {
+      return ResponseUtils.error(res, 'Branch is required for non-Admin users', 400);
+    }
+
     // Create new user
     const user = new User({
       email: email.toLowerCase(),
@@ -58,6 +63,7 @@ class AuthController {
       lastName: ValidationUtils.sanitizeString(lastName),
       phone: phone ? phone.replace(/\s+/g, '') : undefined,
       role,
+      branch: role === 'Admin' ? undefined : branch,
       createdBy: req.user?.id
     });
 
@@ -137,11 +143,17 @@ class AuthController {
    * Update user profile
    */
   static updateProfile = asyncHandler(async (req, res) => {
-    const { fullName, phone } = req.body;
+    const { fullName, firstName, lastName, phone } = req.body;
     const updates = {};
 
     if (fullName) {
-      updates.fullName = ValidationUtils.sanitizeString(fullName);
+      // Split fullName into firstName and lastName
+      const nameParts = ValidationUtils.sanitizeString(fullName).split(' ');
+      updates.firstName = nameParts[0] || '';
+      updates.lastName = nameParts.slice(1).join(' ') || '';
+    } else {
+      if (firstName) updates.firstName = ValidationUtils.sanitizeString(firstName);
+      if (lastName) updates.lastName = ValidationUtils.sanitizeString(lastName);
     }
 
     if (phone) {

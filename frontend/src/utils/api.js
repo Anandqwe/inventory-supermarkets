@@ -78,6 +78,25 @@ export const productsAPI = {
     return response.data;
   },
   
+  importFromCSV: async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post('/products/import', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+  
+  exportToCSV: async (params = {}) => {
+    const response = await api.get('/products/export', { 
+      params,
+      responseType: 'blob'
+    });
+    return response;
+  },
+  
   getInventoryStatus: async (params = {}) => {
     // Get both low stock items and normal products to identify overstock items
     const [lowStockResponse, allProductsResponse] = await Promise.all([

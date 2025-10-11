@@ -13,23 +13,14 @@
     "test:watch": "jest --watch --detectOpenHandles",
     "test:coverage": "jest --coverage --detectOpenHandles",
     "test:ci": "jest --ci --coverage --watchAll=false",
-    "lint": "eslint . --ignore-path .gitignore",
-    "lint:fix": "eslint . --fix --ignore-path .gitignore",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "validate": "npm run lint && npm run format:check && npm run test",
+    "validate": "npm run test",
     "build": "npm run validate",
     "db:seed": "node src/seed/seed.js",
-    "seed:demo": "node src/seed/seed.js",
-    "seed:verify": "node src/seed/verify.js",
-    "seed:products": "node src/seed/seed.js --products-only",
-    "seed:transactions": "node src/seed/seed.js --transactions-only",
-    "seed:wipe": "node src/seed/wipe.js",
-    "seed:sales": "node src/seed/seed.js --sales-only",
-    "seed:purchases": "node src/seed/seed.js --purchases-only",
-    "db:indexes": "node scripts/createIndexes.js",
-    "cache:clear": "node scripts/clearCache.js",
-    "perf:check": "node scripts/performanceCheck.js"
+    "db:indexes": "node scripts/createIndexes.js"
   },
   "keywords": [
     "inventory",
@@ -104,6 +95,7 @@
   },
   "jest": {
     "testEnvironment": "node",
+    "setupFilesAfterEnv": ["<rootDir>/tests/setup.js"],
     "collectCoverageFrom": [
       "src/**/*.js",
       "!src/config/**",

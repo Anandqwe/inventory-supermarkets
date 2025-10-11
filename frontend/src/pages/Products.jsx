@@ -397,29 +397,32 @@ function Products() {
     });
   };
 
-  const handleExportCSV = () => {
-    const headers = ['Name', 'SKU', 'Barcode', 'Category', 'Price', 'Stock', 'Supplier'];
-    const csvContent = [
-      headers.join(','),
-      ...products.map(product => [
-        `"${product.name}"`,
-        product.sku || '',
-        product.barcode || '',
-        product.category?.name || product.category || '',
-        product.price || 0,
-        product.stock || 0,
-        `"${product.supplier?.name || product.supplier || ''}"`
-      ].join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `products-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
-    toast.success('Products exported to CSV');
+  const handleExportCSV = async () => {
+    try {
+      setLoading(true);
+      const response = await productsAPI.exportToCSV({
+        category: filters.category,
+        minPrice: filters.minPrice,
+        maxPrice: filters.maxPrice,
+        ...filters
+      });
+      
+      // Create download link
+      const blob = new Blob([response.data], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `products-export-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('Products exported to CSV successfully');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error(error.response?.data?.message || 'Failed to export products');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleImportCSV = (event) => {
@@ -427,19 +430,27 @@ function Products() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    // Use the actual CSV import API
+    const importCSV = async () => {
       try {
-        const csv = e.target.result;
-        const lines = csv.split('\n');
-        const headers = lines[0].split(',');
+        setLoading(true);
+        const result = await productsAPI.importFromCSV(file);
         
-        // Process CSV data here
-        toast.success('CSV import feature coming soon');
+        if (result.success) {
+          toast.success(`CSV imported successfully! ${result.data.summary.created} products created, ${result.data.summary.updated} updated`);
+          queryClient.invalidateQueries(['products']);
+        } else {
+          toast.error(result.message || 'Import failed');
+        }
       } catch (error) {
-        toast.error('Failed to parse CSV file');
+        console.error('CSV import error:', error);
+        toast.error(error.response?.data?.message || 'Failed to import CSV file');
+      } finally {
+        setLoading(false);
       }
     };
-    reader.readAsText(file);
+    
+    importCSV();
   };
 
   // Clear filters

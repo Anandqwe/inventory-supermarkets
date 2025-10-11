@@ -65,7 +65,7 @@ const rateLimitConfigs = {
     },
     standardHeaders: true,
     legacyHeaders: false,
-    store: createCacheStore()
+    ...(process.env.NODE_ENV !== 'test' && { store: createCacheStore() })
   },
 
   // Authentication endpoints (stricter)
@@ -80,7 +80,7 @@ const rateLimitConfigs = {
     standardHeaders: true,
     legacyHeaders: false,
     skipSuccessfulRequests: true, // Don't count successful logins
-    store: createCacheStore((key) => `auth:${key}`)
+    ...(process.env.NODE_ENV !== 'test' && { store: createCacheStore((key) => `auth:${key}`) })
   },
 
   // Login specific (even stricter)
@@ -95,7 +95,7 @@ const rateLimitConfigs = {
     standardHeaders: true,
     legacyHeaders: false,
     skipSuccessfulRequests: true,
-    store: createCacheStore((key) => `login:${key}`)
+    ...(process.env.NODE_ENV !== 'test' && { store: createCacheStore((key) => `login:${key}`) })
   },
 
   // Password reset

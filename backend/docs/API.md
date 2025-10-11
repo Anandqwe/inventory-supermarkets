@@ -1375,7 +1375,7 @@ Each role has specific permissions for different resources:
 - Real-time stock tracking
 - Low stock alerts
 - Stock adjustments and transfers
-- Barcode support
+- Barcode data entry and search
 - Expiry date tracking
 
 ### Sales & Financial

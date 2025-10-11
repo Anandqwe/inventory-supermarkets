@@ -15,6 +15,7 @@ router.post('/', requirePermission('sales.create'), SalesController.createSale);
 router.get('/', requirePermission('sales.read'), SalesController.getAllSales);
 router.get('/stats', requirePermission('sales.read'), SalesController.getSalesStats);
 router.get('/date-range', requirePermission('sales.read'), SalesController.getSalesByDateRange);
+router.get('/receipt/:receiptNumber', requirePermission('sales.read'), SalesController.getSaleByReceiptNumber);
 router.get('/:id', requirePermission('sales.read'), SalesController.getSaleById);
 
 // Update and management routes
