@@ -1,0 +1,6 @@
+name,sku,barcode,category,brand,unit,supplier,costPrice,sellingPrice,mrp,quantity,reorderLevel,maxStockLevel,gstRate,description
+Fresh Milk 500ml,MILK-500,8901020031011,Dairy,Amul,pieces,Amul Dairy,25.00,28.00,30.00,100,20,500,5,Fresh whole milk 500ml pack
+Tata Salt 1kg,SALT-1KG,8901719402013,Pantry,Tata,pieces,Tata Consumer,18.00,20.00,22.00,200,50,1000,5,Iodized salt 1kg pack
+Maggi Noodles 70g,NOODLES-70G,8901030813720,Snacks,Nestle,pieces,Nestle India,12.00,14.00,15.00,150,30,500,12,Instant noodles masala flavor
+Basmati Rice 1kg,RICE-1KG,8901719802034,Grains,Tata,kg,Tata Consumer,75.00,80.00,85.00,80,15,300,5,Premium basmati rice 1kg
+Good Day Biscuits 100g,BISCUIT-100G,8901063127821,Snacks,Britannia,pieces,Britannia Industries,30.00,33.00,35.00,120,25,400,12,Butter cookies 100g pack

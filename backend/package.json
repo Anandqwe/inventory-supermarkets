@@ -8,7 +8,15 @@
     "start:prod": "NODE_ENV=production node app.js",
     "dev": "nodemon app.js",
     "dev:debug": "DEBUG=* nodemon app.js",
-    "seed": "node src/seed/seed.js",
+    "seed:branches": "node scripts/seedBranchesMumbai.js",
+    "seed:users": "node scripts/seedUsersEnhanced.js",
+    "seed:products": "node scripts/seedProductsRealistic.js",
+    "seed:customers": "node scripts/seedCustomersSegmented.js",
+    "seed:inventory": "node scripts/seedInventoryDistributed.js",
+    "seed:sales": "node scripts/seedSalesConsistent.js",
+    "seed:master": "node scripts/seedMasterData.js",
+    "seed": "npm run seed:master",
+    "validate:data": "node scripts/validateData.js",
     "test": "jest --detectOpenHandles",
     "test:watch": "jest --watch --detectOpenHandles",
     "test:coverage": "jest --coverage --detectOpenHandles",
@@ -19,7 +27,6 @@
     "format:check": "prettier --check .",
     "validate": "npm run test",
     "build": "npm run validate",
-    "db:seed": "node src/seed/seed.js",
     "db:indexes": "node scripts/createIndexes.js"
   },
   "keywords": [
@@ -99,7 +106,7 @@
     "collectCoverageFrom": [
       "src/**/*.js",
       "!src/config/**",
-      "!src/seed/**"
+      "!scripts/**"
     ],
     "coverageThreshold": {
       "global": {

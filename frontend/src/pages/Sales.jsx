@@ -9,7 +9,6 @@ import {
   CalculatorIcon, 
   UserIcon, 
   CreditCardIcon,
-  QrCodeIcon,
   PrinterIcon,
   XMarkIcon,
   ReceiptPercentIcon,
@@ -27,6 +26,7 @@ import {
 import { toast } from 'react-toastify';
 import { useAuth } from '../contexts/AuthContext';
 import { PageHeader } from '../components/shell';
+import { masterDataAPI } from '../utils/api';
 import { 
   Button, 
   Input, 
@@ -50,7 +50,6 @@ function Sales() {
   const [showProductModal, setShowProductModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showCustomerModal, setShowCustomerModal] = useState(false);
-  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [processing, setProcessing] = useState(false);
   
   // Customer & Payment State
@@ -80,19 +79,34 @@ function Sales() {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [savedTransactions, setSavedTransactions] = useState([]);
   const [showSavedTransactions, setShowSavedTransactions] = useState(false);
+  const [selectedBranch, setSelectedBranch] = useState(''); // For admin to select branch
+  const [showMobileCart, setShowMobileCart] = useState(false); // Mobile cart drawer
+  const [pagination, setPagination] = useState({
+    pageIndex: 0,
+    pageSize: 25, // Default to 25 products per page
+  });
   
   // Refs
-  const barcodeInputRef = useRef(null);
   const searchInputRef = useRef(null);
 
   // API Functions
   const fetchProducts = async () => {
     const params = new URLSearchParams({
+      page: pagination.pageIndex + 1,
+      limit: pagination.pageSize,
       search: searchTerm,
-      category: categoryFilter,
-      inStock: 'true',
-      limit: 100
+      inStock: 'true'
     });
+
+    // Only add category if it's selected
+    if (categoryFilter) {
+      params.append('category', categoryFilter);
+    }
+
+    // Add branch filter if selected
+    if (selectedBranch) {
+      params.append('branch', selectedBranch);
+    }
 
     const response = await fetch(`http://localhost:5000/api/products?${params}`, {
       headers: {
@@ -108,8 +122,8 @@ function Sales() {
     return response.json();
   };
 
-  const fetchProductByBarcode = async (barcode) => {
-    const response = await fetch(`http://localhost:5000/api/products/barcode/${barcode}`, {
+  const fetchCategories = async () => {
+    const response = await fetch('http://localhost:5000/api/products/categories', {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
@@ -117,10 +131,22 @@ function Sales() {
     });
 
     if (!response.ok) {
-      throw new Error('Product not found');
+      throw new Error('Failed to fetch categories');
     }
 
     return response.json();
+  };
+
+  const fetchBranches = async () => {
+    try {
+      const response = await masterDataAPI.getBranches({ limit: 100 });
+      // Backend returns { success, data: [...branches array...], pagination }
+      // So we need to wrap it to match our expected structure
+      return { branches: response.data };
+    } catch (error) {
+      console.error('Error fetching branches:', error);
+      throw error;
+    }
   };
 
   // React Query Hooks
@@ -129,9 +155,22 @@ function Sales() {
     isLoading: isLoadingProducts,
     refetch: refetchProducts 
   } = useQuery({
-    queryKey: ['pos-products', searchTerm, categoryFilter],
+    queryKey: ['pos-products', pagination, searchTerm, categoryFilter, selectedBranch],
     queryFn: fetchProducts,
     staleTime: 30000,
+    enabled: !!selectedBranch, // Only fetch if branch is selected
+  });
+
+  const { data: categoriesData } = useQuery({
+    queryKey: ['categories'],
+    queryFn: fetchCategories,
+    staleTime: 300000, // Cache for 5 minutes
+  });
+
+  const { data: branchesData, isLoading: isLoadingBranches, error: branchesError } = useQuery({
+    queryKey: ['branches'],
+    queryFn: fetchBranches,
+    staleTime: 300000, // Cache for 5 minutes
   });
 
   // Mutations
@@ -146,11 +185,14 @@ function Sales() {
         body: JSON.stringify(saleData)
       });
 
+      const data = await response.json();
+      
       if (!response.ok) {
-        throw new Error('Failed to create sale');
+        console.error('Sale creation error:', data);
+        throw new Error(data.message || 'Failed to create sale');
       }
 
-      return response.json();
+      return data;
     },
     onSuccess: (data) => {
       toast.success('Sale completed successfully!');
@@ -158,21 +200,59 @@ function Sales() {
       if (data.data.receipt) {
         handlePrintReceipt(data.data);
       }
+      // Invalidate all related queries to refresh data
       queryClient.invalidateQueries(['pos-products']);
+      queryClient.invalidateQueries({ queryKey: ['dashboard-overview'] }); // Refresh all dashboard queries regardless of dateRange
+      queryClient.invalidateQueries({ queryKey: ['sales-chart'] }); // Refresh all sales charts
     },
     onError: (error) => {
-      toast.error('Failed to complete sale');
+      console.error('Sale mutation error:', error);
+      toast.error(error.message || 'Failed to complete sale');
     }
   });
 
   // Data Processing
   const products = productsData?.data?.products || [];
-  const categories = [...new Set(products.map(p => p.category?.name || p.category))].filter(Boolean);
+  const totalProducts = productsData?.data?.pagination?.totalItems || 0;
+  const categories = categoriesData?.data || [];
+  
+  // Extract branches from the response
+  const branches = branchesData?.branches || [];
+
+  // Set default branch on load (first available branch or user's branch)
+  useEffect(() => {
+    if (!selectedBranch && branches.length > 0) {
+      const defaultBranch = user?.branch?._id || user?.branch || branches[0]?._id;
+      setSelectedBranch(defaultBranch);
+    }
+  }, [branches, user, selectedBranch]);
+
+  // Reset pagination when search or category changes
+  useEffect(() => {
+    setPagination(prev => ({ ...prev, pageIndex: 0 }));
+  }, [searchTerm, categoryFilter]);
+
+  // Helper function to get stock for selected branch
+  const getBranchStock = useCallback((product) => {
+    if (!selectedBranch || !product.stockByBranch) {
+      return product.stock || 0;
+    }
+    
+    const branchStock = product.stockByBranch.find(
+      stock => stock.branch === selectedBranch || stock.branch?._id === selectedBranch
+    );
+    
+    return branchStock?.quantity || 0;
+  }, [selectedBranch]);
 
   // Cart Calculations
+  // Note: Indian Retail Pricing - All prices are GST-inclusive
+  // We don't add tax on top, we extract it for display purposes only
   const cartCalculations = useMemo(() => {
+    // Subtotal: Sum of all items (prices already include GST)
     const subtotal = cart.reduce((sum, item) => sum + ((item.price || 0) * item.quantity), 0);
     
+    // Apply discount
     let discountAmount = 0;
     if (discount.type === 'percentage') {
       discountAmount = (subtotal * discount.value) / 100;
@@ -180,15 +260,20 @@ function Sales() {
       discountAmount = discount.value;
     }
     
-    const afterDiscount = subtotal - discountAmount;
-    const taxAmount = (afterDiscount * taxRate) / 100;
-    const total = afterDiscount + taxAmount;
+    // Total payable (GST already included in prices)
+    const total = subtotal - discountAmount;
+    
+    // For display only: Extract GST component from total
+    // Formula: taxableAmount = total / (1 + taxRate/100)
+    const taxableAmount = total / (1 + (taxRate / 100));
+    const taxAmount = total - taxableAmount;
     
     return {
-      subtotal,
-      discountAmount,
-      taxAmount,
-      total,
+      subtotal,        // Total before discount (GST inclusive)
+      discountAmount,  // Discount applied
+      taxableAmount,   // Base amount (GST exclusive) - for display only
+      taxAmount,       // GST component - for display only  
+      total,           // Final payable amount (GST inclusive)
       itemCount: cart.reduce((sum, item) => sum + item.quantity, 0)
     };
   }, [cart, discount, taxRate]);
@@ -252,28 +337,12 @@ function Sales() {
     setNotes('');
   }, []);
 
-  const handleBarcodeInput = useCallback(async (barcode) => {
-    try {
-      const productData = await fetchProductByBarcode(barcode);
-      if (productData.success) {
-        addToCart(productData.data);
-        toast.success(`Added ${productData.data.name} to cart`);
-      }
-    } catch (error) {
-      toast.error('Product not found');
-    }
-  }, [addToCart]);
-
   const handleKeyboardShortcuts = useCallback((e) => {
     if (e.ctrlKey || e.metaKey) {
       switch (e.key) {
         case 'f':
           e.preventDefault();
           searchInputRef.current?.focus();
-          break;
-        case 'b':
-          e.preventDefault();
-          barcodeInputRef.current?.focus();
           break;
         case 'Enter':
           e.preventDefault();
@@ -325,29 +394,33 @@ function Sales() {
       return;
     }
 
+    // Use selected branch for sale
+    const branchId = selectedBranch || user?.branch?._id || user?.branch;
+
+    if (!branchId) {
+      toast.error('Please select a branch to complete the sale');
+      return;
+    }
+
     const saleData = {
       items: cart.map(item => ({
-        product: item._id,
-        productName: item.name,
-        quantity: item.quantity,
-        price: item.price || 0,
-        total: (item.price || 0) * item.quantity
+        productId: item._id,
+        quantity: item.quantity
       })),
-      customer: customer.name ? customer : null,
+      customerName: customer.name || undefined,
+      customerPhone: customer.phone || undefined,
+      customerEmail: customer.email || undefined,
       paymentMethod,
-      paymentDetails: paymentMethod !== 'cash' ? paymentDetails : null,
-      discount: discount.value > 0 ? discount : null,
-      subtotal: cartCalculations.subtotal,
-      discountAmount: cartCalculations.discountAmount,
-      taxAmount: cartCalculations.taxAmount,
-      total: cartCalculations.total,
-      notes,
-      cashier: user.firstName + ' ' + user.lastName
+      discountPercentage: discount.type === 'percentage' ? discount.value : 0,
+      taxPercentage: taxRate || 18,
+      branchId,
+      notes
     };
 
+    console.log('Sending sale data:', saleData);
     createSaleMutation.mutate(saleData);
     setShowPaymentModal(false);
-  }, [cart, customer, paymentMethod, paymentDetails, discount, cartCalculations, notes, user, createSaleMutation]);
+  }, [cart, customer, paymentMethod, paymentDetails, discount, cartCalculations, notes, taxRate, selectedBranch, user, createSaleMutation]);
 
   const handlePrintReceipt = useCallback((saleData) => {
     // Generate receipt data
@@ -404,7 +477,7 @@ function Sales() {
         
         <div class="total">
           <div class="item">
-            <span>Subtotal:</span>
+            <span>Subtotal (incl. GST):</span>
             <span>₹${data.subtotal.toFixed(2)}</span>
           </div>
           ${data.discount > 0 ? `
@@ -413,15 +486,15 @@ function Sales() {
               <span>-₹${data.discount.toFixed(2)}</span>
             </div>
           ` : ''}
-          <div class="item">
-            <span>Tax (${taxRate}%):</span>
+          <div class="item" style="font-size: 18px; margin-top: 8px; border-top: 2px solid #333; padding-top: 8px;">
+            <span><strong>TOTAL PAYABLE:</strong></span>
+            <span><strong>₹${data.total.toFixed(2)}</strong></span>
+          </div>
+          <div class="item" style="margin-top: 12px; font-size: 11px; color: #666; border-top: 1px dashed #ccc; padding-top: 8px;">
+            <span>GST @ ${taxRate}% (included):</span>
             <span>₹${data.tax.toFixed(2)}</span>
           </div>
-          <div class="item" style="font-size: 18px;">
-            <span>TOTAL:</span>
-            <span>₹${data.total.toFixed(2)}</span>
-          </div>
-          <div class="item">
+          <div class="item" style="margin-top: 8px;">
             <span>Payment (${data.paymentMethod}):</span>
             <span>₹${(data.total + (data.change || 0)).toFixed(2)}</span>
           </div>
@@ -459,18 +532,17 @@ function Sales() {
   return (
     <div className="h-screen flex flex-col bg-white dark:bg-amoled-black">
       {/* Header */}
-      <div className="bg-white dark:bg-amoled-black border-b border-surface-200 dark:border-amoled-border px-6 py-4">
-        <div className="flex items-center justify-between">
+      <div className="bg-white dark:bg-amoled-black border-b border-surface-200 dark:border-amoled-border px-3 sm:px-4 lg:px-6 py-3 lg:py-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-2">
           <PageHeader 
             title="Point of Sale" 
             subtitle={`${cartCalculations.itemCount} items • ₹${cartCalculations.total.toFixed(2)}`}
           />
           
-          <div className="flex items-center gap-2">
-            {/* Keyboard Shortcuts Info */}
-            <div className="hidden lg:flex items-center gap-4 text-xs text-surface-500 dark:text-surface-400">
+          <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto">
+            {/* Keyboard Shortcuts Info - Hidden on mobile/tablet */}
+            <div className="hidden xl:flex items-center gap-4 text-xs text-surface-500 dark:text-surface-400 mr-2">
               <span>Ctrl+F: Search</span>
-              <span>Ctrl+B: Barcode</span>
               <span>Ctrl+Enter: Checkout</span>
               <span>Esc: Clear</span>
             </div>
@@ -481,9 +553,10 @@ function Sales() {
               size="sm"
               onClick={() => setShowSavedTransactions(true)}
               disabled={savedTransactions.length === 0}
+              className="whitespace-nowrap"
             >
-              <ClockIcon className="h-4 w-4 mr-1" />
-              Saved ({savedTransactions.length})
+              <ClockIcon className="h-4 w-4 sm:mr-1" />
+              <span className="hidden sm:inline">Saved</span> ({savedTransactions.length})
             </Button>
             
             <Button
@@ -491,9 +564,10 @@ function Sales() {
               size="sm"
               onClick={saveTransaction}
               disabled={cart.length === 0}
+              className="whitespace-nowrap"
             >
-              <DocumentDuplicateIcon className="h-4 w-4 mr-1" />
-              Save
+              <DocumentDuplicateIcon className="h-4 w-4 sm:mr-1" />
+              <span className="hidden sm:inline">Save</span>
             </Button>
             
             <Button
@@ -501,79 +575,86 @@ function Sales() {
               size="sm"
               onClick={clearCart}
               disabled={cart.length === 0}
+              className="whitespace-nowrap"
             >
-              <XMarkIcon className="h-4 w-4 mr-1" />
-              Clear
+              <XMarkIcon className="h-4 w-4 sm:mr-1" />
+              <span className="hidden sm:inline">Clear</span>
             </Button>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden relative"> 
         {/* Products Panel */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-w-0">
           {/* Search & Filters */}
-          <div className="bg-white dark:bg-amoled-black border-b border-surface-200 dark:border-amoled-border p-4">
-            <div className="flex gap-4">
-              {/* Product Search */}
+          <div className="bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-amoled-border p-3 sm:p-4 shadow-sm">
+            <div className="flex flex-col gap-2 sm:gap-3">
+              {/* First Row: Search */}
               <div className="flex-1 relative">
-                <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-surface-400" />
+                <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-surface-400" />
                 <Input
                   ref={searchInputRef}
-                  placeholder="Search products... (Ctrl+F)"
+                  placeholder="Search products by name or SKU..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 h-11 text-sm border-2 focus:border-blue-500 dark:focus:border-blue-400 bg-white dark:bg-surface-800 w-full"
                 />
               </div>
               
-              {/* Barcode Input */}
-              <div className="w-48 relative">
-                <QrCodeIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-surface-400" />
-                <Input
-                  ref={barcodeInputRef}
-                  placeholder="Scan barcode..."
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter' && e.target.value) {
-                      handleBarcodeInput(e.target.value);
-                      e.target.value = '';
-                    }
-                  }}
-                  className="pl-10"
-                />
+              {/* Second Row: Branch (if admin) and Category */}
+              <div className="flex gap-2 sm:gap-3">
+                {/* Branch Selector (Admin Only) */}
+                {user?.role?.toLowerCase() === 'admin' && (
+                  <select
+                    value={selectedBranch || ''}
+                    onChange={(e) => setSelectedBranch(e.target.value)}
+                    className="flex-1 h-11 px-4 border-2 border-surface-300 dark:border-amoled-border rounded-lg bg-white dark:bg-surface-800 text-sm text-slate-900 dark:text-amoled-primary focus:border-blue-500 dark:focus:border-blue-400 outline-none transition-colors cursor-pointer"
+                    disabled={isLoadingBranches}
+                  >
+                    <option value="">
+                      {isLoadingBranches ? 'Loading branches...' : branchesError ? 'Error loading branches' : 'Select Branch'}
+                    </option>
+                    {branchesData?.branches?.map(branch => (
+                      <option key={branch._id} value={branch._id}>
+                        {branch.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                
+                {/* Category Filter */}
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="flex-1 h-11 px-4 border-2 border-surface-300 dark:border-amoled-border rounded-lg bg-white dark:bg-surface-800 text-sm text-slate-900 dark:text-amoled-primary focus:border-blue-500 dark:focus:border-blue-400 outline-none transition-colors cursor-pointer"
+                >
+                  <option value="">All Categories</option>
+                  {categories.map(category => (
+                    <option key={category._id} value={category._id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
               </div>
-              
-              {/* Category Filter */}
-              <select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                className="px-3 py-2 border border-surface-300 dark:border-amoled-border rounded-lg bg-white dark:bg-amoled-card text-slate-900 dark:text-amoled-primary"
-              >
-                <option value="">All Categories</option>
-                {categories.map(category => (
-                  <option key={category} value={category}>{category}</option>
-                ))}
-              </select>
-              
-              {/* Barcode Scanner Button */}
-              <Button
-                variant="outline"
-                onClick={() => setShowBarcodeScanner(true)}
-              >
-                <QrCodeIcon className="h-4 w-4" />
-              </Button>
             </div>
           </div>
 
           {/* Products Grid */}
-          <div className="flex-1 overflow-auto p-4">
-            {isLoadingProducts ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-                {Array.from({ length: 12 }).map((_, i) => (
+          <div className="flex-1 overflow-auto p-3 sm:p-4 lg:p-6 pb-20 lg:pb-6">
+            {!selectedBranch ? (
+              <EmptyState
+                icon={CubeIcon}
+                title="Select a branch to continue"
+                description="Please select a branch from the dropdown above to view products"
+              />
+            ) : isLoadingProducts ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+                {Array.from({ length: 6 }).map((_, i) => (
                   <div key={i} className="bg-white dark:bg-amoled-card rounded-lg p-4 animate-pulse">
-                    <div className="bg-surface-200 dark:bg-amoled-hover h-24 rounded mb-3"></div>
-                    <div className="bg-surface-200 dark:bg-amoled-hover h-4 rounded mb-2"></div>
-                    <div className="bg-surface-200 dark:bg-amoled-hover h-3 rounded w-2/3"></div>
+                    <div className="bg-surface-200 dark:bg-amoled-hover h-40 sm:h-48 rounded-lg mb-4"></div>
+                    <div className="bg-surface-200 dark:bg-amoled-hover h-5 rounded mb-3"></div>
+                    <div className="bg-surface-200 dark:bg-amoled-hover h-4 rounded w-2/3"></div>
                   </div>
                 ))}
               </div>
@@ -584,66 +665,205 @@ function Sales() {
                 description="Try adjusting your search or filters"
               />
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-                {products.map((product) => (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+                {products.map((product) => {
+                  const branchStock = getBranchStock(product);
+                  return (
                   <Card
                     key={product._id}
                     className={cn(
-                      "cursor-pointer transition-all hover:shadow-lg hover:scale-105",
-                      product.stock === 0 && "opacity-50 cursor-not-allowed"
+                      "group relative cursor-pointer transition-all duration-300 overflow-hidden h-full",
+                      "hover:shadow-2xl hover:-translate-y-2 border-2 border-transparent",
+                      branchStock === 0 
+                        ? "opacity-50 cursor-not-allowed grayscale" 
+                        : "hover:border-blue-500 dark:hover:border-blue-400 hover:shadow-blue-200 dark:hover:shadow-blue-900/50"
                     )}
-                    onClick={() => product.stock > 0 && addToCart(product)}
+                    onClick={() => branchStock > 0 && addToCart(product)}
                   >
-                    <div className="p-4">
-                      {/* Product Image */}
-                      <div className="h-24 bg-surface-100 dark:bg-amoled-hover rounded-lg mb-3 flex items-center justify-center overflow-hidden">
+                    {/* Stock Badge - Top Right */}
+                    <div className="absolute top-2 sm:top-3 right-2 sm:right-3 z-10">
+                      <Badge
+                        variant={
+                          branchStock === 0 ? 'destructive' :
+                          branchStock <= (product.minStockLevel || 10) ? 'warning' : 'success'
+                        }
+                        className="shadow-lg text-xs font-bold px-2 py-0.5 sm:px-2.5 sm:py-1"
+                      >
+                        {branchStock === 0 ? 'Out' : `${branchStock} left`}
+                      </Badge>
+                    </div>
+
+                    {/* Quick Add Button - Top Left (visible on hover) */}
+                    {branchStock > 0 && (
+                      <div className="absolute top-2 sm:top-3 left-2 sm:left-3 z-10 opacity-0 group-hover:opacity-100 transition-all duration-200 transform group-hover:scale-110">
+                        <Button
+                          size="sm"
+                          className="h-8 w-8 sm:h-9 sm:w-9 p-0 rounded-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            addToCart(product);
+                            toast.success('Added to cart!');
+                          }}
+                        >
+                          <PlusIcon className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+                        </Button>
+                      </div>
+                    )}
+
+                    <div className="p-3 sm:p-4 lg:p-5">
+                      {/* Product Image with gradient overlay */}
+                      <div className="relative h-40 sm:h-48 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-surface-800 dark:via-surface-900 dark:to-surface-800 rounded-xl sm:rounded-2xl mb-3 sm:mb-4 overflow-hidden shadow-inner group-hover:shadow-lg transition-all">
                         {product.image ? (
                           <img 
                             src={product.image} 
                             alt={product.name}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ease-out"
                           />
                         ) : (
-                          <CubeIcon className="h-8 w-8 text-surface-400" />
+                          <div className="w-full h-full flex items-center justify-center">
+                            <CubeIcon className="h-16 w-16 sm:h-20 sm:w-20 text-surface-300 dark:text-surface-600 group-hover:text-blue-500 transition-colors duration-300" />
+                          </div>
                         )}
+                        
+                        {/* Gradient overlay on image */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                       </div>
                       
                       {/* Product Info */}
-                      <div>
-                        <h3 className="font-medium text-sm text-surface-900 dark:text-surface-100 mb-1 line-clamp-2">
+                      <div className="space-y-3">
+                        {/* Category Badge */}
+                        <div className="flex items-center gap-1.5">
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-purple-100 to-pink-100 dark:from-purple-900/40 dark:to-pink-900/40 text-purple-800 dark:text-purple-300 shadow-sm">
+                            {product.category?.name || product.category || 'N/A'}
+                          </span>
+                        </div>
+
+                        {/* Product Name */}
+                        <h3 
+                          className="font-bold text-base sm:text-lg text-surface-900 dark:text-surface-100 leading-snug group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors break-words"
+                          title={product.name}
+                        >
                           {product.name}
                         </h3>
                         
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-lg font-bold text-surface-900 dark:text-surface-100">
-                            ₹{(product.price || 0).toFixed(0)}
-                          </span>
-                          
-                          <Badge
-                            variant={
-                              product.stock === 0 ? 'destructive' :
-                              product.stock <= (product.minStockLevel || 10) ? 'warning' : 'success'
-                            }
-                            size="sm"
-                          >
-                            {product.stock} left
-                          </Badge>
-                        </div>
-                        
-                        <div className="text-xs text-surface-500 dark:text-surface-400">
-                          {product.category?.name || product.category || 'N/A'}
+                        {/* SKU */}
+                        <p className="text-xs text-surface-500 dark:text-surface-400 font-mono bg-surface-50 dark:bg-surface-800 px-2 py-1 rounded inline-block">
+                          SKU: {product.sku}
+                        </p>
+
+                        {/* Price Section */}
+                        <div className="pt-3 border-t-2 border-surface-100 dark:border-surface-800">
+                          <div className="flex items-end justify-between">
+                            <div className="flex-1">
+                              <p className="text-xs font-medium text-surface-500 dark:text-surface-400 mb-1">Price</p>
+                              <div className="flex items-baseline gap-2">
+                                <span className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+                                  ₹{(product.price || 0).toFixed(0)}
+                                </span>
+                                {product.mrp && product.mrp > product.price && (
+                                  <span className="text-sm text-surface-400 line-through">
+                                    ₹{product.mrp}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Add to Cart Icon Button */}
+                            {branchStock > 0 && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-10 w-10 p-0 rounded-xl text-blue-600 hover:text-white hover:bg-gradient-to-r hover:from-blue-600 hover:to-blue-700 dark:hover:from-blue-500 dark:hover:to-blue-600 transition-all duration-200"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  addToCart(product);
+                                }}
+                              >
+                                <ShoppingCartIcon className="h-5 w-5" />
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
+
+                    {/* Out of Stock Overlay */}
+                    {branchStock === 0 && (
+                      <div className="absolute inset-0 bg-surface-900/60 dark:bg-black/80 flex items-center justify-center rounded-lg backdrop-blur-sm">
+                        <div className="text-center">
+                          <span className="text-white font-bold text-xl bg-gradient-to-r from-red-600 to-red-700 px-6 py-3 rounded-xl shadow-2xl inline-block">
+                            OUT OF STOCK
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </Card>
-                ))}
+                )})}
+              </div>
+            )}
+
+            {/* Pagination - Show only when there are products */}
+            {!isLoadingProducts && products.length > 0 && (
+              <div className="mt-6 flex flex-col lg:flex-row items-center justify-between gap-3 border-t border-surface-200 dark:border-surface-700 pt-4 px-2">
+                {/* Results Count */}
+                <div className="text-xs sm:text-sm text-surface-600 dark:text-surface-400 font-medium">
+                  Showing {(pagination.pageIndex * pagination.pageSize) + 1} to {Math.min((pagination.pageIndex + 1) * pagination.pageSize, totalProducts)} of {totalProducts} products
+                </div>
+                
+                {/* Navigation and Page Size */}
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                  {/* Page Navigation */}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPagination(prev => ({ ...prev, pageIndex: prev.pageIndex - 1 }))}
+                      disabled={pagination.pageIndex === 0}
+                      className="text-xs sm:text-sm"
+                    >
+                      <span className="hidden sm:inline">Previous</span>
+                      <span className="sm:hidden">Prev</span>
+                    </Button>
+                    <span className="text-xs sm:text-sm text-surface-600 dark:text-surface-400 px-2 font-medium">
+                      Page {pagination.pageIndex + 1} of {Math.ceil(totalProducts / pagination.pageSize) || 1}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPagination(prev => ({ ...prev, pageIndex: prev.pageIndex + 1 }))}
+                      disabled={(pagination.pageIndex + 1) * pagination.pageSize >= totalProducts}
+                      className="text-xs sm:text-sm"
+                    >
+                      Next
+                    </Button>
+                  </div>
+                  
+                  {/* Page Size Selector */}
+                  <select
+                    value={pagination.pageSize}
+                    onChange={(e) => {
+                      setPagination(prev => ({ 
+                        ...prev, 
+                        pageSize: Number(e.target.value),
+                        pageIndex: 0 // Reset to first page when changing page size
+                      }));
+                    }}
+                    className="px-3 py-1.5 text-xs sm:text-sm border-2 border-surface-300 dark:border-surface-700 rounded-lg bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 font-medium cursor-pointer focus:border-blue-500 dark:focus:border-blue-400 outline-none transition-colors"
+                  >
+                    {[25, 50, 100].map((size) => (
+                      <option key={size} value={size}>
+                        Show {size}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* Cart Panel */}
-        <div className="w-96 bg-white dark:bg-amoled-black border-l border-surface-200 dark:border-amoled-border flex flex-col">
+        {/* Cart Panel - Desktop Only (hidden on mobile/tablet) */}
+        <div className="hidden lg:flex w-96 bg-white dark:bg-amoled-black border-l border-surface-200 dark:border-amoled-border flex-col">
           {/* Cart Header */}
           <div className="p-4 border-b border-surface-200 dark:border-surface-700">
             <div className="flex items-center justify-between">
@@ -657,7 +877,7 @@ function Sales() {
                 onClick={() => setShowCustomerModal(true)}
               >
                 <UserIcon className="h-4 w-4 mr-1" />
-                {customer.name || 'Customer'}
+                <span className="max-w-[100px] truncate">{customer.name || 'Customer'}</span>
               </Button>
             </div>
           </div>
@@ -765,7 +985,7 @@ function Sales() {
               {/* Order Summary */}
               <div className="space-y-2 mb-4 text-sm">
                 <div className="flex justify-between">
-                  <span>Subtotal:</span>
+                  <span>Subtotal (incl. GST):</span>
                   <span>₹{cartCalculations.subtotal.toFixed(2)}</span>
                 </div>
                 
@@ -776,14 +996,15 @@ function Sales() {
                   </div>
                 )}
                 
-                <div className="flex justify-between">
-                  <span>Tax ({taxRate}%):</span>
-                  <span>₹{cartCalculations.taxAmount.toFixed(2)}</span>
+                <div className="flex justify-between text-lg font-bold border-t-2 border-surface-300 dark:border-surface-600 pt-2 mt-2">
+                  <span>Total Payable:</span>
+                  <span>₹{cartCalculations.total.toFixed(2)}</span>
                 </div>
                 
-                <div className="flex justify-between text-lg font-bold border-t border-surface-200 dark:border-surface-700 pt-2">
-                  <span>Total:</span>
-                  <span>₹{cartCalculations.total.toFixed(2)}</span>
+                {/* Tax Info - For Reference Only */}
+                <div className="flex justify-between text-xs text-surface-500 dark:text-surface-400 border-t border-dashed border-surface-200 dark:border-surface-700 pt-2 mt-2">
+                  <span>GST @ {taxRate}% (included):</span>
+                  <span>₹{cartCalculations.taxAmount.toFixed(2)}</span>
                 </div>
               </div>
 
@@ -805,6 +1026,166 @@ function Sales() {
             </div>
           )}
         </div>
+
+        {/* Mobile Cart Button - Fixed Bottom */}
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-amoled-black border-t-2 border-surface-200 dark:border-amoled-border p-3 sm:p-4 z-50 shadow-lg">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Button
+              onClick={() => setShowMobileCart(true)}
+              className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold h-12 sm:h-14 text-base sm:text-lg"
+              disabled={cart.length === 0}
+            >
+              <ShoppingCartIcon className="h-5 w-5 sm:h-6 sm:w-6 mr-2" />
+              View Cart ({cartCalculations.itemCount})
+              <span className="ml-auto">₹{cartCalculations.total.toFixed(2)}</span>
+            </Button>
+          </div>
+        </div>
+
+        {/* Mobile Cart Drawer */}
+        {showMobileCart && (
+          <div className="lg:hidden fixed inset-0 bg-black/50 z-50" onClick={() => setShowMobileCart(false)}>
+            <div 
+              className="absolute right-0 top-0 bottom-0 w-full max-w-md bg-white dark:bg-amoled-black flex flex-col animate-slide-in-right"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Mobile Cart Header */}
+              <div className="p-4 border-b border-surface-200 dark:border-surface-700 flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100">
+                  Cart ({cartCalculations.itemCount})
+                </h2>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowCustomerModal(true)}
+                  >
+                    <UserIcon className="h-4 w-4 mr-1" />
+                    <span className="max-w-[80px] truncate">{customer.name || 'Customer'}</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowMobileCart(false)}
+                  >
+                    <XMarkIcon className="h-5 w-5" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Mobile Cart Items */}
+              <div className="flex-1 overflow-auto p-4">
+                {cart.length === 0 ? (
+                  <EmptyState
+                    icon={ShoppingCartIcon}
+                    title="Cart is empty"
+                    description="Add products to start a sale"
+                  />
+                ) : (
+                  <div className="space-y-3">
+                    {cart.map((item) => (
+                      <div key={item._id} className="bg-surface-50 dark:bg-amoled-card rounded-lg p-3">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-sm text-surface-900 dark:text-surface-100">
+                              {item.name}
+                            </h4>
+                            <p className="text-xs text-surface-500 dark:text-surface-400">
+                              ₹{item.price || 0} each
+                            </p>
+                          </div>
+                          
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeFromCart(item._id)}
+                            className="h-6 w-6 p-0 text-red-500 hover:text-red-600"
+                          >
+                            <TrashIcon className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => updateQuantity(item._id, item.quantity - 1)}
+                              className="h-8 w-8 p-0"
+                            >
+                              <MinusIcon className="h-3 w-3" />
+                            </Button>
+                            
+                            <span className="w-10 text-center font-medium">{item.quantity}</span>
+                            
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => updateQuantity(item._id, item.quantity + 1)}
+                              className="h-8 w-8 p-0"
+                            >
+                              <PlusIcon className="h-3 w-3" />
+                            </Button>
+                          </div>
+                          
+                          <div className="text-right">
+                            <div className="font-semibold text-blue-600 dark:text-blue-400">
+                              ₹{((item.price || 0) * item.quantity).toFixed(2)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Mobile Cart Summary & Checkout */}
+              {cart.length > 0 && (
+                <div className="border-t border-surface-200 dark:border-surface-700 p-4 space-y-4">
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span>Subtotal (incl. GST):</span>
+                      <span>₹{cartCalculations.subtotal.toFixed(2)}</span>
+                    </div>
+                    {cartCalculations.discountAmount > 0 && (
+                      <div className="flex justify-between text-green-600">
+                        <span>Discount:</span>
+                        <span>-₹{cartCalculations.discountAmount.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-lg font-bold border-t-2 border-surface-300 dark:border-surface-600 pt-2 mt-2">
+                      <span>Total Payable:</span>
+                      <span>₹{cartCalculations.total.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs text-surface-500 dark:text-surface-400 border-t border-dashed pt-2">
+                      <span>GST @ {taxRate}% (included):</span>
+                      <span>₹{cartCalculations.taxAmount.toFixed(2)}</span>
+                    </div>
+                  </div>
+
+                  <Button
+                    onClick={() => {
+                      setShowMobileCart(false);
+                      setShowPaymentModal(true);
+                    }}
+                    className="w-full bg-green-600 hover:bg-green-700 h-12 text-base"
+                    disabled={processing}
+                  >
+                    {processing ? (
+                      <LoadingSpinner size="sm" />
+                    ) : (
+                      <>
+                        <CreditCardIcon className="h-5 w-5 mr-2" />
+                        Checkout
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Payment Modal */}
@@ -905,7 +1286,7 @@ function Sales() {
               <h3 className="font-medium mb-3">Order Summary</h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span>Subtotal:</span>
+                  <span>Subtotal (incl. GST):</span>
                   <span>₹{cartCalculations.subtotal.toFixed(2)}</span>
                 </div>
                 {cartCalculations.discountAmount > 0 && (
@@ -914,17 +1295,17 @@ function Sales() {
                     <span>-₹{cartCalculations.discountAmount.toFixed(2)}</span>
                   </div>
                 )}
-                <div className="flex justify-between">
-                  <span>Tax:</span>
-                  <span>₹{cartCalculations.taxAmount.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-lg font-bold border-t border-surface-200 dark:border-surface-700 pt-2">
-                  <span>Total:</span>
+                <div className="flex justify-between text-lg font-bold border-t-2 border-surface-300 dark:border-surface-600 pt-2 mt-2">
+                  <span>Total Payable:</span>
                   <span>₹{cartCalculations.total.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-xs text-surface-500 dark:text-surface-400 border-t border-dashed pt-2">
+                  <span>GST @ {taxRate}% (included):</span>
+                  <span>₹{cartCalculations.taxAmount.toFixed(2)}</span>
                 </div>
                 
                 {paymentMethod === 'cash' && (
-                  <div className="flex justify-between text-green-600">
+                  <div className="flex justify-between text-green-600 mt-3">
                     <span>Payment (Cash):</span>
                     <span>₹{cartCalculations.total.toFixed(2)}</span>
                   </div>

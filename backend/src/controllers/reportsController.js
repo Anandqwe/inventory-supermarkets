@@ -121,15 +121,18 @@ class ReportsController {
 
     // Log report generation
     await AuditLog.create({
-      action: 'REPORT_GENERATED',
-      resourceType: 'Report',
+      userId: req.user.id || req.user.userId,
+      userEmail: req.user.email,
+      userRole: req.user.role,
+      action: 'financial_report_generate',
+      resourceType: 'report',
+      description: `Daily report generated for ${date}`,
       details: {
         type: 'daily',
         date,
         branchId,
         recordCount: totalSales
       },
-      user: req.user._id,
       ipAddress: req.ip
     });
 
@@ -139,16 +142,15 @@ class ReportsController {
       return this.generatePDFReport(res, 'Daily Report', reportData);
     }
 
-    res.json(
-      ResponseUtils.success('Daily report generated successfully', reportData)
-    );
+    return ResponseUtils.success(res, reportData, 'Daily report generated successfully');
   });
 
   static getSalesReport = asyncHandler(async (req, res) => {
     const { 
       startDate, 
       endDate, 
-      branchId, 
+      branchId,
+      categoryId,
       paymentMethod, 
       cashierId,
       format = 'json',
@@ -182,15 +184,34 @@ class ReportsController {
     const sales = await Sale.find(filter)
       .populate('branch', 'name address')
       .populate('createdBy', 'name email')
-      .populate('items.product', 'name sku category brand')
+      .populate({
+        path: 'items.product',
+        select: 'name sku category brand',
+        populate: {
+          path: 'category',
+          select: 'name'
+        }
+      })
       .sort({ createdAt: -1 });
 
-    // Calculate comprehensive metrics
-    const totalSales = sales.length;
-    const totalRevenue = sales.reduce((sum, sale) => sum + sale.total, 0);
-    const totalDiscount = sales.reduce((sum, sale) => sum + sale.discountAmount, 0);
-    const totalTax = sales.reduce((sum, sale) => sum + sale.taxAmount, 0);
-    const totalCost = sales.reduce((sum, sale) => 
+    // Filter by category if specified (post-query filtering since category is in populated product)
+    let filteredSales = sales;
+    if (categoryId) {
+      filteredSales = sales.filter(sale => 
+        sale.items.some(item => 
+          item.product && 
+          item.product.category && 
+          item.product.category._id.toString() === categoryId
+        )
+      );
+    }
+
+    // Calculate comprehensive metrics using filtered sales
+    const totalSales = filteredSales.length;
+    const totalRevenue = filteredSales.reduce((sum, sale) => sum + sale.total, 0);
+    const totalDiscount = filteredSales.reduce((sum, sale) => sum + sale.discountAmount, 0);
+    const totalTax = filteredSales.reduce((sum, sale) => sum + sale.taxAmount, 0);
+    const totalCost = filteredSales.reduce((sum, sale) => 
       sum + sale.items.reduce((itemSum, item) => 
         itemSum + (item.costPrice * item.quantity), 0), 0);
     const grossProfit = totalRevenue - totalCost;
@@ -198,7 +219,7 @@ class ReportsController {
 
     // Payment method analysis
     const paymentMethodAnalysis = {};
-    sales.forEach(sale => {
+    filteredSales.forEach(sale => {
       if (!paymentMethodAnalysis[sale.paymentMethod]) {
         paymentMethodAnalysis[sale.paymentMethod] = {
           count: 0,
@@ -215,9 +236,12 @@ class ReportsController {
         (paymentMethodAnalysis[method].amount / totalRevenue) * 100;
     });
 
-    // Cashier performance
+    // Cashier performance (with null checks)
     const cashierPerformance = {};
-    sales.forEach(sale => {
+    filteredSales.forEach(sale => {
+      // Skip sales with no createdBy (orphaned data)
+      if (!sale.createdBy || !sale.createdBy._id) return;
+      
       const cashierId = sale.createdBy._id.toString();
       if (!cashierPerformance[cashierId]) {
         cashierPerformance[cashierId] = {
@@ -236,23 +260,25 @@ class ReportsController {
       perf.avgOrderValue = perf.totalAmount / perf.salesCount;
     });
 
-    // Time-based grouping
+    // Time-based grouping (use filtered sales)
     let timeGroupedData = [];
     if (groupBy === 'hour') {
-      timeGroupedData = this.groupSalesByHour(sales);
+      timeGroupedData = this.groupSalesByHour(filteredSales);
     } else if (groupBy === 'day') {
-      timeGroupedData = this.groupSalesByDay(sales);
+      timeGroupedData = this.groupSalesByDay(filteredSales);
     } else if (groupBy === 'week') {
-      timeGroupedData = this.groupSalesByWeek(sales);
+      timeGroupedData = this.groupSalesByWeek(filteredSales);
     } else if (groupBy === 'month') {
-      timeGroupedData = this.groupSalesByMonth(sales);
+      timeGroupedData = this.groupSalesByMonth(filteredSales);
     }
 
     // Product category analysis
     const categoryAnalysis = {};
-    sales.forEach(sale => {
+    filteredSales.forEach(sale => {
       sale.items.forEach(item => {
-        const categoryName = item.product.category || 'Uncategorized';
+        // Handle both populated and non-populated category
+        const categoryName = item.product?.category?.name || 
+                           (typeof item.product?.category === 'string' ? item.product.category : 'Uncategorized');
         if (!categoryAnalysis[categoryName]) {
           categoryAnalysis[categoryName] = {
             itemsSold: 0,
@@ -266,7 +292,20 @@ class ReportsController {
 
     // Pagination for sales list
     const skip = (page - 1) * limit;
-    const paginatedSales = sales.slice(skip, skip + parseInt(limit));
+    const paginatedSales = sales.slice(skip, skip + parseInt(limit)).map(sale => ({
+      _id: sale._id,
+      invoiceNumber: sale.invoiceNumber,
+      branch: sale.branch,
+      customer: sale.customer,
+      items: sale.items,
+      subtotal: sale.subtotal,
+      discountAmount: sale.discountAmount,
+      taxAmount: sale.taxAmount,
+      total: sale.total,
+      paymentMethod: sale.paymentMethod,
+      createdBy: sale.createdBy,
+      createdAt: sale.createdAt
+    }));
 
     const reportData = {
       period: { startDate, endDate },
@@ -297,15 +336,18 @@ class ReportsController {
 
     // Log report generation
     await AuditLog.create({
-      action: 'REPORT_GENERATED',
-      resourceType: 'Report',
+      userId: req.user.id || req.user.userId,
+      userEmail: req.user.email,
+      userRole: req.user.role,
+      action: 'financial_report_generate',
+      resourceType: 'report',
+      description: 'Sales report generated',
       details: {
         type: 'sales',
-        period: { startDate, endDate },
-        filters: { branchId, paymentMethod, cashierId },
-        recordCount: totalSales
+        filters: { startDate, endDate, branchId, paymentMethod, cashierId, groupBy },
+        recordCount: totalSales,
+        summary: reportData.summary
       },
-      user: req.user._id,
       ipAddress: req.ip
     });
 
@@ -315,9 +357,7 @@ class ReportsController {
       return this.generatePDFReport(res, 'Sales Report', reportData);
     }
 
-    res.json(
-      ResponseUtils.success('Sales report generated successfully', reportData)
-    );
+    return ResponseUtils.success(res, reportData, 'Sales report generated successfully');
   });
 
   static getProductReport = asyncHandler(async (req, res) => {
@@ -472,15 +512,18 @@ class ReportsController {
 
     // Log report generation
     await AuditLog.create({
-      action: 'REPORT_GENERATED',
-      resourceType: 'Report',
+      userId: req.user.id || req.user.userId,
+      userEmail: req.user.email,
+      userRole: req.user.role,
+      action: 'financial_report_generate',
+      resourceType: 'report',
+      description: `Product report generated for period ${startDate} to ${endDate}`,
       details: {
         type: 'product',
         period: { startDate, endDate },
         filters: { branchId, categoryId, brandId },
         recordCount: limitedProducts.length
       },
-      user: req.user._id,
       ipAddress: req.ip
     });
 
@@ -490,9 +533,7 @@ class ReportsController {
       return this.generatePDFReport(res, 'Product Performance Report', reportData);
     }
 
-    res.json(
-      ResponseUtils.success('Product report generated successfully', reportData)
-    );
+    return ResponseUtils.success(res, reportData, 'Product report generated successfully');
   });
 
   static getInventoryReport = asyncHandler(async (req, res) => {
@@ -535,8 +576,10 @@ class ReportsController {
         }
       }
 
-      const stockValue = totalStock * product.costPrice;
-      const sellingValue = totalStock * product.sellingPrice;
+      const costPrice = product.pricing?.costPrice || 0;
+      const sellingPrice = product.pricing?.sellingPrice || 0;
+      const stockValue = totalStock * costPrice;
+      const sellingValue = totalStock * sellingPrice;
       const potentialProfit = sellingValue - stockValue;
       
       const isLowStock = totalStock <= (product.minStockLevel || 0);
@@ -552,8 +595,8 @@ class ReportsController {
         minStockLevel: product.minStockLevel || 0,
         maxStockLevel: product.maxStockLevel || 0,
         reorderPoint: product.reorderPoint || 0,
-        costPrice: product.costPrice,
-        sellingPrice: product.sellingPrice,
+        costPrice,
+        sellingPrice,
         stockValue,
         sellingValue,
         potentialProfit,
@@ -649,14 +692,17 @@ class ReportsController {
 
     // Log report generation
     await AuditLog.create({
-      action: 'REPORT_GENERATED',
-      resourceType: 'Report',
+      userId: req.user.id || req.user.userId,
+      userEmail: req.user.email,
+      userRole: req.user.role,
+      action: 'financial_report_generate',
+      resourceType: 'report',
+      description: 'Inventory report generated',
       details: {
         type: 'inventory',
         filters: { branchId, categoryId, brandId, stockStatus },
         recordCount: inventoryReport.length
       },
-      user: req.user._id,
       ipAddress: req.ip
     });
 
@@ -666,14 +712,12 @@ class ReportsController {
       return this.generatePDFReport(res, 'Inventory Report', reportData);
     }
 
-    res.json(
-      ResponseUtils.success('Inventory report generated successfully', reportData)
-    );
+    return ResponseUtils.success(res, reportData, 'Inventory report generated successfully');
   });
 
   // Advanced Analytics Reports
   static getProfitAnalysis = asyncHandler(async (req, res) => {
-    const { startDate, endDate, branchId, groupBy = 'day' } = req.query;
+    const { startDate, endDate, branchId, categoryId, groupBy = 'day' } = req.query;
 
     if (!startDate || !endDate) {
       return res.status(400).json(
@@ -691,11 +735,30 @@ class ReportsController {
     if (branchId) filter.branch = branchId;
 
     const sales = await Sale.find(filter)
-      .populate('items.product', 'costPrice')
+      .populate({
+        path: 'items.product',
+        select: 'costPrice category',
+        populate: {
+          path: 'category',
+          select: 'name'
+        }
+      })
       .populate('branch', 'name');
 
+    // Filter by category if specified
+    let filteredSales = sales;
+    if (categoryId) {
+      filteredSales = sales.filter(sale => 
+        sale.items.some(item => 
+          item.product && 
+          item.product.category && 
+          item.product.category._id.toString() === categoryId
+        )
+      );
+    }
+
     // Calculate profit for each sale
-    const profitAnalysis = sales.map(sale => {
+    const profitAnalysis = filteredSales.map(sale => {
       const itemsProfitDetails = sale.items.map(item => {
         const itemProfit = (item.sellingPrice - item.costPrice) * item.quantity;
         return {
@@ -739,29 +802,30 @@ class ReportsController {
     };
 
     await AuditLog.create({
-      action: 'REPORT_GENERATED',
-      resourceType: 'Report',
+      userId: req.user.id || req.user.userId,
+      userEmail: req.user.email,
+      userRole: req.user.role,
+      action: 'financial_report_generate',
+      resourceType: 'report',
+      description: `Profit analysis generated for period ${startDate} to ${endDate}`,
       details: {
         type: 'profit_analysis',
         period: { startDate, endDate },
         recordCount: profitAnalysis.length
       },
-      user: req.user._id,
       ipAddress: req.ip
     });
 
-    res.json(
-      ResponseUtils.success('Profit analysis generated successfully', {
-        period: { startDate, endDate },
-        summary,
-        groupedData,
-        details: profitAnalysis
-      })
-    );
+    return ResponseUtils.success(res, {
+      period: { startDate, endDate },
+      summary,
+      groupedData,
+      details: profitAnalysis
+    }, 'Profit analysis generated successfully');
   });
 
   static getCustomerAnalysis = asyncHandler(async (req, res) => {
-    const { startDate, endDate, branchId } = req.query;
+    const { startDate, endDate, branchId, categoryId } = req.query;
 
     if (!startDate || !endDate) {
       return res.status(400).json(
@@ -780,11 +844,58 @@ class ReportsController {
 
     const sales = await Sale.find(filter)
       .populate('customer', 'name email phone')
+      .populate({
+        path: 'items.product',
+        select: 'category',
+        populate: {
+          path: 'category',
+          select: 'name'
+        }
+      })
       .populate('branch', 'name');
+
+    // Filter by category if specified
+    let filteredSales = sales;
+    if (categoryId) {
+      filteredSales = sales.filter(sale => 
+        sale.items.some(item => 
+          item.product && 
+          item.product.category && 
+          item.product.category._id.toString() === categoryId
+        )
+      );
+    }
+
+    // Handle no sales found
+    if (!filteredSales || filteredSales.length === 0) {
+      return ResponseUtils.success(res, {
+        period: { startDate, endDate },
+        summary: {
+          totalCustomers: 0,
+          walkInCustomers: 0,
+          registeredCustomers: 0,
+          averageOrderValue: 0,
+          totalRevenue: 0,
+          segmentation: {
+            vip: 0,
+            loyal: 0,
+            regular: 0,
+            occasional: 0
+          }
+        },
+        segments: {
+          vip: [],
+          loyal: [],
+          regular: [],
+          occasional: []
+        },
+        topCustomers: []
+      }, 'No customer data found for the selected period');
+    }
 
     // Customer behavior analysis
     const customerAnalysis = {};
-    sales.forEach(sale => {
+    filteredSales.forEach(sale => {
       const customerId = sale.customer?._id?.toString() || 'walk-in';
       const customerName = sale.customer?.name || 'Walk-in Customer';
 
@@ -830,8 +941,13 @@ class ReportsController {
         (analysis.totalPurchases / (daysDiff / 30)) : 0;
 
       // Find most preferred payment method
-      analysis.mostPreferredPayment = Object.keys(analysis.preferredPaymentMethod)
-        .reduce((a, b) => analysis.preferredPaymentMethod[a] > analysis.preferredPaymentMethod[b] ? a : b);
+      const paymentMethods = Object.keys(analysis.preferredPaymentMethod);
+      if (paymentMethods.length > 0) {
+        analysis.mostPreferredPayment = paymentMethods
+          .reduce((a, b) => analysis.preferredPaymentMethod[a] > analysis.preferredPaymentMethod[b] ? a : b);
+      } else {
+        analysis.mostPreferredPayment = 'N/A';
+      }
     });
 
     // Sort customers by total spent
@@ -850,7 +966,8 @@ class ReportsController {
       totalCustomers: sortedCustomers.length,
       walkInCustomers: customerAnalysis['walk-in'] ? 1 : 0,
       registeredCustomers: sortedCustomers.length - (customerAnalysis['walk-in'] ? 1 : 0),
-      averageOrderValue: sortedCustomers.reduce((sum, c) => sum + c.averageOrderValue, 0) / sortedCustomers.length,
+      averageOrderValue: sortedCustomers.length > 0 ? 
+        sortedCustomers.reduce((sum, c) => sum + c.averageOrderValue, 0) / sortedCustomers.length : 0,
       totalRevenue: sortedCustomers.reduce((sum, c) => sum + c.totalSpent, 0),
       segmentation: {
         vip: segments.vip.length,
@@ -861,25 +978,26 @@ class ReportsController {
     };
 
     await AuditLog.create({
-      action: 'REPORT_GENERATED',
-      resourceType: 'Report',
+      userId: req.user.id || req.user.userId,
+      userEmail: req.user.email,
+      userRole: req.user.role,
+      action: 'financial_report_generate',
+      resourceType: 'report',
+      description: `Customer analysis generated for period ${startDate} to ${endDate}`,
       details: {
         type: 'customer_analysis',
         period: { startDate, endDate },
         customerCount: sortedCustomers.length
       },
-      user: req.user._id,
       ipAddress: req.ip
     });
 
-    res.json(
-      ResponseUtils.success('Customer analysis generated successfully', {
-        period: { startDate, endDate },
-        summary,
-        segments,
-        topCustomers: sortedCustomers.slice(0, 20)
-      })
-    );
+    return ResponseUtils.success(res, {
+      period: { startDate, endDate },
+      summary,
+      segments,
+      topCustomers: sortedCustomers.slice(0, 20)
+    }, 'Customer analysis generated successfully');
   });
 
   // Utility methods for time-based grouping
@@ -887,13 +1005,21 @@ class ReportsController {
     const grouped = Array.from({ length: 24 }, (_, i) => ({
       period: `${i}:00`,
       sales: 0,
-      revenue: 0
+      revenue: 0,
+      cost: 0,
+      profit: 0
     }));
 
     sales.forEach(sale => {
       const hour = sale.createdAt.getHours();
       grouped[hour].sales++;
       grouped[hour].revenue += sale.total;
+      
+      // Calculate cost for this sale
+      const saleCost = sale.items.reduce((sum, item) => 
+        sum + (item.costPrice * item.quantity), 0);
+      grouped[hour].cost += saleCost;
+      grouped[hour].profit += (sale.total - saleCost);
     });
 
     return grouped;
@@ -904,10 +1030,16 @@ class ReportsController {
     sales.forEach(sale => {
       const day = sale.createdAt.toISOString().split('T')[0];
       if (!grouped[day]) {
-        grouped[day] = { period: day, sales: 0, revenue: 0 };
+        grouped[day] = { period: day, sales: 0, revenue: 0, cost: 0, profit: 0 };
       }
       grouped[day].sales++;
       grouped[day].revenue += sale.total;
+      
+      // Calculate cost for this sale
+      const saleCost = sale.items.reduce((sum, item) => 
+        sum + (item.costPrice * item.quantity), 0);
+      grouped[day].cost += saleCost;
+      grouped[day].profit += (sale.total - saleCost);
     });
 
     return Object.values(grouped).sort((a, b) => a.period.localeCompare(b.period));
@@ -921,10 +1053,16 @@ class ReportsController {
       const weekKey = weekStart.toISOString().split('T')[0];
       
       if (!grouped[weekKey]) {
-        grouped[weekKey] = { period: `Week of ${weekKey}`, sales: 0, revenue: 0 };
+        grouped[weekKey] = { period: `Week of ${weekKey}`, sales: 0, revenue: 0, cost: 0, profit: 0 };
       }
       grouped[weekKey].sales++;
       grouped[weekKey].revenue += sale.total;
+      
+      // Calculate cost for this sale
+      const saleCost = sale.items.reduce((sum, item) => 
+        sum + (item.costPrice * item.quantity), 0);
+      grouped[weekKey].cost += saleCost;
+      grouped[weekKey].profit += (sale.total - saleCost);
     });
 
     return Object.values(grouped).sort((a, b) => a.period.localeCompare(b.period));
@@ -935,10 +1073,16 @@ class ReportsController {
     sales.forEach(sale => {
       const month = sale.createdAt.toISOString().substring(0, 7);
       if (!grouped[month]) {
-        grouped[month] = { period: month, sales: 0, revenue: 0 };
+        grouped[month] = { period: month, sales: 0, revenue: 0, cost: 0, profit: 0 };
       }
       grouped[month].sales++;
       grouped[month].revenue += sale.total;
+      
+      // Calculate cost for this sale
+      const saleCost = sale.items.reduce((sum, item) => 
+        sum + (item.costPrice * item.quantity), 0);
+      grouped[month].cost += saleCost;
+      grouped[month].profit += (sale.total - saleCost);
     });
 
     return Object.values(grouped).sort((a, b) => a.period.localeCompare(b.period));
@@ -982,55 +1126,343 @@ class ReportsController {
 
   // Export utilities
   static generateExcelReport = async (res, reportTitle, data) => {
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet(reportTitle);
-
-    // Add headers and data based on report type
-    if (data.sales) {
-      worksheet.columns = [
-        { header: 'Date', key: 'date', width: 15 },
-        { header: 'Amount', key: 'amount', width: 12 },
-        { header: 'Payment Method', key: 'paymentMethod', width: 15 },
-        { header: 'Branch', key: 'branch', width: 20 }
-      ];
-
-      data.sales.forEach(sale => {
-        worksheet.addRow({
-          date: sale.createdAt.toLocaleDateString(),
-          amount: sale.total,
-          paymentMethod: sale.paymentMethod,
-          branch: sale.branch?.name || 'N/A'
-        });
+    try {
+      console.log('Generating Excel report:', reportTitle);
+      console.log('Data structure:', {
+        hasSummary: !!data.summary,
+        hasTimeGroupedData: !!data.timeGroupedData,
+        hasCategoryPerformance: !!data.categoryPerformance,
+        hasTopProducts: !!data.topProducts
       });
+
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet(reportTitle);
+
+      // Style for headers
+      const headerStyle = {
+        font: { bold: true, color: { argb: 'FFFFFFFF' } },
+        fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F46E5' } },
+        alignment: { vertical: 'middle', horizontal: 'center' }
+      };
+
+      // Style for title
+      const titleStyle = {
+        font: { bold: true, size: 16 },
+        alignment: { vertical: 'middle', horizontal: 'center' }
+      };
+
+      // Add title
+      worksheet.mergeCells('A1:F1');
+      const titleCell = worksheet.getCell('A1');
+      titleCell.value = reportTitle;
+      titleCell.style = titleStyle;
+
+      // Add metadata
+      worksheet.getCell('A2').value = `Generated: ${new Date().toLocaleString('en-IN')}`;
+      worksheet.mergeCells('A2:F2');
+
+      let currentRow = 4;
+
+      // Add summary section
+      if (data.summary) {
+        worksheet.getCell(`A${currentRow}`).value = 'Summary';
+        worksheet.getCell(`A${currentRow}`).font = { bold: true, size: 14 };
+        worksheet.mergeCells(`A${currentRow}:B${currentRow}`);
+        currentRow++;
+
+        Object.entries(data.summary).forEach(([key, value]) => {
+          const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+          worksheet.getCell(`A${currentRow}`).value = label;
+          worksheet.getCell(`B${currentRow}`).value = typeof value === 'number' 
+            ? (key.includes('Revenue') || key.includes('Profit') || key.includes('Value') 
+              ? `₹${value.toFixed(2)}` 
+              : value)
+            : value;
+          currentRow++;
+        });
+        currentRow += 2;
+      }
+
+      // Add detailed data based on report type
+      if (data.timeGroupedData && data.timeGroupedData.length > 0) {
+        worksheet.getCell(`A${currentRow}`).value = 'Daily Breakdown';
+        worksheet.getCell(`A${currentRow}`).font = { bold: true, size: 14 };
+        worksheet.mergeCells(`A${currentRow}:F${currentRow}`);
+        currentRow++;
+
+        // Headers
+        const headers = ['Date', 'Sales', 'Revenue (₹)', 'Cost (₹)', 'Profit (₹)', 'Margin (%)'];
+        headers.forEach((header, index) => {
+          const cell = worksheet.getCell(currentRow, index + 1);
+          cell.value = header;
+          cell.style = headerStyle;
+        });
+        currentRow++;
+
+        // Data rows
+        data.timeGroupedData.forEach(item => {
+          const margin = item.revenue > 0 ? ((item.profit / item.revenue) * 100) : 0;
+          worksheet.addRow([
+            item.period || item.date || 'N/A',
+            item.sales || 0,
+            (item.revenue || 0).toFixed(2),
+            (item.cost || 0).toFixed(2),
+            (item.profit || 0).toFixed(2),
+            margin.toFixed(2)
+          ]);
+          currentRow++;
+        });
+      } else if (data.categoryPerformance && data.categoryPerformance.length > 0) {
+        worksheet.getCell(`A${currentRow}`).value = 'Category Performance';
+        worksheet.getCell(`A${currentRow}`).font = { bold: true, size: 14 };
+        worksheet.mergeCells(`A${currentRow}:F${currentRow}`);
+        currentRow++;
+
+        // Headers
+        const headers = ['Category', 'Products', 'Total Sales', 'Revenue (₹)', 'Avg Price (₹)', 'Stock Level'];
+        headers.forEach((header, index) => {
+          const cell = worksheet.getCell(currentRow, index + 1);
+          cell.value = header;
+          cell.style = headerStyle;
+        });
+        currentRow++;
+
+        // Data rows
+        data.categoryPerformance.forEach(item => {
+          worksheet.addRow([
+            item.categoryName || item.category || 'N/A',
+            item.productCount || 0,
+            item.totalSales || 0,
+            (item.revenue || 0).toFixed(2),
+            (item.averagePrice || 0).toFixed(2),
+            item.totalStock || 0
+          ]);
+          currentRow++;
+        });
+      } else if (data.topProducts && data.topProducts.length > 0) {
+        worksheet.getCell(`A${currentRow}`).value = 'Top Products';
+        worksheet.getCell(`A${currentRow}`).font = { bold: true, size: 14 };
+        worksheet.mergeCells(`A${currentRow}:F${currentRow}`);
+        currentRow++;
+
+        // Headers
+        const headers = ['Product', 'SKU', 'Category', 'Sales', 'Revenue (₹)', 'Stock'];
+        headers.forEach((header, index) => {
+          const cell = worksheet.getCell(currentRow, index + 1);
+          cell.value = header;
+          cell.style = headerStyle;
+        });
+        currentRow++;
+
+        // Data rows
+        data.topProducts.forEach(item => {
+          worksheet.addRow([
+            item.name || 'N/A',
+            item.sku || 'N/A',
+            item.category?.name || 'N/A',
+            item.totalSales || 0,
+            (item.revenue || 0).toFixed(2),
+            item.stock || 0
+          ]);
+          currentRow++;
+        });
+      }
+
+      // Auto-fit columns
+      worksheet.columns.forEach(column => {
+        let maxLength = 0;
+        column.eachCell({ includeEmpty: true }, cell => {
+          const length = cell.value ? cell.value.toString().length : 10;
+          if (length > maxLength) maxLength = length;
+        });
+        column.width = Math.min(maxLength + 2, 50);
+      });
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${reportTitle.replace(/\s+/g, '_')}_${Date.now()}.xlsx"`);
+
+      console.log('Writing Excel workbook to response...');
+      await workbook.xlsx.write(res);
+      console.log('Excel workbook written successfully');
+      res.end();
+    } catch (error) {
+      console.error('Excel generation error:', error);
+      console.error('Error stack:', error.stack);
+      if (!res.headersSent) {
+        throw error;
+      }
     }
-
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="${reportTitle.replace(/\s+/g, '_')}_${Date.now()}.xlsx"`);
-
-    await workbook.xlsx.write(res);
-    res.end();
   };
 
   static generatePDFReport = async (res, reportTitle, data) => {
-    const doc = new PDFDocument();
-    
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${reportTitle.replace(/\s+/g, '_')}_${Date.now()}.pdf"`);
-
-    doc.pipe(res);
-
-    // PDF content generation
-    doc.fontSize(20).text(reportTitle, 50, 50);
-    doc.fontSize(12).text(`Generated on: ${new Date().toLocaleDateString()}`, 50, 80);
-
-    if (data.summary) {
-      doc.text('Summary:', 50, 120);
-      Object.keys(data.summary).forEach((key, index) => {
-        doc.text(`${key}: ${data.summary[key]}`, 70, 140 + (index * 20));
+    try {
+      const doc = new PDFDocument({ 
+        margin: 50, 
+        size: 'A4',
+        bufferPages: true // Enable page buffering for footer
       });
-    }
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${reportTitle.replace(/\s+/g, '_')}_${Date.now()}.pdf"`);
 
-    doc.end();
+      doc.pipe(res);
+
+      // Title
+      doc.fontSize(20)
+         .fillColor('#4F46E5')
+         .text(reportTitle, { align: 'center' })
+         .moveDown(0.5);
+
+      // Generated date
+      doc.fontSize(10)
+         .fillColor('#64748B')
+         .text(`Generated: ${new Date().toLocaleString('en-IN')}`, { align: 'center' })
+         .moveDown(1);
+
+      // Summary section
+      if (data.summary && Object.keys(data.summary).length > 0) {
+        doc.fontSize(14)
+           .fillColor('#1E293B')
+           .text('Summary', { underline: true })
+           .moveDown(0.5);
+
+        doc.fontSize(11)
+           .fillColor('#334155');
+
+        Object.entries(data.summary).forEach(([key, value]) => {
+          const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+          let displayValue = value;
+          
+          if (typeof value === 'number') {
+            if (key.includes('Revenue') || key.includes('Profit') || key.includes('Value') || key.includes('Cost')) {
+              displayValue = `₹${value.toFixed(2)}`;
+            } else if (key.includes('Margin') || key.includes('Percentage')) {
+              displayValue = `${value.toFixed(2)}%`;
+            }
+          }
+          
+          doc.text(`${label}: ${displayValue}`);
+        });
+        
+        doc.moveDown(1.5);
+      } else {
+        // No summary data
+        doc.fontSize(11)
+           .fillColor('#64748B')
+           .text('No summary data available for the selected period.', { align: 'center' })
+           .moveDown(1);
+      }
+
+      // Detailed data section
+      if (data.timeGroupedData && data.timeGroupedData.length > 0) {
+        doc.fontSize(14)
+           .fillColor('#1E293B')
+           .text('Daily Breakdown', { underline: true })
+           .moveDown(0.5);
+
+        doc.fontSize(10)
+           .fillColor('#334155');
+
+        // Table headers
+        const tableTop = doc.y;
+        const col1X = 50;
+        const col2X = 150;
+        const col3X = 240;
+        const col4X = 330;
+        const col5X = 420;
+
+        doc.font('Helvetica-Bold');
+        doc.text('Date', col1X, tableTop);
+        doc.text('Sales', col2X, tableTop);
+        doc.text('Revenue', col3X, tableTop);
+        doc.text('Cost', col4X, tableTop);
+        doc.text('Profit', col5X, tableTop);
+
+        doc.moveTo(50, tableTop + 15)
+           .lineTo(550, tableTop + 15)
+           .stroke();
+
+        doc.font('Helvetica');
+        let rowY = tableTop + 25;
+
+        data.timeGroupedData.slice(0, 25).forEach(item => {
+          if (rowY > 700) {
+            doc.addPage();
+            rowY = 50;
+          }
+
+          doc.text(item.period || item.date || 'N/A', col1X, rowY, { width: 90 });
+          doc.text(String(item.sales || 0), col2X, rowY);
+          doc.text(`₹${(item.revenue || 0).toFixed(2)}`, col3X, rowY);
+          doc.text(`₹${(item.cost || 0).toFixed(2)}`, col4X, rowY);
+          doc.text(`₹${(item.profit || 0).toFixed(2)}`, col5X, rowY);
+          
+          rowY += 20;
+        });
+
+        if (data.timeGroupedData.length > 25) {
+          doc.moveDown(1)
+             .fontSize(9)
+             .fillColor('#64748B')
+             .text(`... and ${data.timeGroupedData.length - 25} more entries`, { align: 'center' });
+        }
+      } else if (data.categoryPerformance && data.categoryPerformance.length > 0) {
+        doc.fontSize(14)
+           .fillColor('#1E293B')
+           .text('Category Performance', { underline: true })
+           .moveDown(0.5);
+
+        doc.fontSize(10)
+           .fillColor('#334155');
+
+        data.categoryPerformance.forEach(item => {
+          doc.fontSize(12)
+             .font('Helvetica-Bold')
+             .text(item.categoryName || item.category || 'N/A')
+             .font('Helvetica')
+             .fontSize(10)
+             .text(`  Products: ${item.productCount || 0}`)
+             .text(`  Total Sales: ${item.totalSales || 0}`)
+             .text(`  Revenue: ₹${(item.revenue || 0).toFixed(2)}`)
+             .text(`  Average Price: ₹${(item.averagePrice || 0).toFixed(2)}`)
+             .moveDown(0.5);
+        });
+      } else if (data.topProducts && data.topProducts.length > 0) {
+        doc.fontSize(14)
+           .fillColor('#1E293B')
+           .text('Top Products', { underline: true })
+           .moveDown(0.5);
+
+        doc.fontSize(10)
+           .fillColor('#334155');
+
+        data.topProducts.slice(0, 20).forEach(item => {
+          doc.fontSize(11)
+             .font('Helvetica-Bold')
+             .text(item.name || 'N/A')
+             .font('Helvetica')
+             .fontSize(9)
+             .text(`  SKU: ${item.sku || 'N/A'} | Category: ${item.category?.name || 'N/A'}`)
+             .text(`  Sales: ${item.totalSales || 0} | Revenue: ₹${(item.revenue || 0).toFixed(2)} | Stock: ${item.stock || 0}`)
+             .moveDown(0.3);
+        });
+      }
+
+      // End document before adding footers
+      doc.end();
+
+      // Note: We've removed the footer loop because it was causing issues
+      // PDFKit's bufferedPageRange() doesn't work reliably until after doc.end()
+      // For page numbers, we would need a different approach or a post-processing step
+      
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      console.error('Data received:', JSON.stringify(data, null, 2).substring(0, 500));
+      // Don't throw after headers are sent
+      if (!res.headersSent) {
+        throw error;
+      }
+    }
   };
 }
 

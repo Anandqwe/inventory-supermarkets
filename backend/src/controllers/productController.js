@@ -35,7 +35,6 @@ class ProductController {
     const { 
       name, 
       sku, 
-      barcode,
       description,
       category: categoryId,
       brand: brandId,
@@ -51,14 +50,6 @@ class ProductController {
     const existingProduct = await Product.findOne({ sku });
     if (existingProduct) {
       return ResponseUtils.error(res, 'Product with this SKU already exists', 409);
-    }
-
-    // Check if barcode already exists (if provided)
-    if (barcode) {
-      const existingBarcode = await Product.findOne({ barcode });
-      if (existingBarcode) {
-        return ResponseUtils.error(res, 'Product with this barcode already exists', 409);
-      }
     }
 
     // Validate required references
@@ -93,7 +84,6 @@ class ProductController {
     const product = new Product({
       name,
       sku: sku.toUpperCase(),
-      barcode,
       description,
       category: categoryId,
       brand: brandId,
@@ -298,35 +288,53 @@ class ProductController {
       brand,
       branch,
       lowStock,
+      stock, // Add stock filter parameter
+      minPrice,
+      maxPrice,
       isActive,
       sortBy = 'name',
       sortOrder = 'asc'
     } = req.query;
 
-    const filter = {};
+    // Default filter to exclude soft-deleted products
+    const filter = { 
+      isActive: isActive !== undefined ? (isActive === 'true') : true,
+      deletedAt: { $exists: false }
+    };
 
     // Search filter
     if (search) {
       filter.$or = [
         { name: { $regex: search, $options: 'i' } },
-        { sku: { $regex: search, $options: 'i' } },
-        { barcode: { $regex: search, $options: 'i' } }
+        { sku: { $regex: search, $options: 'i' } }
       ];
     }
 
     // Category filter
     if (category) {
-      filter.category = category;
+      try {
+        filter.category = new mongoose.Types.ObjectId(category);
+      } catch (e) {
+        // Invalid ObjectId, skip filter
+        console.warn('Invalid category ObjectId:', category);
+      }
     }
 
     // Brand filter
     if (brand) {
-      filter.brand = brand;
+      try {
+        filter.brand = new mongoose.Types.ObjectId(brand);
+      } catch (e) {
+        // Invalid ObjectId, skip filter
+        console.warn('Invalid brand ObjectId:', brand);
+      }
     }
 
-    // Active filter
-    if (isActive !== undefined) {
-      filter.isActive = isActive === 'true';
+    // Price range filter
+    if (minPrice || maxPrice) {
+      filter['pricing.sellingPrice'] = {};
+      if (minPrice) filter['pricing.sellingPrice'].$gte = parseFloat(minPrice);
+      if (maxPrice) filter['pricing.sellingPrice'].$lte = parseFloat(maxPrice);
     }
 
     // Branch access filter for non-admin users
@@ -338,33 +346,72 @@ class ProductController {
     const limitNum = parseInt(limit);
     const skip = (pageNum - 1) * limitNum;
 
+    // Debug logging
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Product Filter:', JSON.stringify(filter, null, 2));
+      console.log('Query params:', { page, limit, search, category, brand, stock, minPrice, maxPrice });
+    }
+
     // Build aggregation pipeline
     const pipeline = [
       { $match: filter }
     ];
 
-    // Low stock filter
-    if (lowStock === 'true') {
-      pipeline.push({
-        $match: {
-          $expr: {
-            $anyElementTrue: {
-              $map: {
-                input: "$stockByBranch",
-                as: "stock",
-                in: { $lte: ["$$stock.quantity", "$$stock.reorderLevel"] }
+    // Stock filter - handle multiple stock states
+    if (stock || lowStock === 'true') {
+      if (stock === 'low-stock' || lowStock === 'true') {
+        // Low stock: total quantity across all branches <= total reorder level
+        // This ensures only products that are genuinely low in stock appear
+        pipeline.push({
+          $match: {
+            $expr: {
+              $let: {
+                vars: {
+                  totalStock: { $sum: "$stockByBranch.quantity" },
+                  totalReorderLevel: { $sum: "$stockByBranch.reorderLevel" }
+                },
+                in: {
+                  $and: [
+                    { $gt: ["$$totalStock", 0] }, // Has some stock (not out of stock)
+                    { $lte: ["$$totalStock", "$$totalReorderLevel"] } // Total stock <= total reorder level
+                  ]
+                }
               }
             }
           }
-        }
-      });
+        });
+      } else if (stock === 'out-of-stock') {
+        // Out of stock: total quantity = 0
+        pipeline.push({
+          $match: {
+            $expr: {
+              $eq: [
+                { $sum: "$stockByBranch.quantity" },
+                0
+              ]
+            }
+          }
+        });
+      } else if (stock === 'in-stock') {
+        // In stock: total quantity > 0
+        pipeline.push({
+          $match: {
+            $expr: {
+              $gt: [
+                { $sum: "$stockByBranch.quantity" },
+                0
+              ]
+            }
+          }
+        });
+      }
     }
 
     // Branch-specific stock filter
     if (branch) {
       pipeline.push({
         $match: {
-          'stockByBranch.branch': mongoose.Types.ObjectId(branch)
+          'stockByBranch.branch': new mongoose.Types.ObjectId(branch)
         }
       });
     }
@@ -571,14 +618,6 @@ class ProductController {
       }
     }
 
-    // Check if barcode is being changed and if it already exists
-    if (req.body.barcode && req.body.barcode !== existingProduct.barcode) {
-      const barcodeExists = await Product.findOne({ barcode: req.body.barcode, _id: { $ne: id } });
-      if (barcodeExists) {
-        return ResponseUtils.error(res, 'Product with this barcode already exists', 409);
-      }
-    }
-
     const updateData = {
       ...req.body,
       updatedBy: req.user.id,
@@ -666,7 +705,7 @@ class ProductController {
   // CSV Export functionality
   static exportProducts = asyncHandler(async (req, res) => {
     try {
-      const { branch, category, format = 'csv' } = req.query;
+      const { branch, category, format = 'csv', search, stock, minPrice, maxPrice } = req.query;
       const filter = { isActive: true };
 
       // Apply filters
@@ -677,12 +716,28 @@ class ProductController {
         filter.category = category;
       }
 
+      // Search filter
+      if (search) {
+        filter.$or = [
+          { name: { $regex: search, $options: 'i' } },
+          { sku: { $regex: search, $options: 'i' } },
+          { barcode: { $regex: search, $options: 'i' } }
+        ];
+      }
+
+      // Price range filter
+      if (minPrice || maxPrice) {
+        filter['pricing.sellingPrice'] = {};
+        if (minPrice) filter['pricing.sellingPrice'].$gte = parseFloat(minPrice);
+        if (maxPrice) filter['pricing.sellingPrice'].$lte = parseFloat(maxPrice);
+      }
+
       // Branch access filter for non-admin users
       if (req.user.role !== 'admin' && req.user.branch) {
         filter['stockByBranch.branch'] = req.user.branch;
       }
 
-      const products = await Product.find(filter)
+      let products = await Product.find(filter)
         .populate('category', 'name')
         .populate('brand', 'name')
         .populate('unit', 'name symbol')
@@ -690,16 +745,45 @@ class ProductController {
         .populate('stockByBranch.branch', 'name code')
         .lean();
 
+      // Apply stock filter after fetching (since stockByBranch is an array)
+      if (stock && stock !== 'all') {
+        products = products.filter(product => {
+          if (!product.stockByBranch || product.stockByBranch.length === 0) {
+            return stock === 'out-of-stock';
+          }
+          
+          const totalStock = product.stockByBranch.reduce((sum, s) => sum + (s.quantity || 0), 0);
+          const minReorderLevel = Math.min(...product.stockByBranch.map(s => s.reorderLevel || 10));
+          
+          if (stock === 'in-stock') {
+            return totalStock > 0;
+          } else if (stock === 'low-stock') {
+            return totalStock > 0 && totalStock <= minReorderLevel;
+          } else if (stock === 'out-of-stock') {
+            return totalStock <= 0;
+          }
+          return true;
+        });
+      }
+
       if (format === 'csv') {
         // Generate CSV
         const csvData = products.map(product => {
-          const branchStock = product.stockByBranch.find(
-            stock => !branch || stock.branch._id.toString() === branch
-          );
+          // Handle products with or without branch stock
+          let branchStock = null;
+          if (product.stockByBranch && Array.isArray(product.stockByBranch) && product.stockByBranch.length > 0) {
+            branchStock = product.stockByBranch.find(
+              stock => !branch || (stock.branch && stock.branch._id && stock.branch._id.toString() === branch)
+            );
+            // If no specific branch found, use the first one
+            if (!branchStock) {
+              branchStock = product.stockByBranch[0];
+            }
+          }
 
           return {
-            name: product.name,
-            sku: product.sku,
+            name: product.name || '',
+            sku: product.sku || '',
             barcode: product.barcode || '',
             description: product.description || '',
             category: product.category?.name || '',
@@ -713,41 +797,52 @@ class ProductController {
             reorderLevel: branchStock?.reorderLevel || 0,
             maxStockLevel: branchStock?.maxStockLevel || 0,
             location: branchStock?.location || '',
-            gstRate: product.taxSettings?.gstRate || 0,
-            isActive: product.isActive
+            gstRate: product.taxSettings?.gstRate || product.pricing?.taxRate || 0,
+            isActive: product.isActive ? 'Yes' : 'No'
           };
         });
 
-        const csvFilePath = path.join(__dirname, `../../uploads/products_export_${Date.now()}.csv`);
-        
-        const csvWriter = createCsvWriter({
-          path: csvFilePath,
-          header: [
-            { id: 'name', title: 'Name' },
-            { id: 'sku', title: 'SKU' },
-            { id: 'barcode', title: 'Barcode' },
-            { id: 'description', title: 'Description' },
-            { id: 'category', title: 'Category' },
-            { id: 'brand', title: 'Brand' },
-            { id: 'unit', title: 'Unit' },
-            { id: 'supplier', title: 'Supplier' },
-            { id: 'costPrice', title: 'Cost Price' },
-            { id: 'sellingPrice', title: 'Selling Price' },
-            { id: 'mrp', title: 'MRP' },
-            { id: 'quantity', title: 'Quantity' },
-            { id: 'reorderLevel', title: 'Reorder Level' },
-            { id: 'maxStockLevel', title: 'Max Stock Level' },
-            { id: 'location', title: 'Location' },
-            { id: 'gstRate', title: 'GST Rate' },
-            { id: 'isActive', title: 'Active' }
-          ]
-        });
+        // Ensure uploads directory exists
+        const uploadsDir = path.join(__dirname, '../../uploads');
+        if (!fs.existsSync(uploadsDir)) {
+          fs.mkdirSync(uploadsDir, { recursive: true });
+        }
 
-        await csvWriter.writeRecords(csvData);
+        const csvFilePath = path.join(uploadsDir, `products_export_${Date.now()}.csv`);
+        
+        try {
+          const csvWriter = createCsvWriter({
+            path: csvFilePath,
+            header: [
+              { id: 'name', title: 'Name' },
+              { id: 'sku', title: 'SKU' },
+              { id: 'barcode', title: 'Barcode' },
+              { id: 'description', title: 'Description' },
+              { id: 'category', title: 'Category' },
+              { id: 'brand', title: 'Brand' },
+              { id: 'unit', title: 'Unit' },
+              { id: 'supplier', title: 'Supplier' },
+              { id: 'costPrice', title: 'Cost Price' },
+              { id: 'sellingPrice', title: 'Selling Price' },
+              { id: 'mrp', title: 'MRP' },
+              { id: 'quantity', title: 'Quantity' },
+              { id: 'reorderLevel', title: 'Reorder Level' },
+              { id: 'maxStockLevel', title: 'Max Stock Level' },
+              { id: 'location', title: 'Location' },
+              { id: 'gstRate', title: 'GST Rate' },
+              { id: 'isActive', title: 'Active' }
+            ]
+          });
+
+          await csvWriter.writeRecords(csvData);
+        } catch (csvError) {
+          console.error('CSV Writer Error:', csvError);
+          throw new Error(`CSV generation failed: ${csvError.message}`);
+        }
 
         // Create audit log
         await AuditLog.create({
-          action: 'product_export',
+          action: 'data_export',
           resourceType: 'product',
           resourceId: 'bulk',
           resourceName: 'Product Export',
@@ -761,7 +856,7 @@ class ProductController {
           newValues: {
             format: 'csv',
             count: products.length,
-            filters: { branch, category }
+            filters: { branch, category, search, stock, minPrice, maxPrice }
           }
         });
 
@@ -782,7 +877,9 @@ class ProductController {
 
     } catch (error) {
       console.error('Export products error:', error);
-      ResponseUtils.error(res, 'Failed to export products', 500);
+      console.error('Error stack:', error.stack);
+      console.error('Error message:', error.message);
+      ResponseUtils.error(res, error.message || 'Failed to export products', 500);
     }
   });
 
@@ -818,6 +915,25 @@ class ProductController {
           }
         } else if (req.user.branch) {
           targetBranch = await Branch.findById(req.user.branch);
+        } else {
+          // For admin users without a branch, use the first available branch or create a default one
+          targetBranch = await Branch.findOne({ isActive: true });
+          
+          if (!targetBranch) {
+            // Create a default branch if none exists
+            targetBranch = await Branch.create({
+              name: 'Main Branch',
+              code: 'MAIN',
+              address: {
+                street: 'Main Street',
+                city: 'City',
+                state: 'State',
+                country: 'India',
+                postalCode: '000000'
+              },
+              isActive: true
+            });
+          }
         }
 
         if (!targetBranch) {
@@ -844,7 +960,29 @@ class ProductController {
         await new Promise((resolve, reject) => {
           fs.createReadStream(csvFilePath)
             .pipe(csv())
-            .on('data', (data) => csvData.push(data))
+            .on('data', (data) => {
+              // Normalize column names (handle both formats)
+              const normalizedData = {
+                name: data['Product Name'] || data['name'] || data['Name'],
+                sku: data['SKU'] || data['sku'],
+                barcode: data['Barcode'] || data['barcode'],
+                category: data['Category'] || data['category'],
+                brand: data['Brand'] || data['brand'],
+                unit: data['Unit'] || data['unit'],
+                supplier: data['Supplier'] || data['supplier'],
+                costPrice: data['Cost Price'] || data['costPrice'],
+                sellingPrice: data['Selling Price'] || data['sellingPrice'],
+                mrp: data['MRP'] || data['mrp'],
+                quantity: data['Stock Quantity'] || data['quantity'] || data['Quantity'],
+                reorderLevel: data['Reorder Level'] || data['reorderLevel'],
+                maxStockLevel: data['Max Stock Level'] || data['maxStockLevel'],
+                gstRate: (data['GST Rate'] || data['gstRate'] || '18').toString().replace('%', ''),
+                location: data['Location'] || data['location'],
+                description: data['Description'] || data['description'],
+                isActive: (data['Status'] || data['isActive'] || 'Active').toLowerCase() === 'active'
+              };
+              csvData.push(normalizedData);
+            })
             .on('end', resolve)
             .on('error', reject);
         });
@@ -1018,13 +1156,15 @@ class ProductController {
 
       } catch (error) {
         console.error('Import products error:', error);
+        console.error('Error stack:', error.stack);
+        console.error('Error message:', error.message);
         
         // Clean up uploaded file
         if (req.file) {
           fs.unlink(req.file.path, () => {});
         }
 
-        ResponseUtils.error(res, 'Failed to import products', 500);
+        ResponseUtils.error(res, error.message || 'Failed to import products', 500);
       }
     })
   ];

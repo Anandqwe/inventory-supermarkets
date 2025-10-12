@@ -80,7 +80,7 @@ export const productsAPI = {
   
   importFromCSV: async (file) => {
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('csvFile', file);
     const response = await api.post('/products/import', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',

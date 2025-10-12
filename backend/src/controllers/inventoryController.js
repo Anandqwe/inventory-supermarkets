@@ -26,12 +26,10 @@ class InventoryController {
 
       const {
         branch: branchId,
-        product: productId,
-        type, // 'increase' | 'decrease' | 'set'
-        quantity,
+        items, // array of { product, currentQuantity, adjustedQuantity, unit, sku, productName }
+        type, // 'increase' | 'decrease' | 'correction'
         reason,
-        notes,
-        costPrice
+        notes
       } = req.body;
 
       // Validate branch
@@ -53,49 +51,9 @@ class InventoryController {
         }
       }
 
-      // Validate product
-      const product = await Product.findById(productId);
-      if (!product) {
-        return res.status(404).json({
-          success: false,
-          message: 'Product not found'
-        });
-      }
-
-      // Get current branch stock
-      const branchStock = product.stockByBranch.find(
-        stock => stock.branch.toString() === branch._id.toString()
-      );
-
-      const currentQuantity = branchStock ? branchStock.quantity : 0;
-      let newQuantity;
-      let adjustmentQuantity;
-
-      // Calculate new quantity based on adjustment type
-      switch (type) {
-        case 'increase':
-          newQuantity = currentQuantity + quantity;
-          adjustmentQuantity = quantity;
-          break;
-        case 'decrease':
-          if (currentQuantity < quantity) {
-            return res.status(400).json({
-              success: false,
-              message: `Cannot decrease by ${quantity}. Current stock: ${currentQuantity}`
-            });
-          }
-          newQuantity = currentQuantity - quantity;
-          adjustmentQuantity = -quantity;
-          break;
-        case 'set':
-          newQuantity = quantity;
-          adjustmentQuantity = quantity - currentQuantity;
-          break;
-        default:
-          return res.status(400).json({
-            success: false,
-            message: 'Invalid adjustment type'
-          });
+      // Validate items
+      if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ success: false, message: 'No items provided for adjustment' });
       }
 
       // Generate adjustment number
@@ -106,64 +64,84 @@ class InventoryController {
       
       try {
         await session.withTransaction(async () => {
+          // Build items array and update product stocks
+          const adjItems = [];
+          for (const item of items) {
+            const product = await Product.findById(item.product);
+            if (!product) {
+              throw new Error(`Product not found: ${item.product}`);
+            }
+
+            const branchStock = product.stockByBranch.find(
+              stock => stock.branch.toString() === branch._id.toString()
+            );
+
+            const currentQuantity = branchStock ? branchStock.quantity : 0;
+            const adjustedQuantity = item.adjustedQuantity;
+            const difference = adjustedQuantity - currentQuantity;
+
+            adjItems.push({
+              product: product._id,
+              productName: item.productName || product.name,
+              sku: item.sku || product.sku,
+              currentQuantity,
+              adjustedQuantity,
+              difference,
+              unit: item.unit || (product.unit?.symbol || 'pcs'),
+              reason
+            });
+
+            // Apply stock update
+            if (branchStock) {
+              await Product.updateOne(
+                { _id: product._id, 'stockByBranch.branch': branch._id },
+                {
+                  $set: {
+                    'stockByBranch.$.quantity': adjustedQuantity,
+                    'stockByBranch.$.lastUpdated': new Date()
+                  }
+                },
+                { session }
+              );
+            } else {
+              await Product.updateOne(
+                { _id: product._id },
+                {
+                  $push: {
+                    stockByBranch: {
+                      branch: branch._id,
+                      quantity: adjustedQuantity,
+                      minLevel: 0,
+                      maxLevel: 100,
+                      lastUpdated: new Date()
+                    }
+                  }
+                },
+                { session }
+              );
+            }
+          }
+
           // Create adjustment record
           const adjustment = new Adjustment({
             adjustmentNumber,
             branch: branch._id,
-            product: product._id,
+            items: adjItems,
             type,
-            previousQuantity: currentQuantity,
-            adjustmentQuantity,
-            newQuantity,
             reason,
             notes,
-            costPrice,
-            adjustedBy: req.user.userId
+            createdBy: req.user.userId
           });
 
           await adjustment.save({ session });
-
-          // Update product stock
-          if (branchStock) {
-            // Update existing stock
-            await Product.updateOne(
-              {
-                _id: product._id,
-                'stockByBranch.branch': branch._id
-              },
-              {
-                $set: {
-                  'stockByBranch.$.quantity': newQuantity,
-                  'stockByBranch.$.lastUpdated': new Date()
-                }
-              },
-              { session }
-            );
-          } else {
-            // Add new branch stock
-            await Product.updateOne(
-              { _id: product._id },
-              {
-                $push: {
-                  stockByBranch: {
-                    branch: branch._id,
-                    quantity: newQuantity,
-                    minLevel: 0,
-                    maxLevel: 100,
-                    lastUpdated: new Date()
-                  }
-                }
-              },
-              { session }
-            );
-          }
         });
 
         // Fetch complete adjustment data
         const completeAdjustment = await Adjustment.findById(adjustment._id)
           .populate('branch', 'name code')
-          .populate('product', 'name sku')
-          .populate('adjustedBy', 'firstName lastName');
+          .populate('items.product', 'name sku')
+          .populate('createdBy', 'firstName lastName')
+          .populate('approvedBy', 'firstName lastName');
 
         res.status(201).json({
           success: true,
@@ -212,7 +190,7 @@ class InventoryController {
 
       // Branch filter for RBAC
       if (req.user.role !== 'admin' && req.user.branch) {
-        filter.branch = req.user.branch._id;
+        filter.branch = req.user.branch._id || req.user.branch;
       } else if (branch) {
         filter.branch = branch;
       }
@@ -278,8 +256,9 @@ class InventoryController {
       const [adjustments, total] = await Promise.all([
         Adjustment.find(filter)
           .populate('branch', 'name code')
-          .populate('product', 'name sku')
-          .populate('adjustedBy', 'firstName lastName')
+          .populate('items.product', 'name sku')
+          .populate('createdBy', 'firstName lastName')
+          .populate('approvedBy', 'firstName lastName')
           .sort(sort)
           .skip(skip)
           .limit(parseInt(limit)),
@@ -420,10 +399,10 @@ class InventoryController {
       await transfer.save();
 
       // Populate the response
-      const populatedTransfer = await Transfer.findById(transfer._id)
-        .populate('fromBranch', 'name code')
-        .populate('toBranch', 'name code')
-        .populate('initiatedBy', 'firstName lastName');
+  const populatedTransfer = await Transfer.findById(transfer._id)
+  .populate('fromBranch', 'name code')
+  .populate('toBranch', 'name code')
+  .populate('createdBy', 'firstName lastName');
 
       res.status(201).json({
         success: true,
@@ -589,10 +568,9 @@ class InventoryController {
         const updatedTransfer = await Transfer.findById(id)
           .populate('fromBranch', 'name code')
           .populate('toBranch', 'name code')
-          .populate('initiatedBy', 'firstName lastName')
-          .populate('shippedBy', 'firstName lastName')
-          .populate('receivedBy', 'firstName lastName')
-          .populate('cancelledBy', 'firstName lastName');
+          .populate('createdBy', 'firstName lastName')
+          .populate('approvedBy', 'firstName lastName')
+          .populate('receivedBy', 'firstName lastName');
 
         res.json({
           success: true,
@@ -639,9 +617,10 @@ class InventoryController {
 
       // Branch filter for RBAC
       if (req.user.role !== 'admin' && req.user.branch) {
+        const branchId = req.user.branch._id || req.user.branch;
         filter.$or = [
-          { fromBranch: req.user.branch._id },
-          { toBranch: req.user.branch._id }
+          { fromBranch: branchId },
+          { toBranch: branchId }
         ];
       } else {
         if (fromBranch) filter.fromBranch = fromBranch;
@@ -688,8 +667,9 @@ class InventoryController {
         Transfer.find(filter)
           .populate('fromBranch', 'name code')
           .populate('toBranch', 'name code')
-          .populate('initiatedBy', 'firstName lastName')
-          .populate('shippedBy', 'firstName lastName')
+          .populate('items.product', 'name sku')
+          .populate('createdBy', 'firstName lastName')
+          .populate('approvedBy', 'firstName lastName')
           .populate('receivedBy', 'firstName lastName')
           .sort(sort)
           .skip(skip)
@@ -841,16 +821,14 @@ class InventoryController {
         limit = 20,
         branch,
         category,
-        sortBy = 'stockQuantity',
+        sortBy = 'name',
         sortOrder = 'asc'
       } = req.query;
 
-      // Build filter for low stock items
+      // Build base filter
       const filter = {
         isActive: true,
-        $expr: {
-          $lt: ['$stockQuantity', '$reorderLevel']
-        }
+        stockByBranch: { $exists: true, $ne: [] }
       };
 
       // Add category filter if specified
@@ -859,45 +837,78 @@ class InventoryController {
       }
 
       // Branch filter for RBAC
+      let branchFilter = null;
       if (req.user.role !== 'admin' && req.user.branch) {
-        filter['stockByBranch.branch'] = req.user.branch._id;
+        branchFilter = req.user.branch._id;
       } else if (branch) {
-        filter['stockByBranch.branch'] = branch;
+        branchFilter = branch;
       }
 
-      // Build sort object
-      const sort = {};
-      sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+      // Get all active products
+      let query = Product.find(filter)
+        .populate('category', 'name')
+        .populate('brand', 'name')
+        .populate('unit', 'name symbol')
+        .populate('supplier', 'name')
+        .populate('stockByBranch.branch', 'name code')
+        .lean();
 
-      // Execute query with pagination
-      const [products, total] = await Promise.all([
-        Product.find(filter)
-          .populate('category', 'name')
-          .populate('brand', 'name')
-          .populate('unit', 'name abbreviation')
-          .populate('supplier', 'name contactInfo')
-          .sort(sort)
-          .limit(limit * 1)
-          .skip((page - 1) * limit)
-          .lean(),
-        Product.countDocuments(filter)
-      ]);
+      const allProducts = await query;
 
-      // Calculate additional metrics for each product
-      const lowStockItems = products.map(product => ({
-        ...product,
-        stockStatus: 'low',
-        reorderQuantity: Math.max(product.maxStockLevel - product.stockQuantity, 0),
-        stockValue: product.stockQuantity * product.costPrice,
-        urgency: product.stockQuantity === 0 ? 'critical' : 
-                 product.stockQuantity <= (product.reorderLevel * 0.5) ? 'high' : 'medium'
-      }));
+      // Filter products with low stock in any branch (or specific branch)
+      const lowStockItems = [];
+      
+      for (const product of allProducts) {
+        for (const stock of product.stockByBranch) {
+          // Check if this branch should be included
+          if (branchFilter && stock.branch._id.toString() !== branchFilter.toString()) {
+            continue;
+          }
+
+          // Check if stock is below reorder level
+          if (stock.quantity <= stock.reorderLevel) {
+            lowStockItems.push({
+              _id: product._id,
+              name: product.name,
+              sku: product.sku,
+              category: product.category,
+              brand: product.brand,
+              unit: product.unit,
+              supplier: product.supplier,
+              stockQuantity: stock.quantity,
+              reorderLevel: stock.reorderLevel,
+              maxStockLevel: stock.maxStockLevel,
+              branch: stock.branch,
+              costPrice: product.pricing?.costPrice || 0,
+              sellingPrice: product.pricing?.sellingPrice || 0,
+              stockStatus: 'low',
+              reorderQuantity: Math.max((stock.maxStockLevel || stock.reorderLevel * 3) - stock.quantity, 0),
+              stockValue: stock.quantity * (product.pricing?.costPrice || 0),
+              urgency: stock.quantity === 0 ? 'critical' : 
+                       stock.quantity <= (stock.reorderLevel * 0.5) ? 'high' : 'medium'
+            });
+          }
+        }
+      }
+
+      // Sort the results
+      lowStockItems.sort((a, b) => {
+        if (sortOrder === 'desc') {
+          return b[sortBy] > a[sortBy] ? 1 : -1;
+        }
+        return a[sortBy] > b[sortBy] ? 1 : -1;
+      });
+
+      // Paginate
+      const total = lowStockItems.length;
+      const startIndex = (page - 1) * limit;
+      const paginatedItems = lowStockItems.slice(startIndex, startIndex + parseInt(limit));
 
       res.json({
         success: true,
         message: 'Low stock items retrieved successfully',
         data: {
-          products: lowStockItems,
+          products: paginatedItems,
           pagination: {
             currentPage: parseInt(page),
             totalPages: Math.ceil(total / limit),

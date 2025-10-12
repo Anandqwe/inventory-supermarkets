@@ -11,7 +11,7 @@ const mongoose = require('mongoose');
 class DashboardController {
   static getDashboardOverview = asyncHandler(async (req, res) => {
     try {
-      const { branchId } = req.query;
+      const { branchId, period = '7days' } = req.query;
       
       // Determine target branch
       const targetBranchId = branchId || req.user.branch;
@@ -23,11 +23,31 @@ class DashboardController {
         branchFilter.branch = targetBranchId;
       }
 
-      // Date ranges
+      // Dynamic date ranges based on period
       const today = new Date();
       const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
       const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      
+      // Calculate period start date
+      let periodStartDate;
+      switch (period) {
+        case '24hours':
+          periodStartDate = new Date(Date.now() - 24 * 60 * 60 * 1000);
+          break;
+        case '7days':
+          periodStartDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case '30days':
+          periodStartDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+          break;
+        case '12months':
+          periodStartDate = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+          break;
+        default:
+          periodStartDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      }
+      
       const last7Days = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
       const last30Days = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
@@ -49,15 +69,15 @@ class DashboardController {
       const todaySalesCount = todaySales.length;
       const todaySalesAmount = todaySales.reduce((sum, sale) => sum + (sale.total || 0), 0);
 
-      // This month's sales
-      const monthSalesFilter = {
+      // Period sales (based on selected period)
+      const periodSalesFilter = {
         ...branchFilter,
-        createdAt: { $gte: startOfMonth },
+        createdAt: { $gte: periodStartDate },
         status: 'completed'
       };
-      const monthSales = await Sale.find(monthSalesFilter);
-      const totalRevenue = monthSales.reduce((sum, sale) => sum + (sale.total || 0), 0);
-      const totalSales = monthSales.length;
+      const periodSales = await Sale.find(periodSalesFilter);
+      const totalRevenue = periodSales.reduce((sum, sale) => sum + (sale.total || 0), 0);
+      const totalSales = periodSales.length;
 
       // Low stock items with advanced aggregation
       const lowStockFilter = { isActive: true };
@@ -98,15 +118,31 @@ class DashboardController {
             category: 1,
             quantity: 1,
             price: '$pricing.sellingPrice',
-            lowStockBranches: 1
+            lowStockBranches: 1,
+            // Extract stock quantity (from branch or main quantity)
+            stock: {
+              $cond: {
+                if: { $gt: [{ $size: '$lowStockBranches' }, 0] },
+                then: { $arrayElemAt: ['$lowStockBranches.quantity', 0] },
+                else: '$quantity'
+              }
+            },
+            // Extract reorder level
+            minStockLevel: {
+              $cond: {
+                if: { $gt: [{ $size: '$lowStockBranches' }, 0] },
+                then: { $arrayElemAt: ['$lowStockBranches.reorderLevel', 0] },
+                else: 10
+              }
+            }
           }
         }
       ]);
 
-      // Top categories by sales
+      // Top categories by sales (use period-based date range)
       const topCategoriesFilter = {
         ...branchFilter,
-        createdAt: { $gte: last30Days },
+        createdAt: { $gte: periodStartDate },
         status: 'completed'
       };
 
@@ -123,15 +159,25 @@ class DashboardController {
         },
         { $unwind: '$product' },
         {
+          $lookup: {
+            from: 'categories',
+            localField: 'product.category',
+            foreignField: '_id',
+            as: 'category'
+          }
+        },
+        { $unwind: '$category' },
+        {
           $group: {
             _id: '$product.category',
+            categoryName: { $first: '$category.name' },
             totalSales: { $sum: '$items.quantity' },
             totalRevenue: { $sum: { $multiply: ['$items.quantity', '$items.unitPrice'] } }
           }
         },
         {
           $project: {
-            categoryName: '$_id',
+            categoryName: 1,
             totalSales: 1,
             totalRevenue: 1
           }
@@ -140,25 +186,22 @@ class DashboardController {
         { $limit: 5 }
       ]);
 
-      // Recent sales with customer information
-      const recentSales = await Sale.find(branchFilter)
+      // Recent sales with customer information (always show most recent, not period-filtered)
+      const recentSalesFilter = {
+        ...branchFilter,
+        status: 'completed'
+      };
+      
+      const recentSales = await Sale.find(recentSalesFilter)
         .populate('customer', 'name email phone')
         .populate('branch', 'name')
         .sort({ createdAt: -1 })
         .limit(10)
-        .select('total items customer branch createdAt paymentMethod status')
+        .select('saleNumber total items customer branch createdAt paymentMethod status')
         .lean();
 
-      // Performance metrics for last 7 days
-      const last7DaysFilter = {
-        ...branchFilter,
-        createdAt: { $gte: last7Days },
-        status: 'completed'
-      };
-
-      const last7DaysSales = await Sale.find(last7DaysFilter);
-      const last7DaysRevenue = last7DaysSales.reduce((sum, sale) => sum + (sale.total || 0), 0);
-      const averageOrderValue = last7DaysSales.length > 0 ? last7DaysRevenue / last7DaysSales.length : 0;
+      // Performance metrics for selected period
+      const averageOrderValue = totalSales > 0 ? totalRevenue / totalSales : 0;
 
       // Top selling products
       const topProducts = await Sale.aggregate([
@@ -236,10 +279,11 @@ class DashboardController {
             count: todaySalesCount,
             amount: todaySalesAmount
           },
-          last7Days: {
-            sales: last7DaysSales.length,
-            revenue: last7DaysRevenue,
-            averageOrderValue: parseFloat(averageOrderValue.toFixed(2))
+          periodStats: {
+            sales: totalSales,
+            revenue: totalRevenue,
+            averageOrderValue: parseFloat(averageOrderValue.toFixed(2)),
+            period: period
           }
         },
         charts: {
@@ -252,8 +296,10 @@ class DashboardController {
           recentSales: recentSales.slice(0, 5)
         },
         period: {
+          selected: period,
           today: today.toISOString(),
           startOfMonth: startOfMonth.toISOString(),
+          periodStart: periodStartDate.toISOString(),
           last7Days: last7Days.toISOString(),
           last30Days: last30Days.toISOString()
         }
@@ -358,23 +404,52 @@ class DashboardController {
 
       // Fill in missing dates with zero values for better chart continuity
       const chartData = [];
-      const daysBetween = Math.ceil((new Date() - startDate) / (1000 * 60 * 60 * 24));
       
-      for (let i = daysBetween; i >= 0; i--) {
-        const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
-        const dateStr = period === '24hours' 
-          ? date.toISOString().slice(0, 13) + ':00'
-          : period === '12months'
-          ? date.toISOString().slice(0, 7)
-          : date.toISOString().slice(0, 10);
-        
-        const existingData = salesData.find(item => item.date === dateStr);
-        chartData.push({
-          date: dateStr,
-          sales: existingData ? existingData.sales : 0,
-          revenue: existingData ? existingData.revenue : 0,
-          averageOrderValue: existingData ? existingData.averageOrderValue : 0
-        });
+      if (period === '24hours') {
+        // For 24 hours, create hourly data points
+        for (let i = 23; i >= 0; i--) {
+          const date = new Date(Date.now() - i * 60 * 60 * 1000);
+          const dateStr = date.toISOString().slice(0, 13) + ':00';
+          
+          const existingData = salesData.find(item => item.date === dateStr);
+          chartData.push({
+            date: dateStr,
+            sales: existingData ? existingData.sales : 0,
+            revenue: existingData ? existingData.revenue : 0,
+            averageOrderValue: existingData ? existingData.averageOrderValue : 0
+          });
+        }
+      } else if (period === '12months') {
+        // For 12 months, create monthly data points
+        for (let i = 11; i >= 0; i--) {
+          const date = new Date();
+          date.setMonth(date.getMonth() - i);
+          const dateStr = date.toISOString().slice(0, 7);
+          
+          const existingData = salesData.find(item => item.date === dateStr);
+          chartData.push({
+            date: dateStr,
+            sales: existingData ? existingData.sales : 0,
+            revenue: existingData ? existingData.revenue : 0,
+            averageOrderValue: existingData ? existingData.averageOrderValue : 0
+          });
+        }
+      } else {
+        // For daily periods (7days, 30days)
+        const days = period === '7days' ? 7 : 30;
+        for (let i = days - 1; i >= 0; i--) {
+          const date = new Date();
+          date.setDate(date.getDate() - i);
+          const dateStr = date.toISOString().slice(0, 10);
+          
+          const existingData = salesData.find(item => item.date === dateStr);
+          chartData.push({
+            date: dateStr,
+            sales: existingData ? existingData.sales : 0,
+            revenue: existingData ? existingData.revenue : 0,
+            averageOrderValue: existingData ? existingData.averageOrderValue : 0
+          });
+        }
       }
 
       ResponseUtils.success(res, chartData, 'Sales chart data retrieved successfully');

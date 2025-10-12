@@ -26,9 +26,16 @@ class SalesController {
     }
 
     // Validate branch
-    const targetBranchId = branchId || req.user.branch;
+    let targetBranchId = branchId || req.user.branch;
     
-
+    // If no branch specified and user doesn't have a branch, use first available branch
+    if (!targetBranchId) {
+      const firstBranch = await Branch.findOne({ isActive: true });
+      if (!firstBranch) {
+        return ResponseUtils.error(res, 'No active branch available', 400);
+      }
+      targetBranchId = firstBranch._id;
+    }
     
     const branch = await Branch.findById(targetBranchId);
     if (!branch) {
@@ -107,10 +114,17 @@ class SalesController {
       }
 
       // Calculate totals
+      // Note: In Indian retail, MRP and selling prices are INCLUSIVE of GST
+      // We don't add tax on top, we extract it for reporting purposes
       const discountAmount = (subtotal * discountPercentage) / 100;
-      const afterDiscount = subtotal - discountAmount;
-      const taxAmount = (afterDiscount * taxPercentage) / 100;
-      const total = afterDiscount + taxAmount;
+      const total = subtotal - discountAmount;  // Final amount (GST already included)
+      
+      // For tax reporting: Extract GST component from the total
+      // Formula: taxableAmount = total / (1 + taxRate/100)
+      // taxAmount = total - taxableAmount
+      const taxRate = taxPercentage || 18; // Default to 18% if not provided
+      const taxableAmount = total / (1 + (taxRate / 100));
+      const taxAmount = total - taxableAmount;
 
       // Generate sale number
       const saleNumber = `SAL-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;

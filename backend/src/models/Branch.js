@@ -31,10 +31,11 @@ const branchSchema = new mongoose.Schema({
       required: [true, 'State is required'],
       trim: true
     },
-    zipCode: {
+    pincode: {
       type: String,
-      required: [true, 'ZIP code is required'],
-      trim: true
+      required: [true, 'PIN code is required'],
+      trim: true,
+      match: [/^[0-9]{6}$/, 'PIN code must be 6 digits']
     },
     country: {
       type: String,
@@ -98,7 +99,7 @@ branchSchema.index({ isActive: 1 });
 
 // Virtuals
 branchSchema.virtual('fullAddress').get(function() {
-  return `${this.address.street}, ${this.address.city}, ${this.address.state} ${this.address.zipCode}`;
+  return `${this.address.street}, ${this.address.city}, ${this.address.state} ${this.address.pincode}`;
 });
 
 // Methods

@@ -56,10 +56,10 @@ const navigation = [
 const Sidebar = ({ isOpen, onClose, lowStockCount = 0, onLogout }) => {
   return (
     <>
-      {/* Mobile overlay */}
+      {/* Mobile overlay - with better backdrop */}
       {isOpen && (
         <div 
-          className="fixed inset-0 z-40 bg-surface-900/50 lg:hidden" 
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden transition-opacity" 
           onClick={onClose}
           aria-hidden="true"
         />
@@ -67,7 +67,7 @@ const Sidebar = ({ isOpen, onClose, lowStockCount = 0, onLogout }) => {
 
       {/* Desktop sidebar - Fixed positioned */}
       <div className="hidden lg:block lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:w-64">
-        <div className="flex h-full flex-col bg-white dark:bg-amoled-black border-r border-surface-200 dark:border-amoled-border">{/* Header */}
+        <div className="flex h-full flex-col bg-white dark:bg-amoled-black border-r border-surface-200 dark:border-amoled-border overflow-y-auto">{/* Header */}
           <div className="flex items-center flex-shrink-0 px-4 py-5">
             <div className="flex items-center">
               <div className="flex-shrink-0 h-8 w-8 bg-primary-600 rounded-lg flex items-center justify-center" aria-hidden="true">
@@ -183,35 +183,38 @@ const Sidebar = ({ isOpen, onClose, lowStockCount = 0, onLogout }) => {
         </div>
       </div>
 
-      {/* Mobile sidebar */}
+      {/* Mobile sidebar - Improved animation and touch */}
       <div className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-amoled-black shadow-lg transform transition-transform duration-300 ease-in-out lg:hidden",
+        "fixed inset-y-0 left-0 z-50 w-72 sm:w-80 max-w-[85vw] bg-white dark:bg-amoled-black shadow-2xl transform transition-transform duration-300 ease-in-out lg:hidden overflow-y-auto",
         isOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex flex-col h-full">
-          {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-surface-200 dark:border-amoled-border">
-            <div className="flex items-center">
+          {/* Header - Sticky */}
+          <div className="sticky top-0 z-10 flex items-center justify-between p-4 border-b border-surface-200 dark:border-amoled-border bg-white dark:bg-amoled-black">
+            <div className="flex items-center min-w-0 flex-1">
               <div className="flex-shrink-0 h-8 w-8 bg-primary-600 rounded-lg flex items-center justify-center">
                 <CubeIcon className="h-5 w-5 text-white" />
               </div>
-              <div className="ml-3">
-                <h1 className="text-lg font-semibold text-surface-900 dark:text-amoled-primary">
+              <div className="ml-3 min-w-0 flex-1">
+                <h1 className="text-lg font-semibold text-surface-900 dark:text-amoled-primary truncate">
                   Inventory
                 </h1>
+                <p className="text-xs text-surface-500 dark:text-amoled-muted truncate">
+                  Management System
+                </p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="p-1 rounded-md text-surface-400 hover:text-surface-500 hover:bg-surface-100 dark:hover:bg-zinc-900/50 transition-colors"
+              className="p-1.5 ml-2 rounded-md text-surface-400 hover:text-surface-500 hover:bg-surface-100 dark:hover:bg-zinc-900/50 transition-colors flex-shrink-0"
               aria-label="Close sidebar"
             >
               <XMarkIcon className="h-6 w-6" />
             </button>
           </div>
 
-          {/* Navigation */}
-          <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
+          {/* Navigation - Scrollable */}
+          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto overscroll-contain">
             {navigation.map((item) => {
               const Icon = item.icon;
               return (
@@ -222,9 +225,9 @@ const Sidebar = ({ isOpen, onClose, lowStockCount = 0, onLogout }) => {
                   onClick={onClose}
                   className={({ isActive }) =>
                     cn(
-                      "group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-all duration-200",
+                      "group flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-all duration-200 touch-manipulation active:scale-95",
                       isActive
-                        ? "bg-violet-50 dark:bg-violet-900/10 text-violet-700 dark:text-violet-300"
+                        ? "bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300"
                         : "text-surface-600 dark:text-zinc-400 hover:bg-surface-50 dark:hover:bg-zinc-900/50 hover:text-surface-900 dark:hover:text-zinc-100"
                     )
                   }
@@ -235,18 +238,18 @@ const Sidebar = ({ isOpen, onClose, lowStockCount = 0, onLogout }) => {
                         className={cn(
                           "mr-3 flex-shrink-0 h-5 w-5",
                           isActive 
-                            ? "text-violet-600 dark:text-violet-400" 
+                            ? "text-primary-600 dark:text-primary-400" 
                             : "text-surface-400 dark:text-zinc-500 group-hover:text-surface-500 dark:group-hover:text-zinc-400"
                         )}
                       />
-                      <div className="flex-1">
-                        <div>{item.name}</div>
-                        <div className="text-xs text-surface-500 dark:text-zinc-400 mt-0.5">
+                      <div className="flex-1 min-w-0">
+                        <div className="truncate">{item.name}</div>
+                        <div className="text-xs text-surface-500 dark:text-zinc-400 mt-0.5 truncate">
                           {item.description}
                         </div>
                       </div>
                       {item.name === 'Products' && lowStockCount > 0 && (
-                        <Badge variant="warning" size="sm">
+                        <Badge variant="warning" size="sm" className="flex-shrink-0">
                           {lowStockCount}
                         </Badge>
                       )}

@@ -75,9 +75,11 @@ const Login = () => {
   };
 
   const demoCredentials = [
-    { role: 'Admin', email: 'admin@supermarket.com', password: 'Admin@123456' },
-    { role: 'Manager', email: 'manager@supermarket.com', password: 'Manager@123456' },
-    { role: 'Cashier', email: 'cashier@supermarket.com', password: 'Cashier@123456' }
+    { role: 'Admin', email: 'admin@mumbaisupermart.com', password: 'Mumbai@123456' },
+    { role: 'Regional Manager', email: 'regional.manager@mumbaisupermart.com', password: 'Mumbai@123456' },
+    { role: 'Store Manager', email: 'manager.andheri@mumbaisupermart.com', password: 'Mumbai@123456' },
+    { role: 'Inventory Manager', email: 'inventory.andheri@mumbaisupermart.com', password: 'Mumbai@123456' },
+    { role: 'Cashier', email: 'cashier1.andheri@mumbaisupermart.com', password: 'Mumbai@123456' }
   ];
 
   const fillDemo = (email, password) => {

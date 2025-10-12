@@ -57,14 +57,6 @@ const productSchema = new mongoose.Schema({
     match: [/^[A-Z0-9-_]+$/, 'SKU can only contain uppercase letters, numbers, hyphens, and underscores'],
     index: true
   },
-  barcode: {
-    type: String,
-    trim: true,
-    sparse: true,
-    unique: true,
-    match: [/^[0-9]+$/, 'Barcode can only contain numbers'],
-    index: true
-  },
   description: {
     type: String,
     trim: true,
@@ -94,33 +86,45 @@ const productSchema = new mongoose.Schema({
     index: true
   },
   
-  // Pricing
+  // Pricing (Indian Retail Model - GST Inclusive)
+  // Note: In India, MRP is ALWAYS inclusive of all taxes including GST
+  // Retailers can sell at MRP or below, but never above MRP
   pricing: {
     costPrice: {
       type: Number,
       required: [true, 'Cost price is required'],
-      min: [0.01, 'Cost price must be greater than 0']
+      min: [0.01, 'Cost price must be greater than 0'],
+      // Cost price from supplier (may or may not include GST depending on supplier)
     },
     sellingPrice: {
       type: Number,
       required: [true, 'Selling price is required'],
-      min: [0.01, 'Selling price must be greater than 0']
+      min: [0.01, 'Selling price must be greater than 0'],
+      // Actual selling price to customer (INCLUSIVE of GST)
+      // This is what customer pays at checkout
     },
     mrp: {
       type: Number,
-      min: [0.01, 'MRP must be greater than 0']
+      min: [0.01, 'MRP must be greater than 0'],
+      // Maximum Retail Price (INCLUSIVE of GST)
+      // As per Indian law, this is the maximum price that can be charged
+      // Printed on product packaging
     },
     discount: {
       type: Number,
       default: 0,
       min: 0,
       max: 100
+      // Discount percentage applied to selling price
     },
     taxRate: {
       type: Number,
       default: 18,
       min: 0,
       max: 100
+      // GST rate for this product (5%, 12%, 18%, 28%)
+      // Used for tax calculation and reporting, NOT added to price
+      // Price already includes this tax
     }
   },
   
@@ -222,11 +226,13 @@ productSchema.index({ isActive: 1, createdAt: -1 });
 
 // Virtual for total quantity across all branches
 productSchema.virtual('totalQuantity').get(function() {
+  if (!this.stockByBranch || !Array.isArray(this.stockByBranch)) return 0;
   return this.stockByBranch.reduce((total, stock) => total + stock.quantity, 0);
 });
 
 // Virtual for available quantity (total - reserved)
 productSchema.virtual('availableQuantity').get(function() {
+  if (!this.stockByBranch || !Array.isArray(this.stockByBranch)) return 0;
   return this.stockByBranch.reduce((total, stock) => total + (stock.quantity - (stock.reservedQuantity || 0)), 0);
 });
 
@@ -240,11 +246,13 @@ productSchema.virtual('profitMargin').get(function() {
 
 // Virtual to check if product is low stock in any branch
 productSchema.virtual('isLowStock').get(function() {
+  if (!this.stockByBranch || !Array.isArray(this.stockByBranch)) return false;
   return this.stockByBranch.some(stock => stock.quantity <= stock.reorderLevel);
 });
 
 // Virtual to check if product is out of stock in any branch
 productSchema.virtual('isOutOfStock').get(function() {
+  if (!this.stockByBranch || !Array.isArray(this.stockByBranch)) return false;
   return this.stockByBranch.some(stock => stock.quantity === 0);
 });
 

@@ -30,7 +30,14 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['Admin', 'Manager', 'Cashier', 'Viewer'],
+    enum: [
+      'Admin',                  // System Administrator - Full access
+      'Regional Manager',       // Oversees all branches
+      'Store Manager',          // Manages single branch
+      'Inventory Manager',      // Manages inventory for assigned branch
+      'Cashier',               // Sales operations only
+      'Viewer'                 // Read-only access
+    ],
     default: 'Cashier',
     required: true
   },
@@ -38,7 +45,8 @@ const userSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Branch',
     required: function() {
-      return this.role !== 'Admin';
+      // Admin, Regional Manager, and Viewer don't need branch assignment
+      return !['Admin', 'Regional Manager', 'Viewer'].includes(this.role);
     }
   },
   permissions: [{

@@ -11,7 +11,6 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "type-check": "tsc --noEmit",
     "validate": "echo 'Validation skipped - build and runtime tests sufficient'",
     "prepare": "husky install"
   },

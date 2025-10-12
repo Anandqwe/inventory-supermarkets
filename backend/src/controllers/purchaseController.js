@@ -14,8 +14,11 @@ class PurchaseController {
    */
   static async createPurchaseOrder(req, res) {
     try {
+      console.log('📦 Create Purchase Order - Request Body:', JSON.stringify(req.body, null, 2));
+      
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
+        console.log('❌ Validation errors:', errors.array());
         return res.status(400).json({
           success: false,
           message: 'Validation failed',
@@ -25,7 +28,7 @@ class PurchaseController {
 
       const {
         supplier: supplierId,
-        branch: branchId,
+        branch: requestedBranchId,
         items,
         expectedDeliveryDate,
         terms,
@@ -34,27 +37,75 @@ class PurchaseController {
         tax = { rate: 0, amount: 0 }
       } = req.body;
 
+      // Validate required fields
+      if (!supplierId) {
+        console.log('❌ Missing supplier ID');
+        return res.status(400).json({
+          success: false,
+          message: 'Supplier is required'
+        });
+      }
+
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        console.log('❌ Invalid items:', items);
+        return res.status(400).json({
+          success: false,
+          message: 'At least one item is required'
+        });
+      }
+
       // Validate supplier
+      console.log('🔍 Looking for supplier:', supplierId);
       const supplier = await Supplier.findById(supplierId);
       if (!supplier) {
+        console.log('❌ Supplier not found');
         return res.status(400).json({
           success: false,
           message: 'Invalid supplier'
         });
       }
+      console.log('✅ Supplier found:', supplier.name);
 
-      // Validate branch
-      const branch = await Branch.findById(branchId || req.user.branch._id);
+      // Validate branch - handle both string ID and populated object
+      let branchId = requestedBranchId || (req.user.branch?._id || req.user.branch);
+      
+      // If no branch in JWT, fetch user's branch from database
+      if (!branchId) {
+        console.log('⚠️ No branch in JWT, fetching from database...');
+        const User = require('../models/User');
+        const user = await User.findById(req.user.userId).select('branch role');
+        if (user && user.branch) {
+          branchId = user.branch;
+          console.log('✅ Branch fetched from user:', branchId);
+        } else if (user && (user.role === 'Admin' || user.role === 'Regional Manager')) {
+          // Admin and Regional Manager don't have assigned branches
+          // Use the first available branch as default
+          console.log('⚠️ Admin/Regional Manager without branch, using default branch...');
+          const defaultBranch = await Branch.findOne();
+          if (defaultBranch) {
+            branchId = defaultBranch._id;
+            console.log('✅ Using default branch:', defaultBranch.name);
+          }
+        }
+      }
+      
+      console.log('🔍 Looking for branch:', branchId);
+      console.log('👤 User role:', req.user.role);
+      
+      const branch = await Branch.findById(branchId);
       if (!branch) {
+        console.log('❌ Branch not found');
         return res.status(400).json({
           success: false,
-          message: 'Invalid branch'
+          message: 'Invalid branch - Please select a branch for this purchase order'
         });
       }
+      console.log('✅ Branch found:', branch.name);
 
       // Check branch access for non-admin users
       if (req.user.role !== 'admin' && req.user.branch) {
-        if (req.user.branch._id.toString() !== branch._id.toString()) {
+        const userBranchId = req.user.branch._id || req.user.branch;
+        if (userBranchId.toString() !== branch._id.toString()) {
           return res.status(403).json({
             success: false,
             message: 'Access denied - Can only create purchase orders for your assigned branch'
@@ -76,27 +127,32 @@ class PurchaseController {
           });
         }
 
-        // Calculate line total
-        const lineTotal = item.unitCost * item.quantity;
-        const discountAmount = item.discount ? (lineTotal * item.discount) / 100 : 0;
-        const discountedAmount = lineTotal - discountAmount;
+        // Calculate line total with tax
+        const unitPrice = item.unitCost;
+        const totalPrice = unitPrice * item.quantity;
+        const taxRate = item.tax?.rate || 18; // Default 18% GST
+        const taxAmount = (totalPrice * taxRate) / 100;
 
         const processedItem = {
           product: product._id,
-          name: product.name,
+          productName: product.name,
           sku: product.sku,
           unit: product.unit?.symbol || 'pcs',
           quantity: item.quantity,
-          unitCost: item.unitCost,
-          discount: item.discount || 0,
-          discountAmount,
-          lineTotal: discountedAmount,
-          receivedQuantity: 0,
-          pendingQuantity: item.quantity
+          unitPrice: unitPrice,
+          totalPrice: totalPrice,
+          discount: {
+            amount: item.discount?.amount || 0,
+            percentage: item.discount?.percentage || 0
+          },
+          tax: {
+            rate: taxRate,
+            amount: taxAmount
+          }
         };
 
         processedItems.push(processedItem);
-        subtotal += discountedAmount;
+        subtotal += totalPrice;
       }
 
       // Calculate purchase totals
@@ -108,34 +164,36 @@ class PurchaseController {
       }
 
       const discountedSubtotal = subtotal - totalDiscount;
-      const taxAmount = tax.rate ? (discountedSubtotal * tax.rate) / 100 : tax.amount;
-      const grandTotal = discountedSubtotal + taxAmount;
+      const totalTax = processedItems.reduce((sum, item) => sum + item.tax.amount, 0);
+      const grandTotal = discountedSubtotal + totalTax;
 
-      // Generate purchase order number
-      const orderNumber = await generatePurchaseOrderNumber(branch.code);
+      // Generate purchase number
+      const purchaseNumber = await generatePurchaseOrderNumber(branch.code);
 
       // Create purchase order
       const purchase = new Purchase({
-        orderNumber,
+        purchaseNumber,
         supplier: supplier._id,
         branch: branch._id,
         items: processedItems,
-        subtotal,
-        discount,
-        discountAmount: totalDiscount,
-        tax: {
-          rate: tax.rate,
-          amount: taxAmount
+        totals: {
+          subtotal,
+          totalDiscount,
+          totalTax,
+          shippingCharges: 0,
+          totalAmount: grandTotal
         },
-        total: grandTotal,
-        status: 'pending',
         expectedDeliveryDate: expectedDeliveryDate ? new Date(expectedDeliveryDate) : undefined,
-        terms,
+        payment: {
+          method: 'credit', // Default to credit for purchase orders
+          status: 'pending'
+        },
         notes,
         createdBy: req.user.userId
       });
 
       await purchase.save();
+      console.log('✅ Purchase order created:', purchaseNumber);
 
       // Populate the response
       const populatedPurchase = await Purchase.findById(purchase._id)
@@ -181,7 +239,7 @@ class PurchaseController {
 
       // Branch filter for RBAC
       if (req.user.role !== 'admin' && req.user.branch) {
-        filter.branch = req.user.branch._id;
+        filter.branch = req.user.branch._id || req.user.branch;
       } else if (branch) {
         filter.branch = branch;
       }
@@ -239,8 +297,9 @@ class PurchaseController {
         Purchase.find(filter)
           .populate('supplier', 'name code contact')
           .populate('branch', 'name code')
+          .populate('items.product', 'name sku')
           .populate('createdBy', 'firstName lastName')
-          .populate('approvedBy', 'firstName lastName')
+          .populate('receivedBy', 'firstName lastName')
           .sort(sort)
           .skip(skip)
           .limit(parseInt(limit)),
@@ -279,7 +338,6 @@ class PurchaseController {
         .populate('supplier', 'name code contact address')
         .populate('branch', 'name code address')
         .populate('createdBy', 'firstName lastName email')
-        .populate('approvedBy', 'firstName lastName email')
         .populate('receivedBy', 'firstName lastName email');
 
       if (!purchase) {
@@ -850,13 +908,14 @@ async function generatePurchaseOrderNumber(branchCode) {
   
   const prefix = `PO-${branchCode}-${year}${month}`;
   
+  // Find the last purchase order with this prefix
   const lastPurchase = await Purchase.findOne({
-    orderNumber: { $regex: `^${prefix}` }
-  }).sort({ orderNumber: -1 });
+    purchaseNumber: { $regex: `^${prefix}` }
+  }).sort({ purchaseNumber: -1 });
 
   let nextNumber = 1;
   if (lastPurchase) {
-    const lastNumber = lastPurchase.orderNumber.match(/(\d+)$/);
+    const lastNumber = lastPurchase.purchaseNumber.match(/(\d+)$/);
     if (lastNumber) {
       nextNumber = parseInt(lastNumber[1]) + 1;
     }

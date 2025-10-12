@@ -14,85 +14,73 @@ import { ThemeToggle } from '../ui/ThemeToggle';
 import { Button } from '../ui/Button';
 import { Badge, NotificationBadge } from '../ui/Badge';
 import { cn } from '../../utils/cn';
+import GlobalSearch from '../GlobalSearch';
+import MobileSearchModal from '../MobileSearchModal';
 
 const TopBar = ({ user, onMenuClick, onLogout }) => {
-  const [searchQuery, setSearchQuery] = useState('');
   const [notifications] = useState([
     { id: 1, title: 'Low Stock Alert', message: 'Product X is running low', type: 'warning', unread: true },
     { id: 2, title: 'New Sale', message: 'Sale #12345 completed', type: 'info', unread: true },
     { id: 3, title: 'System Update', message: 'Inventory updated successfully', type: 'success', unread: false },
   ]);
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
 
   const unreadCount = notifications.filter(n => n.unread).length;
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      // Implement global search functionality
-      console.log('Searching for:', searchQuery);
-    }
-  };
-
   return (
-    <header className="bg-white dark:bg-amoled-black border-b border-slate-200 dark:border-amoled-border h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8 flex-shrink-0 sticky top-0 z-40 backdrop-blur-sm bg-white/95 dark:bg-amoled-black/95">
-      {/* Left side - Mobile menu button and logo */}
-      <div className="flex items-center">
-        {/* Mobile menu button */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onMenuClick}
-          className="lg:hidden mr-2"
-          aria-label="Open sidebar"
-        >
-          <Bars3Icon className="h-6 w-6" />
-        </Button>
+    <>
+      <header className="bg-white dark:bg-amoled-black border-b border-slate-200 dark:border-amoled-border h-14 md:h-16 flex items-center justify-between px-3 sm:px-4 md:px-6 lg:px-8 flex-shrink-0 sticky top-0 z-40 backdrop-blur-sm bg-white/95 dark:bg-amoled-black/95">
+        {/* Left side - Mobile menu button and logo */}
+        <div className="flex items-center min-w-0 flex-shrink-0">
+          {/* Mobile menu button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onMenuClick}
+            className="lg:hidden mr-2 flex-shrink-0"
+            aria-label="Open sidebar"
+          >
+            <Bars3Icon className="h-6 w-6" />
+          </Button>
 
-        {/* Logo and title */}
-        <div className="flex items-center">
-          <div className="flex-shrink-0 lg:hidden">
-            <h1 className="text-lg font-semibold text-slate-900 dark:text-amoled-primary">
-              Inventory
-            </h1>
-          </div>
-          <div className="hidden lg:block">
-            <h1 className="text-xl font-semibold text-slate-900 dark:text-amoled-primary">
-              Supermarket Inventory System
+          {/* Logo and title - Responsive text */}
+          <div className="flex items-center min-w-0">
+            <h1 className="text-base sm:text-lg md:text-xl font-semibold text-slate-900 dark:text-amoled-primary truncate">
+              <span className="lg:hidden">Inventory</span>
+              <span className="hidden lg:inline">Supermarket Inventory System</span>
             </h1>
           </div>
         </div>
-      </div>
 
-      {/* Center - Enhanced Search */}
-      <div className="hidden md:block flex-1 max-w-lg mx-8">
-        <form onSubmit={handleSearch} className="relative">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <MagnifyingGlassIcon className="h-5 w-5 text-slate-400 dark:text-amoled-muted" />
-          </div>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search products, sales, customers..."
-            className="block w-full pl-10 pr-3 py-2 border border-slate-300 dark:border-amoled-border rounded-lg bg-white dark:bg-amoled-card text-slate-900 dark:text-amoled-primary placeholder-slate-500 dark:placeholder-amoled-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm transition-all duration-200"
-          />
-        </form>
-      </div>
+        {/* Center - Desktop Search (Hidden on mobile) */}
+        <div className="hidden md:block flex-1 max-w-xl mx-4 lg:mx-8">
+          <GlobalSearch />
+        </div>
 
-      {/* Right side - Notifications, theme toggle, and user menu */}
-      <div className="flex items-center space-x-1">
-        {/* Notifications */}
-        <Menu as="div" className="relative">
-          <Menu.Button className="relative p-2 text-slate-400 hover:text-slate-500 dark:text-amoled-muted dark:hover:text-amoled-secondary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 rounded-lg transition-colors">
+        {/* Right side - Search button (mobile), Notifications, theme toggle, and user menu */}
+        <div className="flex items-center space-x-1 flex-shrink-0">
+          {/* Mobile Search Button - Only visible on mobile */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsMobileSearchOpen(true)}
+            className="md:hidden"
+            aria-label="Search"
+          >
+            <MagnifyingGlassIcon className="h-6 w-6" />
+          </Button>
+          {/* Notifications - Hidden on small mobile */}
+        <Menu as="div" className="relative hidden sm:block">
+          <Menu.Button className="relative p-1.5 md:p-2 text-slate-400 hover:text-slate-500 dark:text-amoled-muted dark:hover:text-amoled-secondary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 rounded-lg transition-colors">
             <span className="sr-only">View notifications</span>
-            <BellIcon className="h-6 w-6" />
+            <BellIcon className="h-5 w-5 md:h-6 md:w-6" />
             {unreadCount > 0 && (
               <NotificationBadge count={unreadCount} />
             )}
           </Menu.Button>
 
-          <Menu.Items className="absolute right-0 z-50 mt-2 w-80 origin-top-right rounded-lg bg-white dark:bg-amoled-card shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-amoled-border focus:outline-none">
-            <div className="p-4">
+          <Menu.Items className="absolute right-0 z-50 mt-2 w-80 max-w-[calc(100vw-2rem)] origin-top-right rounded-lg bg-white dark:bg-amoled-card shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-amoled-border focus:outline-none">
+            <div className="p-3 md:p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-medium text-slate-900 dark:text-amoled-primary">
                   Notifications
@@ -144,21 +132,21 @@ const TopBar = ({ user, onMenuClick, onLogout }) => {
 
         {/* User menu */}
         <Menu as="div" className="relative">
-          <Menu.Button className="flex items-center text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 p-2 hover:bg-slate-100 dark:hover:bg-amoled-hover transition-colors">
+          <Menu.Button className="flex items-center text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 p-1 md:p-1.5 hover:bg-slate-100 dark:hover:bg-amoled-hover transition-colors">
             <span className="sr-only">Open user menu</span>
-            <div className="flex items-center space-x-2">
-              <div className="h-8 w-8 rounded-full bg-primary-600 flex items-center justify-center">
-                <UserIcon className="h-5 w-5 text-white" />
+            <div className="flex items-center space-x-1 md:space-x-2">
+              <div className="h-7 w-7 md:h-8 md:w-8 rounded-full bg-primary-600 flex items-center justify-center flex-shrink-0">
+                <UserIcon className="h-4 w-4 md:h-5 md:w-5 text-white" />
               </div>
-              <div className="hidden sm:block text-left">
-                <div className="text-sm font-medium text-slate-900 dark:text-amoled-primary">
+              <div className="hidden md:block text-left">
+                <div className="text-sm font-medium text-slate-900 dark:text-amoled-primary truncate max-w-[120px] lg:max-w-[150px]">
                   {user?.fullName || user?.name || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'User'}
                 </div>
-                <div className="text-xs text-slate-500 dark:text-amoled-muted">
+                <div className="text-xs text-slate-500 dark:text-amoled-muted truncate max-w-[120px] lg:max-w-[150px]">
                   {user?.email || 'No email'}
                 </div>
               </div>
-              <ChevronDownIcon className="hidden sm:block h-4 w-4 text-slate-400 dark:text-amoled-muted" />
+              <ChevronDownIcon className="hidden md:block h-4 w-4 text-slate-400 dark:text-amoled-muted flex-shrink-0" />
             </div>
           </Menu.Button>
 
@@ -231,6 +219,13 @@ const TopBar = ({ user, onMenuClick, onLogout }) => {
         </Menu>
       </div>
     </header>
+
+    {/* Mobile Search Modal */}
+    <MobileSearchModal 
+      isOpen={isMobileSearchOpen} 
+      onClose={() => setIsMobileSearchOpen(false)} 
+    />
+  </>
   );
 };
 

@@ -65,120 +65,8 @@ ChartJS.register(
   Filler
 );
 
-// Mock API functions - replace with actual API calls
-const reportsAPI = {
-  getSalesAnalytics: async (params) => {
-    // Mock sales data
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    return {
-      summary: {
-        totalRevenue: 125000,
-        totalSales: 450,
-        avgOrderValue: 278,
-        grossProfit: 45000,
-        netProfit: 35000,
-        profitMargin: 28,
-        cogs: 80000,
-        expenses: 10000
-      },
-      trends: {
-        revenue: [25000, 28000, 32000, 30000, 35000, 38000, 42000],
-        profit: [8000, 9000, 10500, 9500, 11000, 12000, 13500],
-        orders: [85, 92, 105, 98, 115, 125, 140],
-        labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6', 'Week 7']
-      },
-      topProducts: [
-        { name: 'Premium Coffee', revenue: 15000, margin: 35, sales: 150 },
-        { name: 'Fresh Bread', revenue: 12000, margin: 28, sales: 300 },
-        { name: 'Organic Milk', revenue: 8000, margin: 22, sales: 200 }
-      ],
-      categoryPerformance: [
-        { category: 'Beverages', revenue: 35000, profit: 12000, margin: 34 },
-        { category: 'Bakery', revenue: 28000, profit: 8000, margin: 29 },
-        { category: 'Dairy', revenue: 25000, profit: 6000, margin: 24 }
-      ]
-    };
-  },
-
-  getFinancialAnalytics: async (params) => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    return {
-      cashFlow: {
-        operating: 45000,
-        investing: -12000,
-        financing: -8000,
-        netCashFlow: 25000
-      },
-      profitability: {
-        grossProfitMargin: 36,
-        operatingMargin: 28,
-        netProfitMargin: 28,
-        returnOnAssets: 15,
-        returnOnEquity: 22
-      },
-      expenses: [
-        { category: 'Cost of Goods', amount: 80000, percentage: 64 },
-        { category: 'Rent', amount: 5000, percentage: 4 },
-        { category: 'Utilities', amount: 2000, percentage: 1.6 },
-        { category: 'Marketing', amount: 3000, percentage: 2.4 }
-      ],
-      monthlyTrends: {
-        revenue: [120000, 125000, 130000, 128000, 135000, 125000],
-        expenses: [85000, 90000, 88000, 92000, 87000, 90000],
-        profit: [35000, 35000, 42000, 36000, 48000, 35000],
-        months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun']
-      }
-    };
-  },
-
-  getInventoryAnalytics: async () => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    return {
-      overview: {
-        totalValue: 250000,
-        turnoverRate: 6.5,
-        deadStock: 15000,
-        fastMoving: 45,
-        slowMoving: 12,
-        outOfStock: 8
-      },
-      turnoverAnalysis: [
-        { product: 'Premium Coffee', turnover: 12.5, value: 15000, status: 'fast' },
-        { product: 'Fresh Bread', turnover: 8.2, value: 8000, status: 'fast' },
-        { product: 'Specialty Tea', turnover: 1.2, value: 5000, status: 'slow' }
-      ],
-      agingAnalysis: {
-        '0-30': { count: 145, value: 120000 },
-        '31-60': { count: 85, value: 85000 },
-        '61-90': { count: 35, value: 30000 },
-        '90+': { count: 15, value: 15000 }
-      }
-    };
-  },
-
-  getCustomerAnalytics: async () => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    return {
-      overview: {
-        totalCustomers: 1250,
-        newCustomers: 85,
-        retentionRate: 78,
-        avgLifetimeValue: 2400,
-        churnRate: 12
-      },
-      segments: [
-        { segment: 'VIP', count: 125, revenue: 75000, avgOrder: 600 },
-        { segment: 'Regular', count: 450, revenue: 35000, avgOrder: 78 },
-        { segment: 'Occasional', count: 675, revenue: 15000, avgOrder: 22 }
-      ],
-      trends: {
-        acquisition: [15, 22, 18, 25, 19, 28, 35],
-        retention: [82, 81, 79, 78, 80, 78, 79],
-        labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6', 'Week 7']
-      }
-    };
-  }
-};
+// Import actual API functions
+import { reportsAPI, masterDataAPI } from '../utils/api';
 
 // Enhanced Reports Component
 function EnhancedReports() {
@@ -194,32 +82,156 @@ function EnhancedReports() {
   });
   const [showExportModal, setShowExportModal] = useState(false);
   const [toast, setToast] = useState(null);
+  const [showCategoryTable, setShowCategoryTable] = useState(false);
 
   const queryClient = useQueryClient();
 
   // Queries for different analytics
-  const { data: salesData, isLoading: salesLoading } = useQuery({
-    queryKey: ['sales-analytics', dateRange, filters],
-    queryFn: () => reportsAPI.getSalesAnalytics({ ...dateRange, ...filters }),
-    enabled: activeTab === 'sales'
+  const { data: salesData, isLoading: salesLoading, error: salesError, refetch: refetchSales } = useQuery({
+    queryKey: ['sales-analytics', dateRange.startDate, dateRange.endDate, filters.branch, filters.category],
+    queryFn: async () => {
+      try {
+        const params = { 
+          startDate: dateRange.startDate, 
+          endDate: dateRange.endDate,
+          groupBy: 'day'
+        };
+        
+        // Only add branchId if a specific branch is selected (not empty string)
+        if (filters.branch && filters.branch.trim() !== '') {
+          params.branchId = filters.branch;
+        }
+        
+        // Only add categoryId if a specific category is selected
+        if (filters.category && filters.category.trim() !== '') {
+          params.categoryId = filters.category;
+        }
+        
+        const response = await reportsAPI.getSalesReport(params);
+        return response.data;
+      } catch (error) {
+        console.error('Sales report error:', error.response?.data);
+        if (error.response?.data?.errors) {
+          console.error('Validation errors:', error.response.data.errors);
+        }
+        throw error;
+      }
+    },
+    enabled: activeTab === 'sales',
+    retry: false
   });
 
-  const { data: financialData, isLoading: financialLoading } = useQuery({
-    queryKey: ['financial-analytics', dateRange],
-    queryFn: () => reportsAPI.getFinancialAnalytics(dateRange),
-    enabled: activeTab === 'financial'
+  const { data: profitData, isLoading: profitLoading, error: profitError, refetch: refetchProfit } = useQuery({
+    queryKey: ['profit-analytics', dateRange.startDate, dateRange.endDate, filters.branch, filters.category],
+    queryFn: async () => {
+      try {
+        const params = { 
+          startDate: dateRange.startDate, 
+          endDate: dateRange.endDate,
+          groupBy: 'day'
+        };
+        
+        // Only add branchId if a specific branch is selected
+        if (filters.branch && filters.branch.trim() !== '') {
+          params.branchId = filters.branch;
+        }
+        
+        // Only add categoryId if a specific category is selected
+        if (filters.category && filters.category.trim() !== '') {
+          params.categoryId = filters.category;
+        }
+        
+        const response = await reportsAPI.getProfitAnalysis(params);
+        return response.data;
+      } catch (error) {
+        console.error('Profit analysis error:', error.response?.data || error.message);
+        throw error;
+      }
+    },
+    enabled: activeTab === 'financial',
+    retry: false
   });
 
-  const { data: inventoryData, isLoading: inventoryLoading } = useQuery({
-    queryKey: ['inventory-analytics'],
-    queryFn: reportsAPI.getInventoryAnalytics,
-    enabled: activeTab === 'inventory'
+  const { data: inventoryData, isLoading: inventoryLoading, error: inventoryError, refetch: refetchInventory } = useQuery({
+    queryKey: ['inventory-analytics', dateRange.startDate, dateRange.endDate, filters.branch, filters.category],
+    queryFn: async () => {
+      try {
+        const params = {
+          startDate: dateRange.startDate, 
+          endDate: dateRange.endDate
+        };
+        
+        // Only add branchId if a specific branch is selected
+        if (filters.branch && filters.branch.trim() !== '') {
+          params.branchId = filters.branch;
+        }
+        
+        // Only add categoryId if a specific category is selected
+        if (filters.category && filters.category.trim() !== '') {
+          params.categoryId = filters.category;
+        }
+        
+        const response = await reportsAPI.getInventoryReport(params);
+        return response.data;
+      } catch (error) {
+        console.error('Inventory report error:', error.response?.data || error.message);
+        throw error;
+      }
+    },
+    enabled: activeTab === 'inventory',
+    retry: false
   });
 
-  const { data: customerData, isLoading: customerLoading } = useQuery({
-    queryKey: ['customer-analytics', dateRange],
-    queryFn: () => reportsAPI.getCustomerAnalytics(dateRange),
-    enabled: activeTab === 'customer'
+  const { data: customerData, isLoading: customerLoading, error: customerError, refetch: refetchCustomer } = useQuery({
+    queryKey: ['customer-analytics', dateRange.startDate, dateRange.endDate, filters.branch, filters.category],
+    queryFn: async () => {
+      try {
+        const params = { 
+          startDate: dateRange.startDate, 
+          endDate: dateRange.endDate
+        };
+        
+        // Only add branchId if a specific branch is selected
+        if (filters.branch && filters.branch.trim() !== '') {
+          params.branchId = filters.branch;
+        }
+        
+        // Only add categoryId if a specific category is selected
+        if (filters.category && filters.category.trim() !== '') {
+          params.categoryId = filters.category;
+        }
+        
+        const response = await reportsAPI.getCustomerAnalysis(params);
+        return response.data;
+      } catch (error) {
+        console.error('Customer analysis error:', error.response?.data || error.message);
+        throw error;
+      }
+    },
+    enabled: activeTab === 'customer',
+    retry: false
+  });
+
+  // Fetch branches for filter dropdown
+  const { data: branchesData } = useQuery({
+    queryKey: ['branches'],
+    queryFn: async () => {
+      const response = await masterDataAPI.getBranches({ limit: 100 });
+      // Backend returns { success, data: [...branches array...], pagination }
+      // So we need to wrap it to match our expected structure
+      return { branches: response.data };
+    },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+
+  // Fetch categories for filter dropdown
+  const { data: categoriesData } = useQuery({
+    queryKey: ['categories'],
+    queryFn: async () => {
+      const response = await reportsAPI.getAllCategories();
+      return response.data;
+    },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 
   // Tab configuration
@@ -231,31 +243,357 @@ function EnhancedReports() {
   ];
 
   // Export functionality
-  const handleExport = async (format) => {
+  const handleExport = async (format, includeCharts = false) => {
     try {
-      setToast({ type: 'info', message: `Exporting ${format.toUpperCase()}...` });
-      
-      // Simulate export process
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      setToast({ type: 'success', message: `${format.toUpperCase()} exported successfully` });
+      setToast({ type: 'info', message: `Exporting ${format.toUpperCase()} report${includeCharts ? ' with charts' : ''}...` });
       setShowExportModal(false);
+
+      let data, reportType;
+      
+      // Get current tab data
+      if (activeTab === 'sales') {
+        data = salesData;
+        reportType = 'Sales Analytics';
+      } else if (activeTab === 'financial') {
+        data = profitData;
+        reportType = 'Financial Analysis';
+      } else if (activeTab === 'inventory') {
+        data = inventoryData;
+        reportType = 'Inventory Report';
+      } else if (activeTab === 'customer') {
+        data = customerData;
+        reportType = 'Customer Analysis';
+      }
+
+      if (!data) {
+        setToast({ type: 'error', message: 'No data available to export' });
+        return;
+      }
+
+      // Export as CSV (client-side)
+      if (format === 'csv') {
+        exportToCSV(data, reportType, includeCharts);
+        setToast({ type: 'success', message: 'CSV report exported successfully!' });
+      } else {
+        // For Excel and PDF, make API call to backend
+        const apiCall = activeTab === 'sales' ? reportsAPI.getSalesReport 
+          : activeTab === 'financial' ? reportsAPI.getProfitAnalysis
+          : activeTab === 'inventory' ? reportsAPI.getInventoryReport
+          : reportsAPI.getCustomerAnalysis;
+
+        const response = await apiCall({
+          startDate: dateRange.startDate,
+          endDate: dateRange.endDate,
+          branchId: filters.branch || undefined,
+          format: format
+        });
+        
+        // Handle file download from backend
+        const blob = new Blob([response], { type: format === 'excel' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'application/pdf' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${reportType.replace(/\s+/g, '-')}-${dateRange.startDate}-to-${dateRange.endDate}.${format === 'excel' ? 'xlsx' : 'pdf'}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }
+
+      setToast({ type: 'success', message: `${format.toUpperCase()} report exported successfully` });
     } catch (error) {
-      setToast({ type: 'error', message: 'Export failed' });
+      console.error('Export error:', error);
+      setToast({ type: 'error', message: 'Export failed. Please try again.' });
     }
+  };
+
+  // Export to CSV function
+  const exportToCSV = (data, reportType, includeCharts = false) => {
+    let csvContent = '';
+    const filename = `${reportType.replace(/\s+/g, '-')}-${dateRange.startDate}-to-${dateRange.endDate}.csv`;
+
+    // Add BOM for proper UTF-8 encoding in Excel
+    csvContent = '\uFEFF';
+    
+    // Add report header
+    csvContent += `"${reportType}"\n`;
+    csvContent += `"Period: ${dateRange.startDate} to ${dateRange.endDate}"\n`;
+    csvContent += `"Generated: ${new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}"\n`;
+    
+    // Get branch name safely
+    const branchName = filters.branch 
+      ? (branchesData?.branches?.find(b => b._id === filters.branch)?.name || 'Selected Branch')
+      : 'All Branches';
+    csvContent += `"Branch: ${branchName}"\n`;
+    
+    // Note about charts (CSV format limitation)
+    if (includeCharts) {
+      csvContent += `"Note: Chart visualizations are included in Excel and PDF exports only"\n`;
+    }
+    csvContent += '\n';
+
+    // Add data based on report type
+    if (activeTab === 'sales' && data.summary) {
+      // Summary section
+      csvContent += '"Summary"\n';
+      csvContent += `"Total Sales","${data.summary.totalSales || 0}"\n`;
+      csvContent += `"Total Revenue","₹${(data.summary.totalRevenue || 0).toFixed(2)}"\n`;
+      csvContent += `"Total Cost","₹${(data.summary.totalCost || 0).toFixed(2)}"\n`;
+      csvContent += `"Gross Profit","₹${(data.summary.grossProfit || 0).toFixed(2)}"\n`;
+      csvContent += `"Profit Margin","${(data.summary.profitMargin || 0).toFixed(2)}%"\n`;
+      csvContent += '\n';
+
+      // Daily breakdown
+      if (data.timeGroupedData && data.timeGroupedData.length > 0) {
+        csvContent += '"Daily Breakdown"\n';
+        csvContent += '"Date","Sales Count","Revenue (₹)","Cost (₹)","Profit (₹)","Margin (%)"\n';
+        
+        data.timeGroupedData.forEach(d => {
+          const margin = d.revenue > 0 ? ((d.profit / d.revenue) * 100) : 0;
+          csvContent += `"${d.period || d.date || 'N/A'}",`;
+          csvContent += `"${d.sales || 0}",`;
+          csvContent += `"${(d.revenue || 0).toFixed(2)}",`;
+          csvContent += `"${(d.cost || 0).toFixed(2)}",`;
+          csvContent += `"${(d.profit || 0).toFixed(2)}",`;
+          csvContent += `"${margin.toFixed(2)}"\n`;
+        });
+        
+        // Add totals row
+        const totals = data.timeGroupedData.reduce((acc, d) => ({
+          sales: acc.sales + (d.sales || 0),
+          revenue: acc.revenue + (d.revenue || 0),
+          cost: acc.cost + (d.cost || 0),
+          profit: acc.profit + (d.profit || 0)
+        }), { sales: 0, revenue: 0, cost: 0, profit: 0 });
+        
+        const totalMargin = totals.revenue > 0 ? ((totals.profit / totals.revenue) * 100) : 0;
+        csvContent += '\n';
+        csvContent += `"TOTAL","${totals.sales}","${totals.revenue.toFixed(2)}","${totals.cost.toFixed(2)}","${totals.profit.toFixed(2)}","${totalMargin.toFixed(2)}"\n`;
+      }
+      
+      // Category performance
+      if (data.categoryPerformance && data.categoryPerformance.length > 0) {
+        csvContent += '\n"Category Performance"\n';
+        csvContent += '"Category","Products","Total Sales","Revenue (₹)","Average Price (₹)","Stock Level"\n';
+        
+        data.categoryPerformance.forEach(cat => {
+          csvContent += `"${cat.categoryName || cat.category || 'N/A'}",`;
+          csvContent += `"${cat.productCount || 0}",`;
+          csvContent += `"${cat.totalSales || 0}",`;
+          csvContent += `"${(cat.revenue || 0).toFixed(2)}",`;
+          csvContent += `"${(cat.averagePrice || 0).toFixed(2)}",`;
+          csvContent += `"${cat.totalStock || 0}"\n`;
+        });
+      }
+      
+    } else if (activeTab === 'financial' && data.summary) {
+      // Summary section
+      csvContent += '"Financial Summary"\n';
+      csvContent += `"Total Revenue","₹${(data.summary.totalRevenue || 0).toFixed(2)}"\n`;
+      csvContent += `"Total Cost","₹${(data.summary.totalCost || 0).toFixed(2)}"\n`;
+      csvContent += `"Gross Profit","₹${(data.summary.grossProfit || 0).toFixed(2)}"\n`;
+      csvContent += `"Net Profit","₹${(data.summary.netProfit || 0).toFixed(2)}"\n`;
+      csvContent += `"Profit Margin","${(data.summary.profitMargin || 0).toFixed(2)}%"\n`;
+      csvContent += `"Average Margin","${(data.summary.averageMargin || 0).toFixed(2)}%"\n`;
+      csvContent += '\n';
+      
+      // Profit trend
+      if (data.profitTrend && data.profitTrend.length > 0) {
+        csvContent += '"Profit Trend"\n';
+        csvContent += '"Period","Revenue (₹)","Cost (₹)","Profit (₹)","Margin (%)"\n';
+        
+        data.profitTrend.forEach(p => {
+          const margin = p.revenue > 0 ? ((p.profit / p.revenue) * 100) : 0;
+          csvContent += `"${p.period || 'N/A'}",`;
+          csvContent += `"${(p.revenue || 0).toFixed(2)}",`;
+          csvContent += `"${(p.cost || 0).toFixed(2)}",`;
+          csvContent += `"${(p.profit || 0).toFixed(2)}",`;
+          csvContent += `"${margin.toFixed(2)}"\n`;
+        });
+      }
+      
+      // Payment methods
+      if (data.paymentMethods && data.paymentMethods.length > 0) {
+        csvContent += '\n"Payment Methods"\n';
+        csvContent += '"Method","Count","Amount (₹)","Percentage (%)"\n';
+        
+        const totalAmount = data.paymentMethods.reduce((sum, p) => sum + (p.amount || 0), 0);
+        data.paymentMethods.forEach(p => {
+          const percentage = totalAmount > 0 ? ((p.amount / totalAmount) * 100) : 0;
+          csvContent += `"${p.method || 'N/A'}",`;
+          csvContent += `"${p.count || 0}",`;
+          csvContent += `"${(p.amount || 0).toFixed(2)}",`;
+          csvContent += `"${percentage.toFixed(2)}"\n`;
+        });
+      }
+      
+    } else if (activeTab === 'inventory' && data.summary) {
+      // Summary section
+      csvContent += '"Inventory Summary"\n';
+      csvContent += `"Total Products","${data.summary.totalProducts || 0}"\n`;
+      csvContent += `"Total Stock Value","₹${(data.summary.totalStockValue || 0).toFixed(2)}"\n`;
+      csvContent += `"Low Stock Items","${data.summary.lowStockProducts || 0}"\n`;
+      csvContent += `"Out of Stock","${data.summary.outOfStockProducts || 0}"\n`;
+      csvContent += `"Average Stock Level","${(data.summary.averageStockLevel || 0).toFixed(2)}"\n`;
+      csvContent += '\n';
+      
+      // Category distribution
+      if (data.categoryDistribution && data.categoryDistribution.length > 0) {
+        csvContent += '"Category Distribution"\n';
+        csvContent += '"Category","Product Count","Total Stock","Stock Value (₹)","Percentage (%)"\n';
+        
+        const totalValue = data.categoryDistribution.reduce((sum, c) => sum + (c.value || 0), 0);
+        data.categoryDistribution.forEach(cat => {
+          const percentage = totalValue > 0 ? ((cat.value / totalValue) * 100) : 0;
+          csvContent += `"${cat.categoryName || cat.category || 'N/A'}",`;
+          csvContent += `"${cat.productCount || 0}",`;
+          csvContent += `"${cat.totalStock || 0}",`;
+          csvContent += `"${(cat.value || 0).toFixed(2)}",`;
+          csvContent += `"${percentage.toFixed(2)}"\n`;
+        });
+      }
+      
+      // Top products
+      if (data.topProducts && data.topProducts.length > 0) {
+        csvContent += '\n"Top Products by Stock Value"\n';
+        csvContent += '"Product","SKU","Category","Stock","Price (₹)","Value (₹)"\n';
+        
+        data.topProducts.forEach(p => {
+          csvContent += `"${p.name || 'N/A'}",`;
+          csvContent += `"${p.sku || 'N/A'}",`;
+          csvContent += `"${p.category?.name || 'N/A'}",`;
+          csvContent += `"${p.stock || 0}",`;
+          csvContent += `"${(p.sellingPrice || 0).toFixed(2)}",`;
+          csvContent += `"${((p.stock || 0) * (p.sellingPrice || 0)).toFixed(2)}"\n`;
+        });
+      }
+      
+    } else if (activeTab === 'customer' && data.summary) {
+      // Summary section
+      csvContent += '"Customer Analysis"\n';
+      csvContent += `"Total Customers","${data.summary.totalCustomers || 0}"\n`;
+      csvContent += `"Registered Customers","${data.summary.registeredCustomers || 0}"\n`;
+      csvContent += `"Walk-in Customers","${data.summary.walkinCustomers || 0}"\n`;
+      csvContent += `"Total Revenue","₹${(data.summary.totalRevenue || 0).toFixed(2)}"\n`;
+      csvContent += `"Average Order Value","₹${(data.summary.averageOrderValue || 0).toFixed(2)}"\n`;
+      csvContent += `"Average Purchase Frequency","${(data.summary.averagePurchaseFrequency || 0).toFixed(2)}"\n`;
+      csvContent += '\n';
+      
+      // Top customers
+      if (data.topCustomers && data.topCustomers.length > 0) {
+        csvContent += '"Top Customers"\n';
+        csvContent += '"Name","Email","Phone","Total Purchases","Total Spent (₹)","Average Order (₹)","Last Purchase"\n';
+        
+        data.topCustomers.forEach(c => {
+          const avgOrder = c.totalPurchases > 0 ? (c.totalSpent / c.totalPurchases) : 0;
+          csvContent += `"${c.name || 'Walk-in Customer'}",`;
+          csvContent += `"${c.email || 'N/A'}",`;
+          csvContent += `"${c.phone || 'N/A'}",`;
+          csvContent += `"${c.totalPurchases || 0}",`;
+          csvContent += `"${(c.totalSpent || 0).toFixed(2)}",`;
+          csvContent += `"${avgOrder.toFixed(2)}",`;
+          csvContent += `"${c.lastPurchase ? new Date(c.lastPurchase).toLocaleDateString('en-IN') : 'N/A'}"\n`;
+        });
+      }
+      
+      // Purchase frequency
+      if (data.purchaseFrequency && data.purchaseFrequency.length > 0) {
+        csvContent += '\n"Purchase Frequency Distribution"\n';
+        csvContent += '"Frequency Range","Customer Count","Percentage (%)"\n';
+        
+        const totalCustomers = data.purchaseFrequency.reduce((sum, f) => sum + (f.count || 0), 0);
+        data.purchaseFrequency.forEach(f => {
+          const percentage = totalCustomers > 0 ? ((f.count / totalCustomers) * 100) : 0;
+          csvContent += `"${f.range || 'N/A'}",`;
+          csvContent += `"${f.count || 0}",`;
+          csvContent += `"${percentage.toFixed(2)}"\n`;
+        });
+      }
+    }
+
+    // Create and download file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // Refresh data function
+  const handleRefreshData = () => {
+    setToast({ type: 'info', message: 'Refreshing data...' });
+    
+    // Invalidate and refetch all queries
+    if (activeTab === 'sales') {
+      refetchSales();
+    } else if (activeTab === 'financial') {
+      refetchProfit();
+    } else if (activeTab === 'inventory') {
+      refetchInventory();
+    } else if (activeTab === 'customer') {
+      refetchCustomer();
+    }
+    
+    setToast({ type: 'success', message: 'Data refreshed successfully' });
   };
 
   // Sales Analytics Tab
   const SalesAnalyticsTab = () => {
     if (salesLoading) return <LoadingSpinner />;
+    if (salesError) {
+      const errorData = salesError.response?.data;
+      return (
+        <div className="text-center py-12 px-6">
+          <div className="text-red-500 font-semibold mb-2">Error loading sales data</div>
+          <div className="text-sm text-slate-600 mb-4">
+            {errorData?.message || salesError.message}
+          </div>
+          {errorData?.validationErrors && errorData.validationErrors.length > 0 && (
+            <div className="mt-4 text-left max-w-2xl mx-auto">
+              <div className="text-sm font-medium mb-2">Validation Errors:</div>
+              <ul className="text-xs text-slate-600 space-y-1">
+                {errorData.validationErrors.map((err, idx) => (
+                  <li key={idx} className="bg-red-50 dark:bg-red-900/10 p-2 rounded">
+                    <span className="font-medium">{err.field}:</span> {err.message}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {errorData?.errors && errorData.errors.length > 0 && (
+            <div className="mt-4 text-left max-w-2xl mx-auto">
+              <div className="text-sm font-medium mb-2">Errors:</div>
+              <ul className="text-xs text-slate-600 space-y-1">
+                {errorData.errors.map((err, idx) => (
+                  <li key={idx} className="bg-red-50 dark:bg-red-900/10 p-2 rounded">
+                    {typeof err === 'string' ? err : JSON.stringify(err)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {salesError.response?.status === 403 && (
+            <div className="mt-4 text-sm text-orange-600">
+              You need Manager or Admin permissions to view reports
+            </div>
+          )}
+        </div>
+      );
+    }
     if (!salesData) return null;
 
+    // Transform backend data for charts
     const revenueChartData = {
-      labels: salesData.trends.labels,
+      labels: salesData.timeGroupedData?.map(d => d.label || d.date || d.period) || [],
       datasets: [
         {
           label: 'Revenue',
-          data: salesData.trends.revenue,
+          data: salesData.timeGroupedData?.map(d => d.revenue || 0) || [],
           borderColor: 'rgb(59, 130, 246)',
           backgroundColor: 'rgba(59, 130, 246, 0.1)',
           fill: true,
@@ -263,7 +601,7 @@ function EnhancedReports() {
         },
         {
           label: 'Profit',
-          data: salesData.trends.profit,
+          data: salesData.timeGroupedData?.map(d => d.profit || 0) || [],
           borderColor: 'rgb(16, 185, 129)',
           backgroundColor: 'rgba(16, 185, 129, 0.1)',
           fill: true,
@@ -273,193 +611,262 @@ function EnhancedReports() {
     };
 
     const categoryChartData = {
-      labels: salesData.categoryPerformance.map(c => c.category),
+      labels: Object.keys(salesData.categoryAnalysis || {}),
       datasets: [{
-        data: salesData.categoryPerformance.map(c => c.revenue),
+        data: Object.values(salesData.categoryAnalysis || {}).map(c => c.revenue || 0),
         backgroundColor: [
           'rgba(59, 130, 246, 0.8)',
           'rgba(16, 185, 129, 0.8)',
           'rgba(245, 101, 101, 0.8)',
-          'rgba(251, 191, 36, 0.8)'
+          'rgba(251, 191, 36, 0.8)',
+          'rgba(168, 85, 247, 0.8)',
+          'rgba(236, 72, 153, 0.8)'
         ]
       }]
     };
 
     return (
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
           <StatCard
             title="Total Revenue"
-            value={`₹${salesData.summary.totalRevenue.toLocaleString()}`}
-            change="+12.5%"
-            trend="up"
+            value={salesData.summary?.totalRevenue || 0}
+            format="currency"
             icon={CurrencyDollarIcon}
             color="green"
           />
           <StatCard
             title="Gross Profit"
-            value={`₹${salesData.summary.grossProfit.toLocaleString()}`}
-            change="+8.3%"
-            trend="up"
+            value={salesData.summary?.grossProfit || 0}
+            format="currency"
             icon={ArrowTrendingUpIcon}
             color="blue"
           />
           <StatCard
             title="Profit Margin"
-            value={`${salesData.summary.profitMargin}%`}
-            change="+2.1%"
-            trend="up"
+            value={(salesData.summary?.profitMargin || 0).toFixed(1)}
+            format="percentage"
             icon={SparklesIcon}
             color="purple"
           />
           <StatCard
-            title="Avg Order Value"
-            value={`₹${salesData.summary.avgOrderValue}`}
-            change="+5.7%"
-            trend="up"
+            title="Total Sales"
+            value={salesData.summary?.totalSales || 0}
             icon={ChartBarIcon}
             color="orange"
           />
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           {/* Revenue & Profit Trends */}
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-medium">Revenue & Profit Trends</h3>
-              <Button variant="outline" size="sm">
-                <ArrowDownTrayIcon className="h-4 w-4" />
-              </Button>
-            </div>
-            <Line data={revenueChartData} options={{
-              responsive: true,
-              plugins: {
-                legend: { position: 'top' },
-                title: { display: false }
-              },
-              scales: {
-                y: {
-                  beginAtZero: true,
-                  ticks: {
-                    callback: function(value) {
-                      return '₹' + value.toLocaleString();
+          <Card className="p-4 sm:p-6">
+            <h3 className="text-base sm:text-lg font-medium mb-4 sm:mb-6">Revenue & Profit Trends</h3>
+            {revenueChartData.labels.length > 0 ? (
+              <div className="h-64 sm:h-72 md:h-80">
+                <Line data={revenueChartData} options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: { 
+                      position: 'top',
+                      labels: {
+                        boxWidth: 12,
+                        padding: 10,
+                        font: { size: 11 }
+                      }
+                    },
+                    title: { display: false }
+                  },
+                  scales: {
+                    y: {
+                      beginAtZero: true,
+                      ticks: {
+                        font: { size: 10 },
+                        callback: function(value) {
+                          return '₹' + value.toLocaleString('en-IN');
+                        }
+                      }
+                    },
+                    x: {
+                      ticks: {
+                        font: { size: 10 },
+                        maxRotation: 45,
+                        minRotation: 0
+                      }
                     }
                   }
-                }
-              }
-            }} />
+                }} />
+              </div>
+            ) : (
+              <div className="text-center py-8 text-slate-500 text-sm">No trend data available</div>
+            )}
           </Card>
 
           {/* Category Performance */}
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-medium">Category Performance</h3>
-              <Button variant="outline" size="sm">
-                <EyeIcon className="h-4 w-4" />
+          <Card className="p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
+              <h3 className="text-base sm:text-lg font-medium">Category Performance</h3>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setShowCategoryTable(!showCategoryTable)}
+                title="Toggle view"
+                className="h-8 w-8 p-0"
+              >
+                <EyeIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </Button>
             </div>
-            <Doughnut data={categoryChartData} options={{
-              responsive: true,
-              plugins: {
-                legend: { position: 'bottom' }
-              }
-            }} />
+            {categoryChartData.labels.length > 0 ? (
+              showCategoryTable ? (
+                <div className="overflow-x-auto -mx-2 sm:mx-0">
+                  <table className="w-full text-xs sm:text-sm min-w-[300px]">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-2 px-2">Category</th>
+                        <th className="text-right py-2 px-2">Items Sold</th>
+                        <th className="text-right py-2 px-2">Revenue</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(salesData.categoryAnalysis || {}).map(([category, data]) => (
+                        <tr key={category} className="border-b">
+                          <td className="py-2 px-2">{category}</td>
+                          <td className="text-right py-2 px-2">{data.itemsSold?.toLocaleString('en-IN') || 0}</td>
+                          <td className="text-right py-2 px-2">₹{(data.revenue || 0).toLocaleString('en-IN')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="h-64 sm:h-72 md:h-80">
+                  <Doughnut data={categoryChartData} options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: { 
+                        position: 'bottom',
+                        labels: {
+                          boxWidth: 12,
+                          padding: 8,
+                          font: { size: 10 }
+                        }
+                      }
+                    }
+                  }} />
+                </div>
+              )
+            ) : (
+              <div className="text-center py-8 text-slate-500 text-sm">No category data available</div>
+            )}
           </Card>
         </div>
 
-        {/* Top Products Table */}
-        <Card className="p-6">
-          <h3 className="text-lg font-medium mb-4">Top Performing Products</h3>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
-              <thead className="bg-slate-50 dark:bg-slate-800">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Product
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Revenue
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Margin
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Sales
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-slate-900 divide-y divide-slate-200 dark:divide-slate-700">
-                {salesData.topProducts.map((product, index) => (
-                  <tr key={index}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900 dark:text-slate-100">
-                      {product.name}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900 dark:text-slate-100">
-                      ₹{product.revenue.toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <Badge variant={product.margin > 30 ? 'success' : 'warning'}>
-                        {product.margin}%
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900 dark:text-slate-100">
-                      {product.sales}
-                    </td>
+        {/* Payment Methods */}
+        {salesData.paymentMethodAnalysis && Object.keys(salesData.paymentMethodAnalysis).length > 0 && (
+          <Card className="p-4 sm:p-6">
+            <h3 className="text-base sm:text-lg font-medium mb-3 sm:mb-4">Payment Methods</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+              {Object.entries(salesData.paymentMethodAnalysis).map(([method, data]) => (
+                <div key={method} className="p-3 sm:p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                  <div className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">{method}</div>
+                  <div className="text-xl sm:text-2xl font-bold mt-1">₹{(data.amount || 0).toLocaleString('en-IN')}</div>
+                  <div className="text-xs sm:text-sm text-slate-500 mt-1">{data.count || 0} transactions</div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+
+        {/* Cashier Performance */}
+        {salesData.cashierPerformance && salesData.cashierPerformance.length > 0 && (
+          <Card className="p-4 sm:p-6">
+            <h3 className="text-base sm:text-lg font-medium mb-3 sm:mb-4">Cashier Performance</h3>
+            <div className="overflow-x-auto -mx-2 sm:mx-0">
+              <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+                <thead className="bg-slate-50 dark:bg-slate-800">
+                  <tr>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Cashier
+                    </th>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Sales Count
+                    </th>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Total Amount
+                    </th>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Avg Order Value
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+                </thead>
+                <tbody className="bg-white dark:bg-slate-900 divide-y divide-slate-200 dark:divide-slate-700">
+                  {salesData.cashierPerformance.map((cashier, index) => (
+                    <tr key={index}>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100">
+                        {cashier.cashier?.name || cashier.cashier?.email || 'Unknown'}
+                      </td>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-slate-900 dark:text-slate-100">
+                        {cashier.salesCount || 0}
+                      </td>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-slate-900 dark:text-slate-100">
+                        ₹{(cashier.totalAmount || 0).toLocaleString('en-IN')}
+                      </td>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-slate-900 dark:text-slate-100">
+                        ₹{(cashier.avgOrderValue || 0).toLocaleString('en-IN')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
       </div>
     );
   };
 
   // Financial Analytics Tab
   const FinancialAnalyticsTab = () => {
-    if (financialLoading) return <LoadingSpinner />;
-    if (!financialData) return null;
-
-    const cashFlowData = {
-      labels: ['Operating', 'Investing', 'Financing', 'Net Cash Flow'],
-      datasets: [{
-        label: 'Cash Flow',
-        data: [
-          financialData.cashFlow.operating,
-          financialData.cashFlow.investing,
-          financialData.cashFlow.financing,
-          financialData.cashFlow.netCashFlow
-        ],
-        backgroundColor: [
-          'rgba(16, 185, 129, 0.8)',
-          'rgba(245, 101, 101, 0.8)',
-          'rgba(251, 191, 36, 0.8)',
-          'rgba(59, 130, 246, 0.8)'
-        ]
-      }]
-    };
+    if (profitLoading) return <LoadingSpinner />;
+    if (profitError) {
+      return (
+        <div className="text-center py-12">
+          <div className="text-red-500 font-semibold mb-2">Error loading profit data</div>
+          <div className="text-sm text-slate-600">
+            {profitError.response?.data?.message || profitError.message}
+          </div>
+          {profitError.response?.status === 403 && (
+            <div className="mt-4 text-sm text-orange-600">
+              You need Manager or Admin permissions to view reports
+            </div>
+          )}
+        </div>
+      );
+    }
+    if (!profitData) return null;
 
     const profitTrendData = {
-      labels: financialData.monthlyTrends.months,
+      labels: profitData.groupedData?.map(t => t.period) || [],
       datasets: [
         {
           label: 'Revenue',
-          data: financialData.monthlyTrends.revenue,
+          data: profitData.groupedData?.map(t => t.revenue || 0) || [],
           borderColor: 'rgb(59, 130, 246)',
           backgroundColor: 'rgba(59, 130, 246, 0.1)',
           fill: true
         },
         {
-          label: 'Expenses',
-          data: financialData.monthlyTrends.expenses,
+          label: 'Cost',
+          data: profitData.groupedData?.map(t => t.cost || 0) || [],
           borderColor: 'rgb(245, 101, 101)',
           backgroundColor: 'rgba(245, 101, 101, 0.1)',
           fill: true
         },
         {
           label: 'Profit',
-          data: financialData.monthlyTrends.profit,
+          data: profitData.groupedData?.map(t => t.netProfit || 0) || [],
           borderColor: 'rgb(16, 185, 129)',
           backgroundColor: 'rgba(16, 185, 129, 0.1)',
           fill: true
@@ -472,106 +879,139 @@ function EnhancedReports() {
         {/* Financial KPIs */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <StatCard
-            title="Gross Profit Margin"
-            value={`${financialData.profitability.grossProfitMargin}%`}
-            change="+1.2%"
-            trend="up"
-            icon={SparklesIcon}
+            title="Total Revenue"
+            value={profitData.summary?.totalRevenue || 0}
+            format="currency"
+            icon={CurrencyDollarIcon}
             color="green"
           />
           <StatCard
-            title="Operating Margin"
-            value={`${financialData.profitability.operatingMargin}%`}
-            change="+0.8%"
-            trend="up"
-            icon={ChartBarIcon}
+            title="Gross Profit"
+            value={profitData.summary?.grossProfit || 0}
+            format="currency"
+            icon={ArrowTrendingUpIcon}
             color="blue"
           />
           <StatCard
-            title="ROA"
-            value={`${financialData.profitability.returnOnAssets}%`}
-            change="+2.1%"
-            trend="up"
-            icon={PresentationChartLineIcon}
+            title="Net Profit"
+            value={profitData.summary?.netProfit || 0}
+            format="currency"
+            icon={SparklesIcon}
             color="purple"
           />
           <StatCard
-            title="ROE"
-            value={`${financialData.profitability.returnOnEquity}%`}
-            change="+3.5%"
-            trend="up"
-            icon={ArrowTrendingUpIcon}
+            title="Profit Margin"
+            value={(profitData.summary?.averageMargin || 0).toFixed(1)}
+            format="percentage"
+            icon={ChartBarIcon}
             color="orange"
           />
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-6">
-          {/* Cash Flow Analysis */}
-          <Card className="p-6">
-            <h3 className="text-lg font-medium mb-6">Cash Flow Analysis</h3>
-            <Bar data={cashFlowData} options={{
-              responsive: true,
-              plugins: {
-                legend: { display: false }
-              },
-              scales: {
-                y: {
-                  ticks: {
-                    callback: function(value) {
-                      return '₹' + value.toLocaleString();
+        <div className="grid grid-cols-1 gap-4 sm:gap-6">
+          {/* Profit Trends */}
+          <Card className="p-4 sm:p-6">
+            <h3 className="text-base sm:text-lg font-medium mb-4 sm:mb-6">Revenue, Cost & Profit Trends</h3>
+            {profitTrendData.labels.length > 0 ? (
+              <div className="h-64 sm:h-72 md:h-80 lg:h-96">
+                <Line data={profitTrendData} options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: { 
+                      position: 'top',
+                      labels: {
+                        boxWidth: 12,
+                        padding: 10,
+                        font: { size: 11 }
+                      }
+                    },
+                    title: { display: false }
+                  },
+                  scales: {
+                    y: {
+                      beginAtZero: true,
+                      ticks: {
+                        font: { size: 10 },
+                        callback: function(value) {
+                          return '₹' + value.toLocaleString('en-IN');
+                        }
+                      }
+                    },
+                    x: {
+                      ticks: {
+                        font: { size: 10 },
+                        maxRotation: 45,
+                        minRotation: 0
+                      }
                     }
                   }
-                }
-              }
-            }} />
-          </Card>
-
-          {/* Monthly Profit Trends */}
-          <Card className="p-6">
-            <h3 className="text-lg font-medium mb-6">Monthly Profit Trends</h3>
-            <Line data={profitTrendData} options={{
-              responsive: true,
-              plugins: {
-                legend: { position: 'top' }
-              },
-              scales: {
-                y: {
-                  ticks: {
-                    callback: function(value) {
-                      return '₹' + value.toLocaleString();
-                    }
-                  }
-                }
-              }
-            }} />
+                }} />
+              </div>
+            ) : (
+              <div className="text-center py-8 text-slate-500 text-sm">No trend data available</div>
+            )}
           </Card>
         </div>
 
-        {/* Expense Breakdown */}
-        <Card className="p-6">
-          <h3 className="text-lg font-medium mb-4">Expense Breakdown</h3>
-          <div className="space-y-4">
-            {financialData.expenses.map((expense, index) => (
-              <div key={index} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                <div>
-                  <span className="font-medium">{expense.category}</span>
-                  <div className="text-sm text-slate-600 dark:text-slate-400">
-                    {expense.percentage}% of total
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="font-bold">₹{expense.amount.toLocaleString()}</div>
-                  <div className="w-32 bg-slate-200 dark:bg-slate-600 rounded-full h-2 mt-1">
-                    <div 
-                      className="bg-blue-600 h-2 rounded-full" 
-                      style={{ width: `${expense.percentage}%` }}
-                    ></div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
+        {/* Top Profitable Sales */}
+        {profitData.details && profitData.details.length > 0 && (
+          <Card className="p-4 sm:p-6">
+            <h3 className="text-base sm:text-lg font-medium mb-3 sm:mb-4">Recent Profitable Sales</h3>
+            <div className="overflow-x-auto -mx-2 sm:mx-0">
+              <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+                <thead className="bg-slate-50 dark:bg-slate-800">
+                  <tr>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Date
+                    </th>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Revenue
+                    </th>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Cost
+                    </th>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Gross Profit
+                    </th>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Net Profit
+                    </th>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Margin
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-slate-900 divide-y divide-slate-200 dark:divide-slate-700">
+                  {profitData.details.slice(0, 10).map((sale, index) => (
+                    <tr key={index}>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-slate-900 dark:text-slate-100">
+                        {new Date(sale.date).toLocaleDateString('en-IN')}
+                      </td>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-slate-900 dark:text-slate-100">
+                        ₹{(sale.totalRevenue || 0).toLocaleString('en-IN')}
+                      </td>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-slate-900 dark:text-slate-100">
+                        ₹{(sale.totalCost || 0).toLocaleString('en-IN')}
+                      </td>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-slate-900 dark:text-slate-100">
+                        ₹{(sale.grossProfit || 0).toLocaleString('en-IN')}
+                      </td>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-slate-900 dark:text-slate-100">
+                        ₹{(sale.netProfit || 0).toLocaleString('en-IN')}
+                      </td>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
+                        <Badge variant={(sale.profitMargin || 0) > 20 ? 'success' : 'warning'} className="text-xs">
+                          {(sale.profitMargin || 0).toFixed(1)}%
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
       </div>
     );
   };
@@ -579,107 +1019,166 @@ function EnhancedReports() {
   // Inventory Analytics Tab
   const InventoryAnalyticsTab = () => {
     if (inventoryLoading) return <LoadingSpinner />;
+    if (inventoryError) {
+      return (
+        <div className="text-center py-12">
+          <div className="text-red-500 font-semibold mb-2">Error loading inventory data</div>
+          <div className="text-sm text-slate-600">
+            {inventoryError.response?.data?.message || inventoryError.message}
+          </div>
+          {inventoryError.response?.status === 403 && (
+            <div className="mt-4 text-sm text-orange-600">
+              You need Manager or Admin permissions to view reports
+            </div>
+          )}
+        </div>
+      );
+    }
     if (!inventoryData) return null;
-
-    const turnoverData = {
-      labels: inventoryData.turnoverAnalysis.map(item => item.product),
-      datasets: [{
-        label: 'Turnover Rate',
-        data: inventoryData.turnoverAnalysis.map(item => item.turnover),
-        backgroundColor: inventoryData.turnoverAnalysis.map(item => 
-          item.status === 'fast' ? 'rgba(16, 185, 129, 0.8)' : 'rgba(245, 101, 101, 0.8)'
-        )
-      }]
-    };
-
-    const agingData = {
-      labels: ['0-30 Days', '31-60 Days', '61-90 Days', '90+ Days'],
-      datasets: [{
-        label: 'Value',
-        data: [
-          inventoryData.agingAnalysis['0-30'].value,
-          inventoryData.agingAnalysis['31-60'].value,
-          inventoryData.agingAnalysis['61-90'].value,
-          inventoryData.agingAnalysis['90+'].value
-        ],
-        backgroundColor: [
-          'rgba(16, 185, 129, 0.8)',
-          'rgba(251, 191, 36, 0.8)',
-          'rgba(245, 158, 11, 0.8)',
-          'rgba(245, 101, 101, 0.8)'
-        ]
-      }]
-    };
 
     return (
       <div className="space-y-6">
         {/* Inventory KPIs */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <StatCard
-            title="Total Value"
-            value={`₹${inventoryData.overview.totalValue.toLocaleString()}`}
-            change="+5.2%"
-            trend="up"
+            title="Total Products"
+            value={inventoryData.summary?.totalProducts || 0}
             icon={CubeIcon}
             color="blue"
           />
           <StatCard
-            title="Turnover Rate"
-            value={`${inventoryData.overview.turnoverRate}x`}
-            change="+0.8"
-            trend="up"
-            icon={ArrowPathIcon}
+            title="Total Value"
+            value={inventoryData.summary?.totalStockValue || 0}
+            format="currency"
+            icon={CurrencyDollarIcon}
             color="green"
           />
           <StatCard
-            title="Dead Stock"
-            value={`₹${inventoryData.overview.deadStock.toLocaleString()}`}
-            change="-12%"
-            trend="down"
+            title="Low Stock Items"
+            value={inventoryData.summary?.lowStockProducts || 0}
             icon={ExclamationCircleIcon}
-            color="red"
+            color="orange"
           />
           <StatCard
             title="Out of Stock"
-            value={inventoryData.overview.outOfStock}
-            change="-3"
-            trend="down"
-            icon={CubeIcon}
-            color="orange"
+            value={inventoryData.summary?.outOfStockProducts || 0}
+            icon={ExclamationCircleIcon}
+            color="red"
           />
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-6">
-          {/* Turnover Analysis */}
-          <Card className="p-6">
-            <h3 className="text-lg font-medium mb-6">Inventory Turnover</h3>
-            <Bar data={turnoverData} options={{
-              responsive: true,
-              plugins: {
-                legend: { display: false }
-              },
-              scales: {
-                y: {
-                  title: {
-                    display: true,
-                    text: 'Turnover Rate'
-                  }
-                }
-              }
-            }} />
+        {/* Category Stock Distribution */}
+        {inventoryData.categoryWise && Object.keys(inventoryData.categoryWise).length > 0 && (
+          <Card className="p-4 sm:p-6">
+            <h3 className="text-base sm:text-lg font-medium mb-3 sm:mb-4">Stock by Category (Click to filter)</h3>
+            <div className="space-y-2 sm:space-y-3">
+              {Object.entries(inventoryData.categoryWise).map(([categoryName, data]) => {
+                // Find the category ID from categoriesData
+                const categoryObj = categoriesData?.find(cat => cat.name === categoryName);
+                const isActive = filters.category === categoryObj?._id;
+                
+                return (
+                  <button
+                    key={categoryName}
+                    onClick={() => {
+                      if (categoryObj) {
+                        setFilters(prev => ({
+                          ...prev,
+                          category: isActive ? '' : categoryObj._id
+                        }));
+                      }
+                    }}
+                    className={`w-full flex items-center justify-between p-3 sm:p-4 rounded-lg transition-all text-left ${
+                      isActive 
+                        ? 'bg-blue-100 dark:bg-blue-900/30 ring-2 ring-blue-500' 
+                        : 'bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700'
+                    }`}
+                    disabled={!categoryObj}
+                  >
+                    <div className="flex-1 min-w-0 pr-3">
+                      <div className={`font-medium text-sm sm:text-base truncate ${isActive ? 'text-blue-700 dark:text-blue-300' : ''}`}>
+                        {categoryName}
+                      </div>
+                      <div className="text-xs sm:text-sm text-slate-500 mt-1">
+                        {data.productCount || 0} products | Total: {data.totalStock || 0} units
+                      </div>
+                      {(data.lowStockCount > 0 || data.outOfStockCount > 0) && (
+                        <div className="text-xs text-orange-600 mt-1">
+                          {data.lowStockCount > 0 && `${data.lowStockCount} low stock`}
+                          {data.lowStockCount > 0 && data.outOfStockCount > 0 && ' | '}
+                          {data.outOfStockCount > 0 && `${data.outOfStockCount} out of stock`}
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <div className={`font-bold text-sm sm:text-base ${isActive ? 'text-blue-700 dark:text-blue-300' : ''}`}>
+                        ₹{(data.stockValue || 0).toLocaleString('en-IN')}
+                      </div>
+                      {isActive && (
+                        <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                          ✓ Filtered
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </Card>
+        )}
 
-          {/* Aging Analysis */}
-          <Card className="p-6">
-            <h3 className="text-lg font-medium mb-6">Inventory Aging</h3>
-            <Doughnut data={agingData} options={{
-              responsive: true,
-              plugins: {
-                legend: { position: 'bottom' }
-              }
-            }} />
+        {/* Low Stock Products */}
+        {inventoryData.products && inventoryData.products.filter(p => p.isLowStock || p.isOutOfStock).length > 0 && (
+          <Card className="p-4 sm:p-6">
+            <h3 className="text-base sm:text-lg font-medium mb-3 sm:mb-4">Low Stock Alert</h3>
+            <div className="overflow-x-auto -mx-2 sm:mx-0">
+              <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+                <thead className="bg-slate-50 dark:bg-slate-800">
+                  <tr>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Product
+                    </th>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      SKU
+                    </th>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Current Stock
+                    </th>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Reorder Point
+                    </th>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-slate-900 divide-y divide-slate-200 dark:divide-slate-700">
+                  {inventoryData.products.filter(p => p.isLowStock || p.isOutOfStock).slice(0, 10).map((product, index) => (
+                    <tr key={index}>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100">
+                        {product.productName || 'Unknown'}
+                      </td>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+                        {product.sku || '-'}
+                      </td>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-slate-900 dark:text-slate-100">
+                        {product.totalStock || 0}
+                      </td>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-slate-900 dark:text-slate-100">
+                        {product.reorderPoint || 0}
+                      </td>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
+                        <Badge variant={product.isOutOfStock ? 'error' : 'warning'} className="text-xs">
+                          {product.isOutOfStock ? 'Out of Stock' : 'Low Stock'}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </Card>
-        </div>
+        )}
       </div>
     );
   };
@@ -687,28 +1186,22 @@ function EnhancedReports() {
   // Customer Analytics Tab
   const CustomerAnalyticsTab = () => {
     if (customerLoading) return <LoadingSpinner />;
+    if (customerError) {
+      return (
+        <div className="text-center py-12">
+          <div className="text-red-500 font-semibold mb-2">Error loading customer data</div>
+          <div className="text-sm text-slate-600">
+            {customerError.response?.data?.message || customerError.message}
+          </div>
+          {customerError.response?.status === 403 && (
+            <div className="mt-4 text-sm text-orange-600">
+              You need Manager or Admin permissions to view reports
+            </div>
+          )}
+        </div>
+      );
+    }
     if (!customerData) return null;
-
-    const customerTrendsData = {
-      labels: customerData.trends.labels,
-      datasets: [
-        {
-          label: 'New Customers',
-          data: customerData.trends.acquisition,
-          borderColor: 'rgb(59, 130, 246)',
-          backgroundColor: 'rgba(59, 130, 246, 0.1)',
-          fill: true
-        },
-        {
-          label: 'Retention Rate (%)',
-          data: customerData.trends.retention,
-          borderColor: 'rgb(16, 185, 129)',
-          backgroundColor: 'rgba(16, 185, 129, 0.1)',
-          fill: true,
-          yAxisID: 'y1'
-        }
-      ]
-    };
 
     return (
       <div className="space-y-6">
@@ -716,88 +1209,111 @@ function EnhancedReports() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <StatCard
             title="Total Customers"
-            value={customerData.overview.totalCustomers.toLocaleString()}
-            change="+15%"
-            trend="up"
+            value={customerData.summary?.totalCustomers || 0}
             icon={UsersIcon}
             color="blue"
           />
           <StatCard
-            title="New Customers"
-            value={customerData.overview.newCustomers}
-            change="+22%"
-            trend="up"
+            title="Registered"
+            value={customerData.summary?.registeredCustomers || 0}
             icon={UsersIcon}
             color="green"
           />
           <StatCard
-            title="Retention Rate"
-            value={`${customerData.overview.retentionRate}%`}
-            change="+3%"
-            trend="up"
-            icon={ChartBarIcon}
+            title="Avg Order Value"
+            value={customerData.summary?.averageOrderValue || 0}
+            format="currency"
+            icon={CurrencyDollarIcon}
             color="purple"
           />
           <StatCard
-            title="Avg LTV"
-            value={`₹${customerData.overview.avgLifetimeValue}`}
-            change="+8%"
-            trend="up"
-            icon={CurrencyDollarIcon}
+            title="Total Revenue"
+            value={customerData.summary?.totalRevenue || 0}
+            format="currency"
+            icon={ChartBarIcon}
             color="orange"
           />
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-6">
-          {/* Customer Trends */}
-          <Card className="p-6">
-            <h3 className="text-lg font-medium mb-6">Customer Trends</h3>
-            <Line data={customerTrendsData} options={{
-              responsive: true,
-              plugins: {
-                legend: { position: 'top' }
-              },
-              scales: {
-                y: {
-                  type: 'linear',
-                  display: true,
-                  position: 'left'
-                },
-                y1: {
-                  type: 'linear',
-                  display: true,
-                  position: 'right',
-                  grid: {
-                    drawOnChartArea: false
-                  }
-                }
-              }
-            }} />
-          </Card>
-
-          {/* Customer Segments */}
-          <Card className="p-6">
-            <h3 className="text-lg font-medium mb-6">Customer Segments</h3>
-            <div className="space-y-4">
-              {customerData.segments.map((segment, index) => (
-                <div key={index} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                  <div>
-                    <span className="font-medium">{segment.segment}</span>
-                    <div className="text-sm text-slate-600 dark:text-slate-400">
-                      {segment.count} customers
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-bold">₹{segment.revenue.toLocaleString()}</div>
-                    <div className="text-sm text-slate-600 dark:text-slate-400">
-                      Avg: ₹{segment.avgOrder}
-                    </div>
-                  </div>
-                </div>
-              ))}
+        {/* Customer Segmentation */}
+        {customerData.summary?.segmentation && (
+          <Card className="p-4 sm:p-6">
+            <h3 className="text-base sm:text-lg font-medium mb-3 sm:mb-4">Customer Segmentation</h3>
+            <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              <div className="p-3 sm:p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                <div className="text-xs sm:text-sm text-purple-600 dark:text-purple-400">VIP Customers</div>
+                <div className="text-xl sm:text-2xl font-bold mt-1">{customerData.summary.segmentation.vip || 0}</div>
+                <div className="text-xs text-slate-500 mt-1">Spent &gt; ₹10,000</div>
+              </div>
+              <div className="p-3 sm:p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <div className="text-xs sm:text-sm text-blue-600 dark:text-blue-400">Loyal Customers</div>
+                <div className="text-xl sm:text-2xl font-bold mt-1">{customerData.summary.segmentation.loyal || 0}</div>
+                <div className="text-xs text-slate-500 mt-1">10+ purchases</div>
+              </div>
+              <div className="p-3 sm:p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                <div className="text-xs sm:text-sm text-green-600 dark:text-green-400">Regular Customers</div>
+                <div className="text-xl sm:text-2xl font-bold mt-1">{customerData.summary.segmentation.regular || 0}</div>
+                <div className="text-xs text-slate-500 mt-1">3-9 purchases</div>
+              </div>
+              <div className="p-3 sm:p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                <div className="text-xs sm:text-sm text-orange-600 dark:text-orange-400">Occasional</div>
+                <div className="text-xl sm:text-2xl font-bold mt-1">{customerData.summary.segmentation.occasional || 0}</div>
+                <div className="text-xs text-slate-500 mt-1">&lt; 3 purchases</div>
+              </div>
             </div>
           </Card>
-        </div>
+        )}
+
+        {/* Top Customers */}
+        {customerData.topCustomers && customerData.topCustomers.length > 0 && (
+          <Card className="p-4 sm:p-6">
+            <h3 className="text-base sm:text-lg font-medium mb-3 sm:mb-4">Top Customers</h3>
+            <div className="overflow-x-auto -mx-2 sm:mx-0">
+              <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+                <thead className="bg-slate-50 dark:bg-slate-800">
+                  <tr>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Customer
+                    </th>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Total Purchases
+                    </th>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Total Spent
+                    </th>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Avg Order
+                    </th>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Preferred Payment
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-slate-900 divide-y divide-slate-200 dark:divide-slate-700">
+                  {customerData.topCustomers.slice(0, 10).map((customer, index) => (
+                    <tr key={index}>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100">
+                        {customer.customer?.name || 'Walk-in Customer'}
+                      </td>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-slate-900 dark:text-slate-100">
+                        {customer.totalPurchases || 0}
+                      </td>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-slate-900 dark:text-slate-100">
+                        ₹{(customer.totalSpent || 0).toLocaleString('en-IN')}
+                      </td>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-slate-900 dark:text-slate-100">
+                        ₹{(customer.averageOrderValue || 0).toLocaleString('en-IN')}
+                      </td>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
+                        <Badge className="text-xs">{customer.mostPreferredPayment || 'N/A'}</Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
       </div>
     );
   };
@@ -818,95 +1334,113 @@ function EnhancedReports() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 pb-6">
       <PageHeader
         title="Advanced Reports & Analytics"
         description="Comprehensive business intelligence and performance insights"
       >
-        <div className="flex items-center gap-3">
-          <Button variant="outline" onClick={() => setShowExportModal(true)}>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
+          <Button 
+            variant="outline" 
+            onClick={() => setShowExportModal(true)}
+            className="w-full sm:w-auto"
+          >
             <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
-            Export
+            <span className="hidden xs:inline">Export</span>
+            <span className="xs:hidden">Export</span>
           </Button>
-          <Button variant="primary">
+          <Button 
+            variant="primary" 
+            onClick={handleRefreshData}
+            className="w-full sm:w-auto"
+          >
             <ArrowPathIcon className="h-4 w-4 mr-2" />
-            Refresh Data
+            <span className="hidden xs:inline">Refresh Data</span>
+            <span className="xs:hidden">Refresh</span>
           </Button>
         </div>
       </PageHeader>
 
       {/* Filters */}
-      <Card className="p-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <Card className="p-4 sm:p-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 sm:mb-2">
               Start Date
             </label>
             <Input
               type="date"
               value={dateRange.startDate}
               onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
+              className="text-sm"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 sm:mb-2">
               End Date
             </label>
             <Input
               type="date"
               value={dateRange.endDate}
               onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
+              className="text-sm"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 sm:mb-2">
               Branch
             </label>
             <select
               value={filters.branch}
               onChange={(e) => setFilters(prev => ({ ...prev, branch: e.target.value }))}
-              className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700"
+              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700"
             >
               <option value="">All Branches</option>
-              <option value="main">Main Branch</option>
-              <option value="downtown">Downtown</option>
+              {branchesData?.branches?.map(branch => (
+                <option key={branch._id} value={branch._id}>
+                  {branch.name}
+                </option>
+              ))}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 sm:mb-2">
               Category
             </label>
             <select
               value={filters.category}
               onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))}
-              className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700"
+              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700"
             >
               <option value="">All Categories</option>
-              <option value="beverages">Beverages</option>
-              <option value="snacks">Snacks</option>
+              {categoriesData?.map(category => (
+                <option key={category._id} value={category._id}>
+                  {category.name}
+                </option>
+              ))}
             </select>
           </div>
         </div>
       </Card>
 
       {/* Navigation Tabs */}
-      <div className="border-b border-slate-200 dark:border-slate-700">
-        <nav className="-mb-px flex space-x-8">
+      <div className="border-b border-slate-200 dark:border-slate-700 overflow-x-auto">
+        <nav className="-mb-px flex space-x-4 sm:space-x-8 min-w-max px-1">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                className={`py-2 sm:py-3 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${
                   activeTab === tab.id
                     ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                     : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-300'
                 }`}
               >
-                <div className="flex items-center gap-2">
-                  <Icon className="h-4 w-4" />
-                  {tab.label}
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <span className="hidden sm:inline">{tab.label}</span>
                 </div>
               </button>
             );
@@ -942,7 +1476,7 @@ function ExportModal({ isOpen, onClose, onExport }) {
   const [includeCharts, setIncludeCharts] = useState(true);
 
   const handleExport = () => {
-    onExport(exportType);
+    onExport(exportType, includeCharts);
   };
 
   return (
