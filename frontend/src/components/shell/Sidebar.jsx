@@ -13,47 +13,69 @@ import {
 } from '@heroicons/react/24/outline';
 import { Badge } from '../ui/Badge';
 import { cn } from '../../utils/cn';
+import { usePermission } from '../../hooks/usePermission';
+import { PERMISSIONS } from '../../../../shared/permissions';
 
-const navigation = [
+const navigationItems = [
   { 
     name: 'Dashboard', 
     href: '/', 
     icon: HomeIcon,
-    description: 'Overview and analytics'
+    description: 'Overview and analytics',
+    permission: PERMISSIONS.DASHBOARD.READ
   },
   { 
     name: 'Products', 
     href: '/products', 
     icon: CubeIcon,
-    description: 'Manage inventory'
+    description: 'Manage inventory',
+    permission: PERMISSIONS.PRODUCTS.READ
   },
   { 
     name: 'Sales', 
     href: '/sales', 
     icon: ShoppingCartIcon,
-    description: 'Record transactions'
+    description: 'Record transactions',
+    permissions: [PERMISSIONS.SALES.READ, PERMISSIONS.SALES.CREATE] // ANY
   },
   { 
     name: 'Inventory', 
     href: '/inventory', 
     icon: ArchiveBoxIcon,
-    description: 'Stock operations'
+    description: 'Stock operations',
+    permission: PERMISSIONS.INVENTORY.READ
   },
   { 
     name: 'Reports', 
     href: '/reports', 
     icon: ChartBarIcon,
-    description: 'Business insights'
+    description: 'Business insights',
+    permission: PERMISSIONS.REPORTS.READ
   },
   { 
     name: 'Settings', 
     href: '/settings', 
     icon: Cog6ToothIcon,
-    description: 'System configuration'
+    description: 'System configuration',
+    permission: PERMISSIONS.PROFILE.READ // Everyone can access their profile
   },
 ];
 
 const Sidebar = ({ isOpen, onClose, lowStockCount = 0, onLogout }) => {
+  const { hasPermission, hasAnyPermission } = usePermission();
+
+  // Filter navigation items based on user permissions
+  const navigation = navigationItems.filter(item => {
+    if (item.permission) {
+      return hasPermission(item.permission);
+    }
+    if (item.permissions && Array.isArray(item.permissions)) {
+      return hasAnyPermission(item.permissions);
+    }
+    // If no permission specified, show item
+    return true;
+  });
+
   return (
     <>
       {/* Mobile overlay - with better backdrop */}

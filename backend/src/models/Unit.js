@@ -67,7 +67,7 @@ unitSchema.methods.convertTo = function(targetUnit, value) {
   if (this.type !== targetUnit.type) {
     throw new Error('Cannot convert between different unit types');
   }
-  
+
   // Convert to base unit first, then to target unit
   const baseValue = value * this.conversionFactor;
   return baseValue / targetUnit.conversionFactor;

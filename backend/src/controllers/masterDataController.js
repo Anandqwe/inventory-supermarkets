@@ -12,7 +12,7 @@ const { validationResult } = require('express-validator');
  */
 class MasterDataController {
   // ============ CATEGORY OPERATIONS ============
-  
+
   /**
    * Create new category
    */
@@ -181,11 +181,11 @@ class MasterDataController {
 
       // Check code uniqueness if changing
       if (updateData.code && updateData.code !== category.code) {
-        const existingCategory = await Category.findOne({ 
-          code: updateData.code, 
-          _id: { $ne: id } 
+        const existingCategory = await Category.findOne({
+          code: updateData.code,
+          _id: { $ne: id }
         });
-        
+
         if (existingCategory) {
           return res.status(409).json({
             success: false,
@@ -375,7 +375,7 @@ class MasterDataController {
 
       // Pagination
       const skip = (parseInt(page) - 1) * parseInt(limit);
-      
+
       // Sort
       const sort = {};
       sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
@@ -428,11 +428,11 @@ class MasterDataController {
 
       // Check code uniqueness if changing
       if (updateData.code && updateData.code !== brand.code) {
-        const existingBrand = await Brand.findOne({ 
-          code: updateData.code, 
-          _id: { $ne: id } 
+        const existingBrand = await Brand.findOne({
+          code: updateData.code,
+          _id: { $ne: id }
         });
-        
+
         if (existingBrand) {
           return res.status(409).json({
             success: false,
@@ -612,7 +612,7 @@ class MasterDataController {
 
       // Pagination
       const skip = (parseInt(page) - 1) * parseInt(limit);
-      
+
       // Sort
       const sort = {};
       sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
@@ -666,11 +666,11 @@ class MasterDataController {
 
       // Check symbol uniqueness if changing
       if (updateData.symbol && updateData.symbol !== unit.symbol) {
-        const existingUnit = await Unit.findOne({ 
-          symbol: updateData.symbol, 
-          _id: { $ne: id } 
+        const existingUnit = await Unit.findOne({
+          symbol: updateData.symbol,
+          _id: { $ne: id }
         });
-        
+
         if (existingUnit) {
           return res.status(409).json({
             success: false,
@@ -846,7 +846,7 @@ class MasterDataController {
 
       // Pagination
       const skip = (parseInt(page) - 1) * parseInt(limit);
-      
+
       // Sort
       const sort = {};
       sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
@@ -899,11 +899,11 @@ class MasterDataController {
 
       // Check code uniqueness if changing
       if (updateData.code && updateData.code !== supplier.code) {
-        const existingSupplier = await Supplier.findOne({ 
-          code: updateData.code, 
-          _id: { $ne: id } 
+        const existingSupplier = await Supplier.findOne({
+          code: updateData.code,
+          _id: { $ne: id }
         });
-        
+
         if (existingSupplier) {
           return res.status(409).json({
             success: false,
@@ -1094,7 +1094,7 @@ class MasterDataController {
 
       // Pagination
       const skip = (parseInt(page) - 1) * parseInt(limit);
-      
+
       // Sort
       const sort = {};
       sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
@@ -1156,11 +1156,11 @@ class MasterDataController {
 
       // Check code uniqueness if changing
       if (updateData.code && updateData.code !== branch.code) {
-        const existingBranch = await Branch.findOne({ 
-          code: updateData.code, 
-          _id: { $ne: id } 
+        const existingBranch = await Branch.findOne({
+          code: updateData.code,
+          _id: { $ne: id }
         });
-        
+
         if (existingBranch) {
           return res.status(409).json({
             success: false,

@@ -126,7 +126,7 @@ function generateSKU(category, index) {
 function calculatePricing(costPrice, marginPercent, gstRate) {
   const sellingPrice = Math.round(costPrice * (1 + marginPercent / 100));
   const mrp = Math.round(sellingPrice * 1.05); // MRP is 5% above selling price
-  
+
   return {
     costPrice: parseFloat(costPrice.toFixed(2)),
     sellingPrice: parseFloat(sellingPrice.toFixed(2)),
@@ -141,31 +141,31 @@ function generateProductsForCategory(categoryData, brands, templates, startIndex
   const products = [];
   const { name, gstRate, productCount } = categoryData;
   const categoryTemplates = templates[name] || [];
-  
+
   let productIndex = 0;
-  
+
   while (products.length < productCount && categoryTemplates.length > 0) {
     for (const template of categoryTemplates) {
       if (products.length >= productCount) break;
-      
+
       const { prefix, suffixes, sizes } = template;
-      
+
       for (const suffix of suffixes) {
         if (products.length >= productCount) break;
-        
+
         for (const size of sizes) {
           if (products.length >= productCount) break;
-          
+
           const fullName = size ? `${prefix} ${suffix} ${size}`.trim() : `${prefix} ${suffix}`.trim();
           const sku = generateSKU(name, startIndex + productIndex);
-          
+
           // Random cost price between ₹10 and ₹500
           const baseCost = Math.floor(Math.random() * (500 - 10 + 1)) + 10;
           // Profit margin between 15% and 35%
           const margin = Math.floor(Math.random() * (35 - 15 + 1)) + 15;
-          
+
           const pricing = calculatePricing(baseCost, margin, gstRate);
-          
+
           products.push({
             name: fullName,
             sku: sku,
@@ -174,18 +174,18 @@ function generateProductsForCategory(categoryData, brands, templates, startIndex
             isPerishable: ['Dairy', 'Frozen Foods'].includes(name),
             tags: [name.toLowerCase(), prefix.toLowerCase()]
           });
-          
+
           productIndex++;
         }
       }
     }
-    
+
     // If we haven't reached productCount, loop through templates again with variations
     if (products.length < productCount) {
       break; // Prevent infinite loop
     }
   }
-  
+
   return products;
 }
 
@@ -198,7 +198,7 @@ const seedProductsRealistic = async () => {
     if (existingProducts > 0) {
       console.log('⚠️  Warning: Products already exist in database');
       console.log(`📊 Found ${existingProducts} existing products\n`);
-      
+
       const readline = require('readline').createInterface({
         input: process.stdin,
         output: process.stdout
@@ -207,7 +207,7 @@ const seedProductsRealistic = async () => {
       const answer = await new Promise(resolve => {
         readline.question('❓ Do you want to DELETE all existing products and create new ones? (yes/no): ', resolve);
       });
-      
+
       readline.close();
 
       if (answer.toLowerCase() !== 'yes') {
@@ -222,16 +222,16 @@ const seedProductsRealistic = async () => {
 
     // Get or create categories
     console.log('📂 Setting up categories...');
-    
+
     // Get system admin for createdBy
     const User = require('../src/models/User');
-    let systemUser = await User.findOne({ role: 'Admin' }).limit(1);
+    const systemUser = await User.findOne({ role: 'Admin' }).limit(1);
     if (!systemUser) {
       console.log('⚠️  No admin user found! Please run seed:users first.');
       process.exit(1);
     }
     console.log(`👤 Using admin: ${systemUser.email}\n`);
-    
+
     const categoryMap = {};
     for (const catData of indianCategories) {
       // Generate category code from name (e.g., "Beverages" -> "BEV")
@@ -242,7 +242,7 @@ const seedProductsRealistic = async () => {
         .toUpperCase()
         .replace(/[^A-Z0-9]/g, '')
         .substring(0, 6);
-      
+
       let category = await Category.findOne({ code: categoryCode });
       if (!category) {
         category = await Category.create({
@@ -264,14 +264,14 @@ const seedProductsRealistic = async () => {
     const brandMap = {};
     const allBrands = new Set();
     Object.values(indianBrands).forEach(brands => brands.forEach(b => allBrands.add(b)));
-    
+
     for (const brandName of allBrands) {
       // Generate brand code (e.g., "Coca-Cola" -> "COCACOLA" -> "COCACO")
       const brandCode = brandName
         .replace(/[^A-Za-z0-9]/g, '')
         .toUpperCase()
         .substring(0, 6);
-      
+
       let brand = await Brand.findOne({ code: brandCode });
       if (!brand) {
         brand = await Brand.create({
@@ -297,7 +297,7 @@ const seedProductsRealistic = async () => {
       { name: 'piece', code: 'PCS', symbol: 'pcs', type: 'count' },
       { name: 'pack', code: 'PACK', symbol: 'pack', type: 'count' }
     ];
-    
+
     for (const unitData of unitsData) {
       let unit = await Unit.findOne({ code: unitData.code });
       if (!unit) {
@@ -344,7 +344,7 @@ const seedProductsRealistic = async () => {
 
     for (const categoryData of indianCategories) {
       console.log(`📦 Creating ${categoryData.productCount} products for ${categoryData.name}...`);
-      
+
       const categoryProducts = generateProductsForCategory(
         categoryData,
         indianBrands[categoryData.name],
@@ -358,9 +358,9 @@ const seedProductsRealistic = async () => {
         product.unit = unitMap['pcs']; // Default unit (piece)
         product.supplier = supplier._id;
         product.createdBy = systemUser._id;
-        
+
         // Try to match brand from product name
-        const matchedBrand = indianBrands[categoryData.name]?.find(b => 
+        const matchedBrand = indianBrands[categoryData.name]?.find(b =>
           product.name.toLowerCase().includes(b.toLowerCase())
         );
         if (matchedBrand) {
@@ -374,7 +374,7 @@ const seedProductsRealistic = async () => {
         totalProducts += categoryProducts.length;
         console.log(`✅ Created ${categoryProducts.length} ${categoryData.name} products`);
       }
-      
+
       startIndex += categoryData.productCount;
     }
 
@@ -403,7 +403,7 @@ const seedProductsRealistic = async () => {
 // Run if called directly
 if (require.main === module) {
   const database = require('../src/config/database');
-  
+
   database.connect()
     .then(async () => {
       await seedProductsRealistic();

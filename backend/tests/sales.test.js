@@ -9,7 +9,7 @@ describe('Sales API', () => {
   beforeEach(async () => {
     // Create a test branch first
     const testBranch = await global.testHelpers.createTestBranch();
-    
+
     // Create test users
     adminUser = await global.testHelpers.createTestUser({
       email: `admin-${Date.now()}@example.com`,
@@ -63,7 +63,7 @@ describe('Sales API', () => {
 
       // Verify stock was reduced
       const updatedProduct = await Product.findById(testProduct._id);
-      const branchStock = updatedProduct.stockByBranch.find(stock => 
+      const branchStock = updatedProduct.stockByBranch.find(stock =>
         stock.branch.toString() === testProduct.stockByBranch[0].branch.toString()
       );
       expect(branchStock.quantity).toBe(98);
@@ -184,7 +184,7 @@ describe('Sales API', () => {
 
     it('should support date range filtering', async () => {
       const today = new Date().toISOString().split('T')[0];
-      
+
       const response = await request(app)
         .get(`/api/sales?startDate=${today}&endDate=${today}`)
         .set('Authorization', `Bearer ${adminToken}`)
@@ -263,7 +263,7 @@ describe('Sales API', () => {
 
       // Verify stock was restored
       const updatedProduct = await Product.findById(testProduct._id);
-      const branchStock = updatedProduct.stockByBranch.find(stock => 
+      const branchStock = updatedProduct.stockByBranch.find(stock =>
         stock.branch.toString() === cashierUser.branch.toString()
       );
       expect(branchStock.quantity).toBe(100); // Original 100 - 2 sold + 2 refunded

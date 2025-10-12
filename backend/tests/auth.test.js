@@ -6,9 +6,9 @@ describe('Auth Endpoints', () => {
   describe('POST /api/auth/register', () => {
     it('should register a new user successfully', async () => {
       // Create a manager user first
-      const managerUser = await global.testHelpers.createTestUser({ 
+      const managerUser = await global.testHelpers.createTestUser({
         role: 'Manager',
-        email: 'manager@example.com' 
+        email: 'manager@example.com'
       });
       const managerToken = global.testHelpers.generateTestToken(managerUser._id, 'Manager');
 
@@ -35,9 +35,9 @@ describe('Auth Endpoints', () => {
 
     it('should not register user with duplicate email', async () => {
       // Create a manager user first
-      const managerUser = await global.testHelpers.createTestUser({ 
+      const managerUser = await global.testHelpers.createTestUser({
         role: 'Manager',
-        email: 'manager@example.com' 
+        email: 'manager@example.com'
       });
       const managerToken = global.testHelpers.generateTestToken(managerUser._id, 'Manager');
 
@@ -65,9 +65,9 @@ describe('Auth Endpoints', () => {
 
     it('should validate required fields', async () => {
       // Create a manager user first
-      const managerUser = await global.testHelpers.createTestUser({ 
+      const managerUser = await global.testHelpers.createTestUser({
         role: 'Manager',
-        email: 'manager@example.com' 
+        email: 'manager@example.com'
       });
       const managerToken = global.testHelpers.generateTestToken(managerUser._id, 'Manager');
 

@@ -141,11 +141,11 @@ class ValidationMiddleware {
               .replace(/on\w+\s*=/gi, '') // Remove event handlers
               .trim();
           }
-          
+
           if (Array.isArray(obj)) {
             return obj.map(sanitizeObject);
           }
-          
+
           if (obj && typeof obj === 'object') {
             const sanitized = {};
             for (const [key, value] of Object.entries(obj)) {
@@ -153,7 +153,7 @@ class ValidationMiddleware {
             }
             return sanitized;
           }
-          
+
           return obj;
         };
 
@@ -168,7 +168,7 @@ class ValidationMiddleware {
           endpoint: req.originalUrl,
           method: req.method
         });
-        
+
         res.status(500).json({
           success: false,
           message: 'Input processing failed',

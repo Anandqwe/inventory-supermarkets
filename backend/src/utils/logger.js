@@ -64,7 +64,7 @@ const logger = winston.createLogger({
       maxFiles: 5,
       tailable: true
     }),
-    
+
     // Combined log file
     new winston.transports.File({
       filename: path.join(logsDir, 'combined.log'),
@@ -72,7 +72,7 @@ const logger = winston.createLogger({
       maxFiles: 5,
       tailable: true
     }),
-    
+
     // HTTP requests log
     new winston.transports.File({
       filename: path.join(logsDir, 'http.log'),
@@ -82,14 +82,14 @@ const logger = winston.createLogger({
       tailable: true
     })
   ],
-  
+
   // Handle exceptions
   exceptionHandlers: [
     new winston.transports.File({
       filename: path.join(logsDir, 'exceptions.log')
     })
   ],
-  
+
   // Handle rejections
   rejectionHandlers: [
     new winston.transports.File({
@@ -111,7 +111,7 @@ const loggerHelpers = {
   // Request logging
   logRequest: (req, res, next) => {
     const start = Date.now();
-    
+
     res.on('finish', () => {
       const duration = Date.now() - start;
       const logData = {
@@ -123,17 +123,17 @@ const loggerHelpers = {
         ip: req.ip || req.connection.remoteAddress,
         userId: req.user?.id
       };
-      
+
       if (res.statusCode >= 400) {
         logger.warn('HTTP Request Error', logData);
       } else {
         logger.http('HTTP Request', logData);
       }
     });
-    
+
     next();
   },
-  
+
   // Authentication logging
   logAuth: (action, user, success, details = {}) => {
     const logData = {
@@ -145,14 +145,14 @@ const loggerHelpers = {
       userAgent: details.userAgent,
       ...details
     };
-    
+
     if (success) {
       logger.info(`Auth: ${action} successful`, logData);
     } else {
       logger.warn(`Auth: ${action} failed`, logData);
     }
   },
-  
+
   // Database operation logging
   logDatabase: (operation, collection, success, details = {}) => {
     const logData = {
@@ -161,14 +161,14 @@ const loggerHelpers = {
       success,
       ...details
     };
-    
+
     if (success) {
       logger.debug(`Database: ${operation} on ${collection}`, logData);
     } else {
       logger.error(`Database: ${operation} failed on ${collection}`, logData);
     }
   },
-  
+
   // Business logic logging
   logBusiness: (action, success, details = {}) => {
     const logData = {
@@ -176,14 +176,14 @@ const loggerHelpers = {
       success,
       ...details
     };
-    
+
     if (success) {
       logger.info(`Business: ${action}`, logData);
     } else {
       logger.warn(`Business: ${action} failed`, logData);
     }
   },
-  
+
   // Security logging
   logSecurity: (event, severity = 'warn', details = {}) => {
     const logData = {
@@ -191,14 +191,14 @@ const loggerHelpers = {
       severity,
       ...details
     };
-    
+
     if (severity === 'critical') {
       logger.error(`Security: ${event}`, logData);
     } else {
       logger.warn(`Security: ${event}`, logData);
     }
   },
-  
+
   // Performance logging
   logPerformance: (operation, duration, details = {}) => {
     const logData = {
@@ -206,7 +206,7 @@ const loggerHelpers = {
       duration: `${duration}ms`,
       ...details
     };
-    
+
     if (duration > 5000) { // Log slow operations (>5s)
       logger.warn(`Performance: Slow operation - ${operation}`, logData);
     } else if (duration > 1000) { // Log medium operations (>1s)
@@ -215,7 +215,7 @@ const loggerHelpers = {
       logger.debug(`Performance: ${operation}`, logData);
     }
   },
-  
+
   // Error logging with context
   logError: (error, context = {}) => {
     const errorData = {
@@ -225,10 +225,10 @@ const loggerHelpers = {
       code: error.code,
       ...context
     };
-    
+
     logger.error('Application Error', errorData);
   },
-  
+
   // API Response logging
   logApiResponse: (endpoint, statusCode, responseTime, details = {}) => {
     const logData = {
@@ -237,7 +237,7 @@ const loggerHelpers = {
       responseTime: `${responseTime}ms`,
       ...details
     };
-    
+
     if (statusCode >= 500) {
       logger.error('API Error Response', logData);
     } else if (statusCode >= 400) {

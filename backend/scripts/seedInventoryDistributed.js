@@ -35,25 +35,25 @@ const storageLocations = [
  */
 function calculateQuantityForProduct(product, targetValue, isMainBranch = true) {
   const costPrice = product.pricing.costPrice;
-  
+
   // For main branch (Andheri), stock all products
   // For others, stock based on popularity (higher selling price = more popular)
   if (!isMainBranch && Math.random() > 0.7) {
     // 30% chance to skip product in smaller branches
     return 0;
   }
-  
+
   // Base quantity calculation
-  let baseQuantity = Math.floor(targetValue / costPrice);
-  
+  const baseQuantity = Math.floor(targetValue / costPrice);
+
   // Add variance (-20% to +30%)
   const variance = 0.8 + Math.random() * 0.5;
   let quantity = Math.floor(baseQuantity * variance);
-  
+
   // Ensure minimum and maximum bounds
   quantity = Math.max(5, quantity); // Minimum 5 units
   quantity = Math.min(1000, quantity); // Maximum 1000 units
-  
+
   // Round to reasonable numbers based on product type
   if (costPrice < 20) {
     // Small items (snacks, etc.) - round to nearest 10
@@ -65,7 +65,7 @@ function calculateQuantityForProduct(product, targetValue, isMainBranch = true) 
     // High-value items - keep as is
     quantity = Math.round(quantity);
   }
-  
+
   return quantity;
 }
 
@@ -91,99 +91,99 @@ async function seedInventory() {
     console.log('🔗 Connecting to MongoDB Atlas...');
     await mongoose.connect(process.env.MONGODB_URI);
     console.log('✅ Connected to database:', mongoose.connection.db.databaseName);
-    
+
     // Get system admin user
     console.log('\n👤 Finding system admin...');
-    let systemUser = await User.findOne({ email: 'admin@mumbaisupermart.com' });
-    
+    const systemUser = await User.findOne({ email: 'admin@mumbaisupermart.com' });
+
     if (!systemUser) {
       console.log('⚠️  System admin not found. Please run seed:users first.');
       process.exit(1);
     }
-    
+
     console.log(`✅ Found system admin: ${systemUser.fullName} (${systemUser.email})`);
-    
+
     // Get all branches sorted by code
     console.log('\n🏢 Finding branches...');
     const branches = await Branch.find({}).sort({ code: 1 });
-    
+
     if (branches.length === 0) {
       console.log('⚠️  No branches found. Please run seed:branches first.');
       process.exit(1);
     }
-    
+
     console.log(`✅ Found ${branches.length} branches:`);
     branches.forEach(branch => {
       console.log(`   - ${branch.name} (${branch.code})`);
     });
-    
+
     // Get all products
     console.log('\n📦 Loading products...');
     const products = await Product.find({});
-    
+
     if (products.length === 0) {
       console.log('⚠️  No products found. Please run seed:products first.');
       process.exit(1);
     }
-    
+
     console.log(`✅ Found ${products.length} products`);
-    
+
     // Branch inventory targets (in lakhs)
     const branchTargets = [
       { branch: branches[0], targetValue: 4500000, name: 'Andheri West', isMain: true },    // ₹45L - All products
       { branch: branches[1], targetValue: 3500000, name: 'Bandra West', isMain: false },     // ₹35L - ~70% products
       { branch: branches[2], targetValue: 1500000, name: 'Vile Parle East', isMain: false }  // ₹15L - ~50% products
     ];
-    
+
     console.log('\n📊 Inventory Distribution Target:');
-    console.log(`   Total Target: ₹95,00,000`);
+    console.log('   Total Target: ₹95,00,000');
     branchTargets.forEach(target => {
       console.log(`   ${target.name}: ₹${(target.targetValue / 100000).toFixed(1)}L`);
     });
-    
+
     // Clear existing inventory data from products
     console.log('\n🗑️  Clearing existing inventory...');
     await Product.updateMany({}, { $set: { stockByBranch: [] } });
     console.log('✅ Cleared existing inventory data');
-    
+
     // Distribute inventory across branches
     console.log('\n🔄 Distributing inventory across branches...\n');
-    
+
     const branchStats = [];
-    
+
     for (const targetConfig of branchTargets) {
       const { branch, targetValue, name, isMain } = targetConfig;
-      
+
       console.log(`📍 Processing ${name}...`);
-      
+
       let totalValue = 0;
       let productsStocked = 0;
       let totalQuantity = 0;
       const usedLocations = new Set();
-      
+
       // Calculate per-product target value
       const productsToStock = isMain ? products.length : Math.floor(products.length * (Math.random() * 0.2 + 0.6));
       const perProductTarget = targetValue / productsToStock;
-      
+
       // Shuffle products for variety in smaller branches
-      const productsList = isMain ? [...products] : 
+      const productsList = isMain ? [...products] :
         [...products].sort(() => Math.random() - 0.5).slice(0, productsToStock);
-      
+
       for (const product of productsList) {
         const quantity = calculateQuantityForProduct(product, perProductTarget, isMain);
-        
+
         if (quantity === 0) continue;
-        
+
         const reorderLevel = calculateReorderLevel(quantity);
         const maxStockLevel = calculateMaxStockLevel(quantity);
-        
+
         // Get unique storage location
         let location;
         do {
           location = getRandomElement(storageLocations);
         } while (usedLocations.has(location) && usedLocations.size < storageLocations.length);
         usedLocations.add(location);
-        
+
         // Add stock data to product
         const stockData = {
           branch: branch._id,
@@ -194,19 +194,19 @@ async function seedInventory() {
           lastRestocked: new Date(Date.now() - getRandomInt(1, 30) * 24 * 60 * 60 * 1000), // Last 30 days
           location
         };
-        
+
         // Update product
         await Product.findByIdAndUpdate(
           product._id,
           { $push: { stockByBranch: stockData } }
         );
-        
+
         const itemValue = quantity * product.pricing.costPrice;
         totalValue += itemValue;
         totalQuantity += quantity;
         productsStocked++;
       }
-      
+
       branchStats.push({
         name,
         productsStocked,
@@ -215,7 +215,7 @@ async function seedInventory() {
         targetValue,
         achievement: (totalValue / targetValue * 100).toFixed(1)
       });
-      
+
       console.log(`   ✅ ${name}:`);
       console.log(`      Products: ${productsStocked}/${products.length}`);
       console.log(`      Total Units: ${totalQuantity.toLocaleString('en-IN')}`);
@@ -223,20 +223,20 @@ async function seedInventory() {
       console.log(`      Target: ₹${targetValue.toLocaleString('en-IN')}`);
       console.log(`      Achievement: ${branchStats[branchStats.length - 1].achievement}%\n`);
     }
-    
+
     // Overall statistics
     console.log('\n📈 Overall Inventory Statistics:');
-    
+
     const totalValue = branchStats.reduce((sum, stat) => sum + stat.totalValue, 0);
     const totalQuantity = branchStats.reduce((sum, stat) => sum + stat.totalQuantity, 0);
     const totalTarget = branchTargets.reduce((sum, target) => sum + target.targetValue, 0);
-    
+
     console.log(`   📦 Total Products in Catalog: ${products.length}`);
     console.log(`   📊 Total Units Stocked: ${totalQuantity.toLocaleString('en-IN')}`);
     console.log(`   💰 Total Inventory Value: ₹${Math.round(totalValue).toLocaleString('en-IN')}`);
     console.log(`   🎯 Target Inventory Value: ₹${totalTarget.toLocaleString('en-IN')}`);
     console.log(`   ✅ Overall Achievement: ${(totalValue / totalTarget * 100).toFixed(1)}%`);
-    
+
     console.log('\n   🏢 By Branch:');
     branchStats.forEach(stat => {
       const percentage = (stat.totalValue / totalValue * 100).toFixed(1);
@@ -246,12 +246,12 @@ async function seedInventory() {
       console.log(`         Units: ${stat.totalQuantity.toLocaleString('en-IN')}`);
       console.log(`         Avg Units/Product: ${Math.round(stat.totalQuantity / stat.productsStocked)}`);
     });
-    
+
     // Verify data integrity
     console.log('\n🔍 Verifying data integrity...');
     const verifyProducts = await Product.find({ 'stockByBranch.0': { $exists: true } });
     console.log(`   ✅ Products with inventory: ${verifyProducts.length}/${products.length}`);
-    
+
     // Check products with low stock (simple count)
     let lowStockCount = 0;
     for (const product of verifyProducts) {
@@ -261,9 +261,9 @@ async function seedInventory() {
       }
     }
     console.log(`   ⚠️  Products below reorder level: ${lowStockCount}`);
-    
+
     console.log('\n✅ Inventory distribution completed successfully!');
-    
+
   } catch (error) {
     console.error('\n❌ Error seeding inventory:', error);
     throw error;

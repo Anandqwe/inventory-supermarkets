@@ -198,7 +198,7 @@ class FinancialController {
 
       // Pagination
       const skip = (parseInt(page) - 1) * parseInt(limit);
-      
+
       // Sort
       const sort = {};
       sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
@@ -415,17 +415,17 @@ class FinancialController {
 
       // Handle specific status updates
       switch (status) {
-        case 'sent':
-          invoice.sentAt = new Date();
-          break;
-        case 'cancelled':
-          invoice.cancelledAt = new Date();
-          invoice.cancelledBy = req.user.userId;
-          break;
-        case 'refunded':
-          invoice.refundedAt = new Date();
-          invoice.refundedBy = req.user.userId;
-          break;
+      case 'sent':
+        invoice.sentAt = new Date();
+        break;
+      case 'cancelled':
+        invoice.cancelledAt = new Date();
+        invoice.cancelledBy = req.user.userId;
+        break;
+      case 'refunded':
+        invoice.refundedAt = new Date();
+        invoice.refundedBy = req.user.userId;
+        break;
       }
 
       await invoice.save();
@@ -490,38 +490,38 @@ class FinancialController {
       // Group by configuration
       let dateGroupFormat;
       switch (groupBy) {
-        case 'day':
-          dateGroupFormat = { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } };
-          break;
-        case 'week':
-          dateGroupFormat = { $dateToString: { format: "%Y-W%V", date: "$createdAt" } };
-          break;
-        case 'month':
-          dateGroupFormat = { $dateToString: { format: "%Y-%m", date: "$createdAt" } };
-          break;
-        case 'quarter':
-          dateGroupFormat = { $dateToString: { format: "%Y-Q%q", date: "$createdAt" } };
-          break;
-        default:
-          dateGroupFormat = { $dateToString: { format: "%Y-%m", date: "$createdAt" } };
+      case 'day':
+        dateGroupFormat = { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } };
+        break;
+      case 'week':
+        dateGroupFormat = { $dateToString: { format: '%Y-W%V', date: '$createdAt' } };
+        break;
+      case 'month':
+        dateGroupFormat = { $dateToString: { format: '%Y-%m', date: '$createdAt' } };
+        break;
+      case 'quarter':
+        dateGroupFormat = { $dateToString: { format: '%Y-Q%q', date: '$createdAt' } };
+        break;
+      default:
+        dateGroupFormat = { $dateToString: { format: '%Y-%m', date: '$createdAt' } };
       }
 
       let reportData;
 
       switch (reportType) {
-        case 'sales':
-          reportData = await getSalesReport(baseFilter, dateGroupFormat);
-          break;
-        case 'purchases':
-          reportData = await getPurchasesReport(baseFilter, dateGroupFormat);
-          break;
-        case 'profit_loss':
-          reportData = await getProfitLossReport(baseFilter, dateGroupFormat);
-          break;
-        case 'summary':
-        default:
-          reportData = await getFinancialSummary(baseFilter, dateGroupFormat);
-          break;
+      case 'sales':
+        reportData = await getSalesReport(baseFilter, dateGroupFormat);
+        break;
+      case 'purchases':
+        reportData = await getPurchasesReport(baseFilter, dateGroupFormat);
+        break;
+      case 'profit_loss':
+        reportData = await getProfitLossReport(baseFilter, dateGroupFormat);
+        break;
+      case 'summary':
+      default:
+        reportData = await getFinancialSummary(baseFilter, dateGroupFormat);
+        break;
       }
 
       res.json({
@@ -569,7 +569,7 @@ class FinancialController {
       const aged = invoices.map(invoice => {
         const dueDate = invoice.dueDate || invoice.createdAt;
         const daysOverdue = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24));
-        
+
         let agingCategory;
         if (daysOverdue <= 0) {
           agingCategory = 'current';
@@ -628,7 +628,7 @@ class FinancialController {
  */
 async function getSalesReport(filter, dateGroupFormat) {
   const salesFilter = { ...filter, status: 'completed' };
-  
+
   const salesData = await Sale.aggregate([
     { $match: salesFilter },
     {
@@ -672,7 +672,7 @@ async function getSalesReport(filter, dateGroupFormat) {
  */
 async function getPurchasesReport(filter, dateGroupFormat) {
   const purchasesFilter = { ...filter, status: 'completed' };
-  
+
   const purchasesData = await Purchase.aggregate([
     { $match: purchasesFilter },
     {
@@ -728,9 +728,9 @@ async function getProfitLossReport(filter, dateGroupFormat) {
   ]);
 
   for (const period of allPeriods) {
-    const salesPeriod = salesReport.salesData.find(s => s._id === period) || 
+    const salesPeriod = salesReport.salesData.find(s => s._id === period) ||
       { totalRevenue: 0, totalDiscount: 0 };
-    const purchasesPeriod = purchasesReport.purchasesData.find(p => p._id === period) || 
+    const purchasesPeriod = purchasesReport.purchasesData.find(p => p._id === period) ||
       { totalCost: 0, totalDiscount: 0 };
 
     const grossProfit = salesPeriod.totalRevenue - purchasesPeriod.totalCost;
@@ -754,7 +754,7 @@ async function getProfitLossReport(filter, dateGroupFormat) {
       totalRevenue: salesReport.summary.totalRevenue,
       totalCost: purchasesReport.summary.totalCost,
       grossProfit: salesReport.summary.totalRevenue - purchasesReport.summary.totalCost,
-      grossMargin: salesReport.summary.totalRevenue > 0 ? 
+      grossMargin: salesReport.summary.totalRevenue > 0 ?
         ((salesReport.summary.totalRevenue - purchasesReport.summary.totalCost) / salesReport.summary.totalRevenue) * 100 : 0
     }
   };
@@ -776,7 +776,7 @@ async function getFinancialSummary(filter, dateGroupFormat) {
     invoices: invoiceStats,
     profitability: {
       grossProfit: salesReport.summary.totalRevenue - purchasesReport.summary.totalCost,
-      grossMargin: salesReport.summary.totalRevenue > 0 ? 
+      grossMargin: salesReport.summary.totalRevenue > 0 ?
         ((salesReport.summary.totalRevenue - purchasesReport.summary.totalCost) / salesReport.summary.totalRevenue) * 100 : 0
     }
   };
@@ -814,9 +814,9 @@ async function generateInvoiceNumber(branchCode) {
   const today = new Date();
   const year = today.getFullYear();
   const month = String(today.getMonth() + 1).padStart(2, '0');
-  
+
   const prefix = `INV-${branchCode}-${year}${month}`;
-  
+
   const lastInvoice = await Invoice.findOne({
     invoiceNumber: { $regex: `^${prefix}` }
   }).sort({ invoiceNumber: -1 });

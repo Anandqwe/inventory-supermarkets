@@ -15,14 +15,23 @@ class ValidationUtils {
   }
 
   /**
-   * Check if string is valid phone number (Indian format)
+   * Check if string is valid phone number
    * @param {string} phone - Phone number to validate
    * @returns {boolean} - True if valid phone
    */
   static isValidPhone(phone) {
     // Indian phone number: 10 digits starting with 6-9
+    // Accept formats: 9876543210, +919876543210, +91 9876543210, 91 9876543210
     const phoneRegex = /^[6-9]\d{9}$/;
-    return phoneRegex.test(phone.replace(/\s+/g, ''));
+
+    // Clean phone number: remove spaces, +, and country code
+    const cleanedPhone = phone
+      .replace(/\s+/g, '')        // Remove spaces
+      .replace(/^\+91/, '')       // Remove +91 prefix
+      .replace(/^91/, '')         // Remove 91 prefix
+      .replace(/^\+/, '');        // Remove any other + prefix
+
+    return phoneRegex.test(cleanedPhone);
   }
 
   /**
@@ -32,23 +41,23 @@ class ValidationUtils {
    */
   static validatePassword(password) {
     const errors = [];
-    
+
     if (!password || password.length < 8) {
       errors.push('Password must be at least 8 characters long');
     }
-    
+
     if (!/(?=.*[a-z])/.test(password)) {
       errors.push('Password must contain at least one lowercase letter');
     }
-    
+
     if (!/(?=.*[A-Z])/.test(password)) {
       errors.push('Password must contain at least one uppercase letter');
     }
-    
+
     if (!/(?=.*\d)/.test(password)) {
       errors.push('Password must contain at least one number');
     }
-    
+
     if (!/(?=.*[@$!%*?&])/.test(password)) {
       errors.push('Password must contain at least one special character (@$!%*?&)');
     }
@@ -85,7 +94,7 @@ class ValidationUtils {
    */
   static validatePrice(price) {
     const errors = [];
-    
+
     if (price === undefined || price === null) {
       errors.push('Price is required');
     } else if (typeof price !== 'number') {
@@ -109,7 +118,7 @@ class ValidationUtils {
    */
   static validateQuantity(quantity) {
     const errors = [];
-    
+
     if (quantity === undefined || quantity === null) {
       errors.push('Quantity is required');
     } else if (typeof quantity !== 'number') {
@@ -134,7 +143,7 @@ class ValidationUtils {
   static validateDate(dateStr) {
     const errors = [];
     const date = new Date(dateStr);
-    
+
     if (!dateStr) {
       errors.push('Date is required');
     } else if (isNaN(date.getTime())) {
@@ -156,7 +165,7 @@ class ValidationUtils {
   static validatePagination(params) {
     const page = Math.max(1, parseInt(params.page) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(params.limit) || 10));
-    
+
     return { page, limit };
   }
 
@@ -170,7 +179,7 @@ class ValidationUtils {
   static validateSort(sortBy, sortOrder, allowedFields = []) {
     const validSortBy = allowedFields.includes(sortBy) ? sortBy : 'createdAt';
     const validSortOrder = ['asc', 'desc'].includes(sortOrder) ? sortOrder : 'desc';
-    
+
     return {
       sortBy: validSortBy,
       sortOrder: validSortOrder,
@@ -187,7 +196,7 @@ class ValidationUtils {
   static validateRequiredFields(obj, requiredFields) {
     const errors = [];
     const missing = [];
-    
+
     for (const field of requiredFields) {
       if (!obj.hasOwnProperty(field) || obj[field] === undefined || obj[field] === null || obj[field] === '') {
         missing.push(field);
@@ -209,7 +218,7 @@ class ValidationUtils {
    */
   static validateGST(gst) {
     const errors = [];
-    
+
     if (!gst) {
       errors.push('GST number is required');
     } else {
@@ -233,11 +242,11 @@ class ValidationUtils {
    */
   static cleanSearchQuery(query) {
     if (!query || typeof query !== 'string') return '';
-    
+
     // Remove special regex characters and trim
     return query.trim()
-                .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-                .slice(0, 100); // Limit length
+      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      .slice(0, 100); // Limit length
   }
 }
 

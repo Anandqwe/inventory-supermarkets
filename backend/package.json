@@ -17,6 +17,8 @@
     "seed:master": "node scripts/seedMasterData.js",
     "seed": "npm run seed:master",
     "validate:data": "node scripts/validateData.js",
+    "migrate:permissions": "node scripts/migrateUserPermissions.js",
+    "test:rbac": "node scripts/testRBAC.js",
     "test": "jest --detectOpenHandles",
     "test:watch": "jest --watch --detectOpenHandles",
     "test:coverage": "jest --coverage --detectOpenHandles",
@@ -76,11 +78,14 @@
   "devDependencies": {
     "@eslint/js": "^9.0.0",
     "@faker-js/faker": "^10.0.0",
+  "@babel/core": "^7.26.0",
+  "@babel/preset-env": "^7.26.0",
     "eslint": "^8.48.0",
     "eslint-config-prettier": "^9.0.0",
     "eslint-plugin-node": "^11.1.0",
     "eslint-plugin-security": "^1.7.1",
-    "globals": "^13.20.0",
+  "globals": "^13.20.0",
+  "babel-jest": "^29.7.0",
     "husky": "^8.0.3",
     "jest": "^29.7.0",
     "lint-staged": "^14.0.1",
@@ -107,6 +112,12 @@
       "src/**/*.js",
       "!src/config/**",
       "!scripts/**"
+    ],
+    "transform": {
+      "^.+\\.js$": "babel-jest"
+    },
+    "transformIgnorePatterns": [
+      "/node_modules/"
     ],
     "coverageThreshold": {
       "global": {

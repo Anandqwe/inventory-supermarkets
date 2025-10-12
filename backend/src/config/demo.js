@@ -6,7 +6,7 @@
 const DEMO_CONFIG = {
   // Demo mode settings
   demoMode: process.env.DEMO_MODE === 'true',
-  
+
   // Sample data settings
   sampleData: {
     enabled: true,
@@ -17,7 +17,7 @@ const DEMO_CONFIG = {
     transfersCount: 45,
     adjustmentsCount: 35
   },
-  
+
   // Frontend integration
   frontend: {
     baseUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
@@ -29,7 +29,7 @@ const DEMO_CONFIG = {
       'http://127.0.0.1:3000'
     ]
   },
-  
+
   // Demo users (automatically created during seeding)
   demoUsers: [
     {
@@ -51,14 +51,14 @@ const DEMO_CONFIG = {
       name: 'POS Operator'
     }
   ],
-  
+
   // Database settings for demo
   database: {
     dropOnSeed: process.env.NODE_ENV !== 'production',
     createIndexes: true,
     enableAuditing: true
   },
-  
+
   // Performance settings for demo
   performance: {
     cacheEnabled: true,
@@ -66,7 +66,7 @@ const DEMO_CONFIG = {
     rateLimitEnabled: false, // Disabled for demo
     loggingLevel: 'info'
   },
-  
+
   // Features enabled in demo
   features: {
     dashboard: true,
@@ -80,7 +80,7 @@ const DEMO_CONFIG = {
     userManagement: true,
     auditLogs: true
   },
-  
+
   // API response settings
   api: {
     includeTimestamps: true,

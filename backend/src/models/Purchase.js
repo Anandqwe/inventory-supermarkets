@@ -63,7 +63,7 @@ const purchaseSchema = new mongoose.Schema({
     required: true
   },
   items: [purchaseItemSchema],
-  
+
   // Financial details
   totals: {
     subtotal: { type: Number, required: true },
@@ -72,7 +72,7 @@ const purchaseSchema = new mongoose.Schema({
     shippingCharges: { type: Number, default: 0 },
     totalAmount: { type: Number, required: true }
   },
-  
+
   // Purchase details
   orderDate: {
     type: Date,
@@ -81,7 +81,7 @@ const purchaseSchema = new mongoose.Schema({
   },
   expectedDeliveryDate: Date,
   actualDeliveryDate: Date,
-  
+
   // Documents
   invoiceNumber: String,
   invoiceDate: Date,
@@ -93,14 +93,14 @@ const purchaseSchema = new mongoose.Schema({
       enum: ['invoice', 'receipt', 'delivery_note', 'other']
     }
   }],
-  
+
   // Status tracking
   status: {
     type: String,
     enum: ['pending', 'ordered', 'partial_received', 'received', 'cancelled'],
     default: 'pending'
   },
-  
+
   // Payment details
   payment: {
     method: {
@@ -117,12 +117,12 @@ const purchaseSchema = new mongoose.Schema({
     paidAmount: { type: Number, default: 0 },
     reference: String
   },
-  
+
   notes: {
     type: String,
     maxlength: [500, 'Notes cannot exceed 500 characters']
   },
-  
+
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -152,22 +152,22 @@ purchaseSchema.pre('save', function(next) {
     let subtotal = 0;
     let totalDiscount = 0;
     let totalTax = 0;
-    
+
     this.items.forEach(item => {
       const itemTotal = item.quantity * item.unitPrice;
       const discountAmount = item.discount.amount || (itemTotal * item.discount.percentage / 100);
       const taxableAmount = itemTotal - discountAmount;
       const taxAmount = taxableAmount * item.tax.rate / 100;
-      
+
       item.totalPrice = itemTotal;
       item.discount.amount = discountAmount;
       item.tax.amount = taxAmount;
-      
+
       subtotal += itemTotal;
       totalDiscount += discountAmount;
       totalTax += taxAmount;
     });
-    
+
     this.totals.subtotal = subtotal;
     this.totals.totalDiscount = totalDiscount;
     this.totals.totalTax = totalTax;
@@ -188,13 +188,13 @@ purchaseSchema.methods.updatePayment = function(amount, method, reference) {
   this.payment.paidAmount = (this.payment.paidAmount || 0) + amount;
   this.payment.method = method;
   this.payment.reference = reference;
-  
+
   if (this.payment.paidAmount >= this.totals.totalAmount) {
     this.payment.status = 'paid';
   } else if (this.payment.paidAmount > 0) {
     this.payment.status = 'partial';
   }
-  
+
   return this.save();
 };
 
@@ -204,17 +204,17 @@ purchaseSchema.statics.generatePurchaseNumber = async function() {
   const year = today.getFullYear();
   const month = String(today.getMonth() + 1).padStart(2, '0');
   const prefix = `PO${year}${month}`;
-  
+
   const lastPurchase = await this.findOne({
     purchaseNumber: { $regex: `^${prefix}` }
   }).sort({ purchaseNumber: -1 });
-  
+
   let nextNumber = 1;
   if (lastPurchase) {
     const lastNumber = parseInt(lastPurchase.purchaseNumber.substring(prefix.length));
     nextNumber = lastNumber + 1;
   }
-  
+
   return `${prefix}${String(nextNumber).padStart(4, '0')}`;
 };
 

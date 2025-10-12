@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { logger } = require('../utils/logger');
 
 /**
  * Database connection configuration
@@ -20,25 +21,25 @@ class Database {
       const options = {
         maxPoolSize: 10, // Maintain up to 10 socket connections
         serverSelectionTimeoutMS: 5000, // Keep trying to send operations for 5 seconds
-        socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
+        socketTimeoutMS: 45000 // Close sockets after 45 seconds of inactivity
       };
 
       this.connection = await mongoose.connect(process.env.MONGODB_URI, options);
-      
-      console.log('✅ Connected to MongoDB Atlas');
-      console.log(`📊 Database: ${this.connection.connection.name}`);
-      
+
+      logger.info('✅ Connected to MongoDB Atlas');
+      logger.info(`📊 Database: ${this.connection.connection.name}`);
+
       // Handle connection events
       mongoose.connection.on('error', (err) => {
-        console.error('❌ MongoDB connection error:', err);
+        logger.error('MongoDB connection error', { error: err.message });
       });
 
       mongoose.connection.on('disconnected', () => {
-        console.log('📡 MongoDB disconnected');
+        logger.info('📡 MongoDB disconnected');
       });
 
       mongoose.connection.on('reconnected', () => {
-        console.log('🔄 MongoDB reconnected');
+        logger.info('🔄 MongoDB reconnected');
       });
 
       // Graceful shutdown
@@ -47,7 +48,7 @@ class Database {
 
       return this.connection;
     } catch (error) {
-      console.error('❌ Database connection failed:', error.message);
+      logger.error('Database connection failed', { error: error.message });
       process.exit(1);
     }
   }
@@ -58,10 +59,10 @@ class Database {
   async disconnect() {
     try {
       await mongoose.connection.close();
-      console.log('📡 MongoDB connection closed');
+      logger.info('📡 MongoDB connection closed');
       process.exit(0);
     } catch (error) {
-      console.error('❌ Error closing database connection:', error);
+      logger.error('Error closing database connection', { error: error.message });
       process.exit(1);
     }
   }
@@ -76,7 +77,7 @@ class Database {
       2: 'connecting',
       3: 'disconnecting'
     };
-    
+
     return {
       state: states[mongoose.connection.readyState],
       name: mongoose.connection.name,
@@ -96,16 +97,16 @@ class Database {
 
       // Ping the database
       await mongoose.connection.db.admin().ping();
-      
-      return { 
-        healthy: true, 
+
+      return {
+        healthy: true,
         message: 'Database connection healthy',
         ...this.getStatus()
       };
     } catch (error) {
-      return { 
-        healthy: false, 
-        message: `Database health check failed: ${error.message}` 
+      return {
+        healthy: false,
+        message: `Database health check failed: ${error.message}`
       };
     }
   }

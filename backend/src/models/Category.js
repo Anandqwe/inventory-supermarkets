@@ -93,9 +93,9 @@ categorySchema.pre('save', async function(next) {
 
 // Methods
 categorySchema.methods.getFullPath = async function() {
-  let path = [this.name];
+  const path = [this.name];
   let current = this;
-  
+
   while (current.parentCategory) {
     current = await mongoose.model('Category').findById(current.parentCategory);
     if (current) {
@@ -104,7 +104,7 @@ categorySchema.methods.getFullPath = async function() {
       break;
     }
   }
-  
+
   return path.join(' > ');
 };
 

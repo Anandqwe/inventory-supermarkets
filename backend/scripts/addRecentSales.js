@@ -26,14 +26,14 @@ function generateSaleNumber(date, sequence) {
 
 function generatePaymentReference(method) {
   switch (method) {
-    case 'card':
-      return `CARD${Date.now()}${getRandomInt(1000, 9999)}`;
-    case 'upi':
-      return `UPI${Date.now()}${getRandomInt(100000, 999999)}`;
-    case 'netbanking':
-      return `NB${Date.now()}${getRandomInt(100000, 999999)}`;
-    default:
-      return null;
+  case 'card':
+    return `CARD${Date.now()}${getRandomInt(1000, 9999)}`;
+  case 'upi':
+    return `UPI${Date.now()}${getRandomInt(100000, 999999)}`;
+  case 'netbanking':
+    return `NB${Date.now()}${getRandomInt(100000, 999999)}`;
+  default:
+    return null;
   }
 }
 
@@ -54,7 +54,7 @@ async function addRecentSales() {
 
     // Load products with inventory
     console.log('\n📦 Loading products with inventory...');
-    const products = await Product.find({ 
+    const products = await Product.find({
       isActive: true,
       'stockByBranch.0': { $exists: true }
     });
@@ -80,7 +80,7 @@ async function addRecentSales() {
         { role: 'Cashier' }
       ]
     });
-    
+
     if (cashiers.length === 0) {
       console.log('❌ No staff members found. Please run seed:users first.');
       process.exit(1);
@@ -121,17 +121,17 @@ async function addRecentSales() {
       console.log(`📍 Generating ${branchSalesTarget} sales for ${branch.name}...`);
 
       // Get products available in this branch
-      const branchProducts = products.filter(p => 
+      const branchProducts = products.filter(p =>
         p.stockByBranch.some(s => s.branch.toString() === branch._id.toString() && s.quantity > 0)
       );
 
       // Get cashiers for this branch
-      const branchCashiers = cashiers.filter(c => 
+      const branchCashiers = cashiers.filter(c =>
         c.role === 'Admin' || c.role === 'Regional Manager' || c.branch?.toString() === branch._id.toString()
       );
 
       // Get customers registered at this branch
-      const branchCustomers = customers.filter(c => 
+      const branchCustomers = customers.filter(c =>
         c.registeredBranch?.toString() === branch._id.toString()
       );
 
@@ -149,7 +149,7 @@ async function addRecentSales() {
         const dayOfWeek = saleDate.getDay();
         const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
         const weekendMultiplier = isWeekend ? 1.3 : 1.0;
-        
+
         const dailyTarget = Math.round((branchSalesTarget / 7) * recencyMultiplier * weekendMultiplier);
 
         for (let i = 0; i < dailyTarget; i++) {
@@ -166,7 +166,7 @@ async function addRecentSales() {
             : null;
 
           // Select cashier
-          const cashier = branchCashiers.length > 0 
+          const cashier = branchCashiers.length > 0
             ? getRandomElement(branchCashiers)
             : cashiers[0];
 
@@ -264,7 +264,7 @@ async function addRecentSales() {
     console.log('\n📈 Recent Sales Summary:');
     console.log(`   📊 Total Sales Added: ${totalSalesAdded}`);
     console.log(`   💰 Total Revenue: ₹${Math.round(totalRevenue).toLocaleString('en-IN')}`);
-    console.log(`   📅 Date Range: Last 7 days`);
+    console.log('   📅 Date Range: Last 7 days');
 
     console.log('\n✅ Recent sales data added successfully!');
 

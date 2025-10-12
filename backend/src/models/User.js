@@ -1,5 +1,13 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const { logger } = require('../utils/logger');
+const {
+  ROLE_PERMISSIONS,
+  getRolePermissions,
+  isBranchScopedRole,
+  hasCrossBranchAccess,
+  normalizeRoleName
+} = require('../../../shared/permissions');
 
 const userSchema = new mongoose.Schema({
   email: {
@@ -13,7 +21,7 @@ const userSchema = new mongoose.Schema({
   password: {
     type: String,
     required: [true, 'Password is required'],
-    minlength: [6, 'Password must be at least 6 characters'],
+    minlength: [8, 'Password must be at least 8 characters'],
     select: false
   },
   firstName: {
@@ -31,22 +39,22 @@ const userSchema = new mongoose.Schema({
   role: {
     type: String,
     enum: [
-      'Admin',                  // System Administrator - Full access
-      'Regional Manager',       // Oversees all branches
-      'Store Manager',          // Manages single branch
-      'Inventory Manager',      // Manages inventory for assigned branch
-      'Cashier',               // Sales operations only
-      'Viewer'                 // Read-only access
+      'Admin',
+      'Regional Manager',
+      'Store Manager',
+      'Inventory Manager',
+      'Cashier',
+      'Viewer'
     ],
     default: 'Cashier',
-    required: true
+    required: true,
+    set: normalizeRoleName
   },
   branch: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Branch',
     required: function() {
-      // Admin, Regional Manager, and Viewer don't need branch assignment
-      return !['Admin', 'Regional Manager', 'Viewer'].includes(this.role);
+      return isBranchScopedRole(this.role);
     }
   },
   permissions: [{
@@ -113,56 +121,25 @@ userSchema.virtual('isLocked').get(function() {
 // Pre-save middleware to set default permissions based on role
 userSchema.pre('save', function(next) {
   if (this.isNew || this.isModified('role')) {
+    this.role = normalizeRoleName(this.role);
     this.setDefaultPermissions();
+
+    if (!isBranchScopedRole(this.role)) {
+      this.branch = this.branch || undefined;
+    }
   }
   next();
 });
 
 // Method to set default permissions based on role
 userSchema.methods.setDefaultPermissions = function() {
-  const rolePermissions = {
-    Admin: [
-      'users:create', 'users:read', 'users:update', 'users:delete',
-      'products:create', 'products:read', 'products:update', 'products:delete', 'products:export',
-      'sales:create', 'sales:read', 'sales:update', 'sales:delete', 'sales:refund',
-      'inventory:read', 'inventory:update',
-      'reports:read', 'reports:analytics',
-      'dashboard:read', 'dashboard:analytics',
-      'branches:create', 'branches:read', 'branches:update', 'branches:delete',
-      'audit:read', 'session:manage', 'permissions:update', 'roles:read',
-      'profile:read', 'profile:update'
-    ],
-    Manager: [
-      'users:create', 'users:read', 'users:update',
-      'products:create', 'products:read', 'products:update', 'products:export',
-      'sales:create', 'sales:read', 'sales:update', 'sales:refund',
-      'inventory:read', 'inventory:update',
-      'reports:read', 'reports:analytics',
-      'dashboard:read', 'dashboard:analytics',
-      'branches:read', 'audit:read',
-      'profile:read', 'profile:update'
-    ],
-    Cashier: [
-      'products:read',
-      'sales:create', 'sales:read',
-      'inventory:read',
-      'reports:read',
-      'dashboard:read',
-      'profile:read', 'profile:update'
-    ],
-    Viewer: [
-      'products:read',
-      'sales:read',
-      'inventory:read',
-      'reports:read',
-      'dashboard:read',
-      'profile:read'
-    ]
-  };
-  
-  if (rolePermissions[this.role]) {
-    this.permissions = rolePermissions[this.role];
+  if (ROLE_PERMISSIONS[this.role]) {
+    this.permissions = getRolePermissions(this.role);
+    return;
   }
+
+  logger.warn(`Unknown role: ${this.role}. Assigning minimal permissions.`, { role: this.role });
+  this.permissions = ['profile.read', 'profile.update'];
 };
 
 // Method to check if user has permission
@@ -170,23 +147,28 @@ userSchema.methods.hasPermission = function(permission) {
   return this.permissions.includes(permission);
 };
 
+// Method to determine if user has cross-branch access
+userSchema.methods.hasCrossBranchAccess = function() {
+  return hasCrossBranchAccess(this.role);
+};
+
 // Method to add refresh token
 userSchema.methods.addRefreshToken = function(token, userAgent, ipAddress) {
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 30); // 30 days
-  
+
   this.refreshTokens.push({
     token,
     userAgent,
     ipAddress,
     expiresAt
   });
-  
+
   // Keep only last 5 refresh tokens
   if (this.refreshTokens.length > 5) {
     this.refreshTokens = this.refreshTokens.slice(-5);
   }
-  
+
   return this.save();
 };
 
@@ -216,7 +198,7 @@ userSchema.methods.clearRefreshTokens = function() {
 userSchema.methods.incLoginAttempts = function() {
   const maxAttempts = 5;
   const lockTime = 2 * 60 * 60 * 1000; // 2 hours
-  
+
   // If we have a previous lock that has expired, restart at 1
   if (this.lockUntil && this.lockUntil < Date.now()) {
     return this.updateOne({
@@ -224,14 +206,14 @@ userSchema.methods.incLoginAttempts = function() {
       $set: { loginAttempts: 1 }
     });
   }
-  
+
   const updates = { $inc: { loginAttempts: 1 } };
-  
+
   // If we have hit max attempts and it's not locked, lock the account
   if (this.loginAttempts + 1 >= maxAttempts && !this.isLocked) {
     updates.$set = { lockUntil: Date.now() + lockTime };
   }
-  
+
   return this.updateOne(updates);
 };
 
@@ -245,7 +227,7 @@ userSchema.methods.resetLoginAttempts = function() {
 // Hash password before saving
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
-  
+
   try {
     const salt = await bcrypt.genSalt(12);
     this.password = await bcrypt.hash(this.password, salt);
@@ -274,6 +256,46 @@ userSchema.statics.findActive = function() {
 // Virtual for full name
 userSchema.virtual('fullName').get(function() {
   return `${this.firstName} ${this.lastName}`;
+});
+
+userSchema.pre('findOneAndUpdate', function(next) {
+  const update = this.getUpdate() || {};
+  const getRoleFromUpdate = () => {
+    if (update.role) {
+      return update.role;
+    }
+
+    if (update.$set && update.$set.role) {
+      return update.$set.role;
+    }
+
+    return null;
+  };
+
+  const roleFromUpdate = getRoleFromUpdate();
+
+  if (roleFromUpdate) {
+    const normalized = normalizeRoleName(roleFromUpdate);
+
+    const applyRoleUpdate = (target) => {
+      target.role = normalized;
+      target.permissions = getRolePermissions(normalized);
+
+      if (!isBranchScopedRole(normalized)) {
+        target.branch = undefined;
+      }
+    };
+
+    if (update.$set) {
+      applyRoleUpdate(update.$set);
+    } else {
+      applyRoleUpdate(update);
+    }
+
+    this.setUpdate(update);
+  }
+
+  next();
 });
 
 const User = mongoose.model('User', userSchema);

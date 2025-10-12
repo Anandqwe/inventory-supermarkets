@@ -67,7 +67,7 @@ const mumbaiLocalities = [
 
 // Street prefixes for realistic addresses
 const streetPrefixes = [
-  'Plot No.', 'Flat No.', 'Building', 'Wing', 'Block', 'House No.', 
+  'Plot No.', 'Flat No.', 'Building', 'Wing', 'Block', 'House No.',
   'Shop No.', 'Tower', 'Apartment', 'Residence'
 ];
 
@@ -109,7 +109,7 @@ function generateAddress() {
   const streetPrefix = getRandomElement(streetPrefixes);
   const buildingName = getRandomElement(buildingNames);
   const streetNumber = getRandomInt(1, 999);
-  
+
   return {
     street: `${streetPrefix} ${streetNumber}, ${buildingName}`,
     landmark: locality.landmark,
@@ -124,10 +124,10 @@ function generateCustomerData(tier, systemUserId, branchId, customerIndex) {
   const gender = Math.random() > 0.5 ? 'male' : 'female';
   const firstName = getRandomElement(firstNames[gender]);
   const lastName = getRandomElement(lastNames);
-  
+
   // Generate customer number (CUS + 6 digits)
   const customerNumber = `CUS${String(customerIndex).padStart(6, '0')}`;
-  
+
   // Define tier characteristics
   const tierConfig = {
     'VIP': {
@@ -167,22 +167,22 @@ function generateCustomerData(tier, systemUserId, branchId, customerIndex) {
       customerGroup: 'retail'
     }
   };
-  
+
   const config = tierConfig[tier];
   const totalSpent = getRandomInt(config.minSpend, config.maxSpend);
   const totalPurchases = getRandomInt(config.minPurchases, config.maxPurchases);
   const loyaltyPoints = Math.floor(totalSpent * 0.01 * config.loyaltyMultiplier);
   const averageOrderValue = Math.floor(totalSpent / totalPurchases);
-  
+
   // 70% chance of credit limit for VIP/Loyal, 30% for Regular, 10% for Occasional
   const creditChance = tier === 'VIP' ? 0.7 : tier === 'Loyal' ? 0.7 : tier === 'Regular' ? 0.3 : 0.1;
   const hasCreditLimit = Math.random() < creditChance;
   const creditLimit = hasCreditLimit ? getRandomInt(config.creditLimit.min, config.creditLimit.max) : 0;
-  const currentBalance = hasCreditLimit && Math.random() > 0.6 ? 
+  const currentBalance = hasCreditLimit && Math.random() > 0.6 ?
     getRandomInt(0, Math.floor(creditLimit * 0.5)) : 0;
-  
+
   const address = generateAddress();
-  
+
   return {
     customerNumber,
     firstName,
@@ -211,10 +211,10 @@ function generateCustomerData(tier, systemUserId, branchId, customerIndex) {
     firstPurchaseDate: new Date(Date.now() - getRandomInt(180, 730) * 24 * 60 * 60 * 1000), // 6 months to 2 years ago
     registeredBranch: branchId,
     createdBy: systemUserId,
-    notes: tier === 'VIP' ? 'High value customer - priority service' : 
-           tier === 'Loyal' ? 'Regular customer - good credit history' :
-           tier === 'Regular' ? 'Active customer' : 
-           'Occasional shopper',
+    notes: tier === 'VIP' ? 'High value customer - priority service' :
+      tier === 'Loyal' ? 'Regular customer - good credit history' :
+        tier === 'Regular' ? 'Active customer' :
+          'Occasional shopper',
     tags: [tier.toLowerCase()],
     marketingConsent: {
       email: Math.random() > 0.3,
@@ -230,34 +230,34 @@ async function seedCustomers() {
     console.log('🔗 Connecting to MongoDB Atlas...');
     await mongoose.connect(process.env.MONGODB_URI);
     console.log('✅ Connected to database:', mongoose.connection.db.databaseName);
-    
+
     // Get or create system admin user
     console.log('\n👤 Finding system admin...');
-    let systemUser = await User.findOne({ email: 'admin@mumbaisupermart.com' });
-    
+    const systemUser = await User.findOne({ email: 'admin@mumbaisupermart.com' });
+
     if (!systemUser) {
       console.log('⚠️  System admin not found. Please run seed:users first.');
       process.exit(1);
     }
-    
+
     console.log(`✅ Found system admin: ${systemUser.fullName} (${systemUser.email})`);
-    
+
     // Get all branches
     console.log('\n🏢 Finding branches...');
     const branches = await Branch.find({}).sort({ code: 1 });
-    
+
     if (branches.length === 0) {
       console.log('⚠️  No branches found. Please run seed:branches first.');
       process.exit(1);
     }
-    
+
     console.log(`✅ Found ${branches.length} branches: ${branches.map(b => b.name).join(', ')}`);
-    
+
     // Clear existing customers
     console.log('\n🗑️  Clearing existing customers...');
     const deleteResult = await Customer.deleteMany({});
     console.log(`✅ Deleted ${deleteResult.deletedCount} existing customers`);
-    
+
     // Customer tier distribution
     const tierDistribution = [
       { tier: 'VIP', count: 50 },
@@ -265,24 +265,24 @@ async function seedCustomers() {
       { tier: 'Regular', count: 150 },
       { tier: 'Occasional', count: 200 }
     ];
-    
+
     console.log('\n👥 Generating customers by tier...');
     let totalCreated = 0;
     let customerIndex = 1;
-    
+
     for (const { tier, count } of tierDistribution) {
       console.log(`\n📊 Creating ${count} ${tier} customers...`);
       const customers = [];
-      
+
       for (let i = 0; i < count; i++) {
         // Distribute customers across branches (Andheri gets 50%, Bandra 30%, Vile Parle 20%)
         const branchIndex = Math.random() < 0.5 ? 0 : Math.random() < 0.6 ? 1 : 2;
         const branch = branches[branchIndex];
-        
+
         const customerData = generateCustomerData(tier, systemUser._id, branch._id, customerIndex++);
         customers.push(customerData);
       }
-      
+
       // Batch insert with error handling
       let createdCustomers = [];
       try {
@@ -305,7 +305,7 @@ async function seedCustomers() {
           throw error; // Re-throw if no documents were inserted
         }
       }
-      
+
       // Calculate tier statistics (using original customer data for averages)
       const tierStats = {
         total: createdCustomers.length,
@@ -313,11 +313,11 @@ async function seedCustomers() {
         avgPurchases: Math.round(customers.reduce((sum, c) => sum + c.totalPurchases, 0) / customers.length),
         avgLoyaltyPoints: Math.round(customers.reduce((sum, c) => sum + c.loyaltyPoints, 0) / customers.length),
         withCreditLimit: customers.filter(c => c.creditLimit > 0).length,
-        avgCreditLimit: Math.round(customers.filter(c => c.creditLimit > 0).reduce((sum, c) => sum + c.creditLimit, 0) / 
+        avgCreditLimit: Math.round(customers.filter(c => c.creditLimit > 0).reduce((sum, c) => sum + c.creditLimit, 0) /
                                     customers.filter(c => c.creditLimit > 0).length) || 0,
         active: customers.filter(c => c.isActive).length
       };
-      
+
       console.log(`   ✅ ${tier}: ${tierStats.total} customers`);
       console.log(`      💰 Avg Total Spent: ₹${tierStats.avgTotalSpent.toLocaleString('en-IN')}`);
       console.log(`      📦 Avg Purchases: ${tierStats.avgPurchases}`);
@@ -325,7 +325,7 @@ async function seedCustomers() {
       console.log(`      💳 With Credit: ${tierStats.withCreditLimit} (Avg: ₹${tierStats.avgCreditLimit.toLocaleString('en-IN')})`);
       console.log(`      ✓  Active: ${tierStats.active}`);
     }
-    
+
     // Overall statistics
     console.log('\n📈 Overall Customer Statistics:');
     const allCustomers = await Customer.find({});
@@ -334,25 +334,25 @@ async function seedCustomers() {
     const totalCreditLimit = allCustomers.reduce((sum, c) => sum + c.creditLimit, 0);
     const totalOutstanding = allCustomers.reduce((sum, c) => sum + c.currentBalance, 0);
     const activeCustomers = allCustomers.filter(c => c.isActive).length;
-    
+
     // Branch distribution
     const byBranch = {};
     for (const branch of branches) {
       byBranch[branch.name] = allCustomers.filter(c => c.registeredBranch.toString() === branch._id.toString()).length;
     }
-    
+
     console.log(`   👥 Total Customers: ${totalCreated}`);
     console.log(`   💰 Total Spent: ₹${totalTotalSpent.toLocaleString('en-IN')}`);
     console.log(`   ⭐ Total Loyalty Points: ${totalLoyaltyPoints.toLocaleString('en-IN')}`);
     console.log(`   💳 Total Credit Limit: ₹${totalCreditLimit.toLocaleString('en-IN')}`);
     console.log(`   📉 Total Outstanding: ₹${totalOutstanding.toLocaleString('en-IN')}`);
     console.log(`   ✓  Active Customers: ${activeCustomers} (${Math.round(activeCustomers/totalCreated*100)}%)`);
-    console.log(`\n   🏢 By Branch:`);
+    console.log('\n   🏢 By Branch:');
     for (const [branchName, count] of Object.entries(byBranch)) {
       console.log(`      ${branchName}: ${count} customers (${Math.round(count/totalCreated*100)}%)`);
-    }    
+    }
     console.log('\n✅ Customer seeding completed successfully!');
-    
+
   } catch (error) {
     console.error('\n❌ Error seeding customers:', error);
     throw error;

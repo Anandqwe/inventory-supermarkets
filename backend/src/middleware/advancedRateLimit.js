@@ -14,9 +14,9 @@ const createCacheStore = (keyGenerator) => {
         const current = await cache.get(cacheKey);
         const count = (current?.count || 0) + 1;
         const resetTime = current?.resetTime || Date.now() + (15 * 60 * 1000); // 15 minutes
-        
+
         await cache.set(cacheKey, { count, resetTime }, 900); // 15 minutes TTL
-        
+
         callback(null, count, new Date(resetTime));
       } catch (error) {
         callback(error);
@@ -27,7 +27,7 @@ const createCacheStore = (keyGenerator) => {
       try {
         const cacheKey = `rateLimit:${keyGenerator ? keyGenerator(key) : key}`;
         const current = await cache.get(cacheKey);
-        
+
         if (current && current.count > 0) {
           const count = current.count - 1;
           await cache.set(cacheKey, { ...current, count }, 900);
@@ -206,12 +206,12 @@ Object.keys(rateLimitConfigs).forEach(key => {
  */
 const dynamicRateLimit = (req, res, next) => {
   const userRole = req.user?.role || 'staff';
-  
+
   // Use role-specific rate limiter if available
   if (rateLimiters[userRole]) {
     return rateLimiters[userRole](req, res, next);
   }
-  
+
   // Fallback to general rate limiter
   return rateLimiters.general(req, res, next);
 };
@@ -224,17 +224,17 @@ const endpointRateLimiters = {
   login: rateLimiters.login,
   auth: rateLimiters.auth,
   passwordReset: rateLimiters.passwordReset,
-  
+
   // Operations
   pos: rateLimiters.pos,
   reports: rateLimiters.reports,
   upload: rateLimiters.upload,
-  
+
   // Role-based
   admin: rateLimiters.admin,
   manager: rateLimiters.manager,
   staff: rateLimiters.staff,
-  
+
   // General
   general: rateLimiters.general
 };
@@ -245,12 +245,12 @@ const endpointRateLimiters = {
 const createWhitelistMiddleware = (whitelist = []) => {
   return (req, res, next) => {
     const clientIP = req.ip || req.connection.remoteAddress;
-    
+
     // Check if IP is whitelisted
     if (whitelist.includes(clientIP)) {
       req.skipRateLimit = true;
     }
-    
+
     next();
   };
 };
@@ -292,7 +292,7 @@ const createEnhancedRateLimit = (options) => {
     onLimitReached: (req, res, options) => {
       // Log rate limit exceeded
       console.warn(`Rate limit exceeded for IP: ${req.ip}, endpoint: ${req.originalUrl}`);
-      
+
       // Custom callback
       if (onLimitReached) {
         onLimitReached(req, res, options);
@@ -313,7 +313,7 @@ const rateLimitAnalytics = {
     try {
       const pattern = `rateLimit:${type}:*`;
       const keys = await cache.keys(pattern);
-      
+
       const stats = {
         type,
         totalKeys: keys.length,
@@ -327,7 +327,7 @@ const rateLimitAnalytics = {
         if (data) {
           stats.activeConnections++;
           const limit = rateLimitConfigs[type]?.max || 100;
-          
+
           if (data.count >= limit) {
             stats.atLimit++;
           } else if (data.count >= limit * 0.8) {
@@ -345,7 +345,7 @@ const rateLimitAnalytics = {
   async clearLimits(type = null, ip = null) {
     try {
       let pattern = 'rateLimit:';
-      
+
       if (type && ip) {
         pattern += `${type}:${ip}`;
       } else if (type) {
@@ -365,18 +365,18 @@ const rateLimitAnalytics = {
 module.exports = {
   // Individual rate limiters
   ...endpointRateLimiters,
-  
+
   // Dynamic and enhanced limiters
   dynamicRateLimit,
   createEnhancedRateLimit,
-  
+
   // Utility middleware
   createWhitelistMiddleware,
   createBypassMiddleware,
-  
+
   // Analytics and management
   rateLimitAnalytics,
-  
+
   // Configurations
   rateLimitConfigs
 };

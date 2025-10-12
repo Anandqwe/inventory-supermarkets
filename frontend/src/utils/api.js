@@ -43,6 +43,16 @@ export const authAPI = {
   getProfile: async () => {
     const response = await api.get('/auth/profile');
     return response; // Return the full axios response
+  },
+
+  getAllUsers: async () => {
+    const response = await api.get('/auth/users');
+    return response.data;
+  },
+
+  toggleUserStatus: async (userId) => {
+    const response = await api.patch(`/auth/users/${userId}/toggle-status`);
+    return response.data;
   }
 };
 
@@ -162,8 +172,8 @@ export const inventoryAPI = {
     return response.data;
   },
 
-  getLowStockAlerts: async () => {
-    const response = await api.get('/inventory/low-stock');
+  getLowStockAlerts: async (params = {}) => {
+    const response = await api.get('/inventory/low-stock', { params });
     return response.data;
   },
 
@@ -172,8 +182,8 @@ export const inventoryAPI = {
     return response.data;
   },
 
-  getReorderSuggestions: async () => {
-    const response = await api.get('/purchases/reorder-suggestions');
+  getReorderSuggestions: async (params = {}) => {
+    const response = await api.get('/purchases/reorder-suggestions', { params });
     return response.data;
   }
 };
@@ -373,7 +383,7 @@ export const settingsAPI = {
   },
   
   changePassword: async (data) => {
-    const response = await api.put('/auth/change-password', data);
+    const response = await api.post('/auth/change-password', data);
     return response.data;
   }
 };

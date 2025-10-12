@@ -16,10 +16,19 @@ A comprehensive, production-ready inventory and sales management solution design
 
 ### 🔐 Authentication & Security
 - **JWT Authentication** with access & refresh tokens (24h/7d expiry)
-- **Role-Based Access Control** (Admin, Manager, Cashier, Viewer)
-- **Password Security** with bcrypt hashing and strength validation
-- **Rate Limiting** (100 req/15min) and advanced security headers
-- **Input Sanitization** and XSS prevention
+- **Advanced Role-Based Access Control (RBAC)** with 6 hierarchical roles:
+  - **Admin**: Full system access across all branches
+  - **Regional Manager**: Multi-branch oversight and management
+  - **Store Manager**: Complete control of assigned branch
+  - **Inventory Manager**: Stock control and purchase management
+  - **Cashier**: Sales operations only
+  - **Viewer**: Read-only access for auditing
+- **Granular Permissions System** with 50+ individual permissions
+- **Per-Branch Access Control** with automatic data filtering
+- **Password Security** with bcrypt hashing (12 rounds) and strength validation
+- **Rate Limiting** (100 req/15min general, 5 req/15min auth) with IP tracking
+- **Input Sanitization** and XSS prevention on all endpoints
+- **Account Security** with login attempt tracking and auto-lockout (5 attempts)
 
 ### 📦 Product Management
 - **Complete CRUD Operations** with advanced search and filtering

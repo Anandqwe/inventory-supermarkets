@@ -40,24 +40,65 @@ import Toast from '../components/Toast';
 import { PageHeader } from '../components/shell/PageHeader';
 import { inventoryAPI, purchaseAPI, masterDataAPI, productsAPI } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
+import { usePermission } from '../hooks/usePermission';
+import { PERMISSIONS } from '../../../shared/permissions';
+
+const getBranchIdFromUser = (user) => {
+  if (!user || !user.branch) {
+    return null;
+  }
+
+  if (typeof user.branch === 'string') {
+    return user.branch;
+  }
+
+  if (typeof user.branch === 'object') {
+    if (user.branch._id) {
+      return typeof user.branch._id === 'string'
+        ? user.branch._id
+        : user.branch._id.toString();
+    }
+
+    if (typeof user.branch.toString === 'function') {
+      return user.branch.toString();
+    }
+  }
+
+  return null;
+};
 
 // Inventory Operations Component
 function Inventory() {
   const { user } = useAuth();
+  const { hasPermission } = usePermission();
+  const userBranchId = useMemo(() => getBranchIdFromUser(user), [user]);
   const [activeTab, setActiveTab] = useState('overview');
   const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showPurchaseOrderModal, setShowPurchaseOrderModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [toast, setToast] = useState(null);
-  const [filters, setFilters] = useState({});
-  const [selectedBranch, setSelectedBranch] = useState('all');
+  const [selectedBranch, setSelectedBranch] = useState(userBranchId || 'all');
   const [dateRange, setDateRange] = useState({
     startDate: '',
     endDate: ''
   });
 
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (userBranchId && selectedBranch === 'all') {
+      setSelectedBranch(userBranchId);
+    } else if (!user && selectedBranch !== 'all') {
+      setSelectedBranch('all');
+    }
+  }, [userBranchId, selectedBranch, user]);
+
+  const canCreateAdjustments = hasPermission(PERMISSIONS.INVENTORY.ADJUST) ||
+    hasPermission(PERMISSIONS.INVENTORY.UPDATE) ||
+    hasPermission(PERMISSIONS.INVENTORY.CREATE);
+  const canInitiateTransfers = hasPermission(PERMISSIONS.INVENTORY.TRANSFER);
+  const canCreatePurchaseOrders = hasPermission(PERMISSIONS.PURCHASES.CREATE);
 
   // Build filter params
   const filterParams = useMemo(() => {
@@ -117,7 +158,8 @@ function Inventory() {
   const createAdjustmentMutation = useMutation({
     mutationFn: inventoryAPI.createAdjustment,
     onSuccess: () => {
-      queryClient.invalidateQueries(['adjustments']);
+      queryClient.invalidateQueries({ queryKey: ['adjustments'] });
+      queryClient.invalidateQueries({ queryKey: ['low-stock-alerts'] });
       setShowAdjustmentModal(false);
       setToast({ type: 'success', message: 'Stock adjustment created successfully' });
     },
@@ -129,7 +171,8 @@ function Inventory() {
   const createTransferMutation = useMutation({
     mutationFn: inventoryAPI.createTransfer,
     onSuccess: () => {
-      queryClient.invalidateQueries(['transfers']);
+      queryClient.invalidateQueries({ queryKey: ['transfers'] });
+      queryClient.invalidateQueries({ queryKey: ['low-stock-alerts'] });
       setShowTransferModal(false);
       setToast({ type: 'success', message: 'Stock transfer created successfully' });
     },
@@ -141,7 +184,7 @@ function Inventory() {
   const createPurchaseOrderMutation = useMutation({
     mutationFn: purchaseAPI.createOrder,
     onSuccess: () => {
-      queryClient.invalidateQueries(['purchase-orders']);
+      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
       setShowPurchaseOrderModal(false);
       setToast({ type: 'success', message: 'Purchase order created successfully' });
     },
@@ -207,7 +250,11 @@ function Inventory() {
         <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100">
           Low Stock Alerts
         </h3>
-        <Button variant="outline" size="sm">
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={() => queryClient.invalidateQueries({ queryKey: ['low-stock-alerts'] })}
+        >
           <ArrowPathIcon className="h-4 w-4 mr-2" />
           Refresh
         </Button>
@@ -263,14 +310,16 @@ function Inventory() {
         <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100">
           Reorder Suggestions
         </h3>
-        <Button 
-          variant="primary" 
-          size="sm"
-          onClick={() => setShowPurchaseOrderModal(true)}
-        >
-          <PlusIcon className="h-4 w-4 mr-2" />
-          Create PO
-        </Button>
+        {canCreatePurchaseOrders && (
+          <Button 
+            variant="primary" 
+            size="sm"
+            onClick={() => setShowPurchaseOrderModal(true)}
+          >
+            <PlusIcon className="h-4 w-4 mr-2" />
+            Create PO
+          </Button>
+        )}
       </div>
 
       {reorderLoading ? (
@@ -769,16 +818,18 @@ function Inventory() {
                               </div>
                             </div>
                           </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedProduct(item);
-                              setShowPurchaseOrderModal(true);
-                            }}
-                          >
-                            Order Now
-                          </Button>
+                          {canCreatePurchaseOrders && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedProduct(item);
+                                setShowPurchaseOrderModal(true);
+                              }}
+                            >
+                              Order Now
+                            </Button>
+                          )}
                         </div>
                       </Card>
                     ))}
@@ -805,15 +856,17 @@ function Inventory() {
                       Quick Order from Suppliers
                     </h3>
                   </div>
-                  <Button 
-                    variant="primary" 
-                    size="sm"
-                    className="w-full sm:w-auto"
-                    onClick={() => setShowPurchaseOrderModal(true)}
-                  >
-                    <PlusIcon className="h-4 w-4 mr-2" />
-                    Create PO
-                  </Button>
+                  {canCreatePurchaseOrders && (
+                    <Button 
+                      variant="primary" 
+                      size="sm"
+                      className="w-full sm:w-auto"
+                      onClick={() => setShowPurchaseOrderModal(true)}
+                    >
+                      <PlusIcon className="h-4 w-4 mr-2" />
+                      Create PO
+                    </Button>
+                  )}
                 </div>
 
                 {suppliersLoading ? (
@@ -955,19 +1008,21 @@ function Inventory() {
                     variant="outline"
                     size="sm"
                     className="flex-1 sm:flex-initial"
-                    onClick={() => queryClient.invalidateQueries(['adjustments'])}
+                    onClick={() => queryClient.invalidateQueries({ queryKey: ['adjustments'] })}
                   >
                     <ArrowPathIcon className="h-4 w-4" />
                   </Button>
-                  <Button 
-                    variant="primary"
-                    className="flex-1 sm:flex-initial"
-                    onClick={() => setShowAdjustmentModal(true)}
-                  >
-                    <PlusIcon className="h-4 w-4 mr-2" />
-                    <span className="hidden sm:inline">New Adjustment</span>
-                    <span className="sm:hidden">New</span>
-                  </Button>
+                  {canCreateAdjustments && (
+                    <Button 
+                      variant="primary"
+                      className="flex-1 sm:flex-initial"
+                      onClick={() => setShowAdjustmentModal(true)}
+                    >
+                      <PlusIcon className="h-4 w-4 mr-2" />
+                      <span className="hidden sm:inline">New Adjustment</span>
+                      <span className="sm:hidden">New</span>
+                    </Button>
+                  )}
                 </div>
               </div>
               
@@ -996,13 +1051,15 @@ function Inventory() {
                   <p className="text-sm text-slate-600 dark:text-slate-400 mt-1 mb-4">
                     Start by creating your first stock adjustment
                   </p>
-                  <Button 
-                    variant="primary"
-                    onClick={() => setShowAdjustmentModal(true)}
-                  >
-                    <PlusIcon className="h-4 w-4 mr-2" />
-                    Create First Adjustment
-                  </Button>
+                  {canCreateAdjustments && (
+                    <Button 
+                      variant="primary"
+                      onClick={() => setShowAdjustmentModal(true)}
+                    >
+                      <PlusIcon className="h-4 w-4 mr-2" />
+                      Create First Adjustment
+                    </Button>
+                  )}
                 </div>
               )}
             </Card>
@@ -1084,17 +1141,19 @@ function Inventory() {
                   <Button 
                     variant="outline"
                     size="sm"
-                    onClick={() => queryClient.invalidateQueries(['transfers'])}
+                    onClick={() => queryClient.invalidateQueries({ queryKey: ['transfers'] })}
                   >
                     <ArrowPathIcon className="h-4 w-4" />
                   </Button>
-                  <Button 
-                    variant="primary"
-                    onClick={() => setShowTransferModal(true)}
-                  >
-                    <PlusIcon className="h-4 w-4 mr-2" />
-                    New Transfer
-                  </Button>
+                  {canInitiateTransfers && (
+                    <Button 
+                      variant="primary"
+                      onClick={() => setShowTransferModal(true)}
+                    >
+                      <PlusIcon className="h-4 w-4 mr-2" />
+                      New Transfer
+                    </Button>
+                  )}
                 </div>
               </div>
               
@@ -1119,13 +1178,15 @@ function Inventory() {
                   <p className="text-sm text-slate-600 dark:text-slate-400 mt-1 mb-4">
                     Start moving inventory between your branches
                   </p>
-                  <Button 
-                    variant="primary"
-                    onClick={() => setShowTransferModal(true)}
-                  >
-                    <PlusIcon className="h-4 w-4 mr-2" />
-                    Create First Transfer
-                  </Button>
+                  {canInitiateTransfers && (
+                    <Button 
+                      variant="primary"
+                      onClick={() => setShowTransferModal(true)}
+                    >
+                      <PlusIcon className="h-4 w-4 mr-2" />
+                      Create First Transfer
+                    </Button>
+                  )}
                 </div>
               )}
             </Card>
@@ -1207,17 +1268,19 @@ function Inventory() {
                   <Button 
                     variant="outline"
                     size="sm"
-                    onClick={() => queryClient.invalidateQueries(['purchase-orders'])}
+                    onClick={() => queryClient.invalidateQueries({ queryKey: ['purchase-orders'] })}
                   >
                     <ArrowPathIcon className="h-4 w-4" />
                   </Button>
-                  <Button 
-                    variant="primary"
-                    onClick={() => setShowPurchaseOrderModal(true)}
-                  >
-                    <PlusIcon className="h-4 w-4 mr-2" />
-                    New Purchase Order
-                  </Button>
+                  {canCreatePurchaseOrders && (
+                    <Button 
+                      variant="primary"
+                      onClick={() => setShowPurchaseOrderModal(true)}
+                    >
+                      <PlusIcon className="h-4 w-4 mr-2" />
+                      New Purchase Order
+                    </Button>
+                  )}
                 </div>
               </div>
               
@@ -1343,10 +1406,13 @@ function Inventory() {
                               <EyeIcon className="h-4 w-4 mr-1" />
                               View
                             </Button>
-                            {po.status === 'draft' && (
-                              <Button variant="primary" size="sm">
-                                <PencilIcon className="h-4 w-4 mr-1" />
-                                Edit
+                            {canCreatePurchaseOrders && (
+                              <Button 
+                                variant="primary"
+                                onClick={() => setShowPurchaseOrderModal(true)}
+                              >
+                                <PlusIcon className="h-4 w-4 mr-2" />
+                                Create Purchase Order
                               </Button>
                             )}
                             {(po.status === 'pending' || po.status === 'sent') && (
@@ -1368,13 +1434,15 @@ function Inventory() {
                   <p className="text-sm text-slate-600 dark:text-slate-400 mt-1 mb-4">
                     Create your first purchase order to restock inventory
                   </p>
-                  <Button 
-                    variant="primary"
-                    onClick={() => setShowPurchaseOrderModal(true)}
-                  >
-                    <PlusIcon className="h-4 w-4 mr-2" />
-                    Create First PO
-                  </Button>
+                  {canCreatePurchaseOrders && (
+                    <Button 
+                      variant="primary"
+                      onClick={() => setShowPurchaseOrderModal(true)}
+                    >
+                      <PlusIcon className="h-4 w-4 mr-2" />
+                      Create First PO
+                    </Button>
+                  )}
                 </div>
               )}
             </Card>
@@ -1433,33 +1501,39 @@ function Inventory() {
       {renderTabContent()}
 
       {/* Modals */}
-      <StockAdjustmentModal
-        isOpen={showAdjustmentModal}
-        onClose={() => setShowAdjustmentModal(false)}
-        onSubmit={(data) => createAdjustmentMutation.mutate(data)}
-        isLoading={createAdjustmentMutation.isPending}
-      />
+      {canCreateAdjustments && (
+        <StockAdjustmentModal
+          isOpen={canCreateAdjustments && showAdjustmentModal}
+          onClose={() => setShowAdjustmentModal(false)}
+          onSubmit={(data) => createAdjustmentMutation.mutate(data)}
+          isLoading={createAdjustmentMutation.isPending}
+        />
+      )}
 
-      <StockTransferModal
-        isOpen={showTransferModal}
-        onClose={() => setShowTransferModal(false)}
-        onSubmit={(data) => createTransferMutation.mutate(data)}
-        isLoading={createTransferMutation.isPending}
-        branches={branchesData?.data || []}
-      />
+      {canInitiateTransfers && (
+        <StockTransferModal
+          isOpen={canInitiateTransfers && showTransferModal}
+          onClose={() => setShowTransferModal(false)}
+          onSubmit={(data) => createTransferMutation.mutate(data)}
+          isLoading={createTransferMutation.isPending}
+          branches={branchesData?.data || []}
+        />
+      )}
 
-      <PurchaseOrderModal
-        isOpen={showPurchaseOrderModal}
-        onClose={() => {
-          setShowPurchaseOrderModal(false);
-          setSelectedProduct(null);
-        }}
-        onSubmit={(data) => createPurchaseOrderMutation.mutate(data)}
-        isLoading={createPurchaseOrderMutation.isPending}
-        suppliers={suppliersData?.data || []}
-        reorderSuggestions={reorderData?.data || []}
-        selectedProduct={selectedProduct}
-      />
+      {canCreatePurchaseOrders && (
+        <PurchaseOrderModal
+          isOpen={canCreatePurchaseOrders && showPurchaseOrderModal}
+          onClose={() => {
+            setShowPurchaseOrderModal(false);
+            setSelectedProduct(null);
+          }}
+          onSubmit={(data) => createPurchaseOrderMutation.mutate(data)}
+          isLoading={createPurchaseOrderMutation.isPending}
+          suppliers={suppliersData?.data || []}
+          reorderSuggestions={reorderData?.data || []}
+          selectedProduct={selectedProduct}
+        />
+      )}
 
       {/* Toast */}
       {toast && (

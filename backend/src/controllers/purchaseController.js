@@ -15,7 +15,7 @@ class PurchaseController {
   static async createPurchaseOrder(req, res) {
     try {
       console.log('📦 Create Purchase Order - Request Body:', JSON.stringify(req.body, null, 2));
-      
+
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         console.log('❌ Validation errors:', errors.array());
@@ -68,7 +68,7 @@ class PurchaseController {
 
       // Validate branch - handle both string ID and populated object
       let branchId = requestedBranchId || (req.user.branch?._id || req.user.branch);
-      
+
       // If no branch in JWT, fetch user's branch from database
       if (!branchId) {
         console.log('⚠️ No branch in JWT, fetching from database...');
@@ -88,10 +88,10 @@ class PurchaseController {
           }
         }
       }
-      
+
       console.log('🔍 Looking for branch:', branchId);
       console.log('👤 User role:', req.user.role);
-      
+
       const branch = await Branch.findById(branchId);
       if (!branch) {
         console.log('❌ Branch not found');
@@ -287,7 +287,7 @@ class PurchaseController {
 
       // Pagination
       const skip = (parseInt(page) - 1) * parseInt(limit);
-      
+
       // Sort
       const sort = {};
       sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
@@ -430,24 +430,24 @@ class PurchaseController {
 
       // Handle specific status updates
       switch (status) {
-        case 'approved':
-          purchase.approvedAt = new Date();
-          purchase.approvedBy = req.user.userId;
-          purchase.approverComments = approverComments;
-          break;
-        case 'rejected':
-          purchase.rejectedAt = new Date();
-          purchase.rejectedBy = req.user.userId;
-          purchase.approverComments = approverComments;
-          break;
-        case 'ordered':
-          purchase.orderedAt = new Date();
-          purchase.orderedBy = req.user.userId;
-          break;
-        case 'cancelled':
-          purchase.cancelledAt = new Date();
-          purchase.cancelledBy = req.user.userId;
-          break;
+      case 'approved':
+        purchase.approvedAt = new Date();
+        purchase.approvedBy = req.user.userId;
+        purchase.approverComments = approverComments;
+        break;
+      case 'rejected':
+        purchase.rejectedAt = new Date();
+        purchase.rejectedBy = req.user.userId;
+        purchase.approverComments = approverComments;
+        break;
+      case 'ordered':
+        purchase.orderedAt = new Date();
+        purchase.orderedBy = req.user.userId;
+        break;
+      case 'cancelled':
+        purchase.cancelledAt = new Date();
+        purchase.cancelledBy = req.user.userId;
+        break;
       }
 
       await purchase.save();
@@ -513,7 +513,7 @@ class PurchaseController {
 
       // Start transaction
       const session = await Purchase.db.startSession();
-      
+
       try {
         await session.withTransaction(async () => {
           let allItemsReceived = true;
@@ -795,20 +795,20 @@ class PurchaseController {
       // Group by configuration
       let dateGroupFormat;
       switch (groupBy) {
-        case 'day':
-          dateGroupFormat = { $dateToString: { format: "%Y-%m-%d", date: "$completedAt" } };
-          break;
-        case 'week':
-          dateGroupFormat = { $dateToString: { format: "%Y-W%V", date: "$completedAt" } };
-          break;
-        case 'month':
-          dateGroupFormat = { $dateToString: { format: "%Y-%m", date: "$completedAt" } };
-          break;
-        case 'quarter':
-          dateGroupFormat = { $dateToString: { format: "%Y-Q%q", date: "$completedAt" } };
-          break;
-        default:
-          dateGroupFormat = { $dateToString: { format: "%Y-%m", date: "$completedAt" } };
+      case 'day':
+        dateGroupFormat = { $dateToString: { format: '%Y-%m-%d', date: '$completedAt' } };
+        break;
+      case 'week':
+        dateGroupFormat = { $dateToString: { format: '%Y-W%V', date: '$completedAt' } };
+        break;
+      case 'month':
+        dateGroupFormat = { $dateToString: { format: '%Y-%m', date: '$completedAt' } };
+        break;
+      case 'quarter':
+        dateGroupFormat = { $dateToString: { format: '%Y-Q%q', date: '$completedAt' } };
+        break;
+      default:
+        dateGroupFormat = { $dateToString: { format: '%Y-%m', date: '$completedAt' } };
       }
 
       // Analytics aggregation
@@ -905,9 +905,9 @@ async function generatePurchaseOrderNumber(branchCode) {
   const today = new Date();
   const year = today.getFullYear();
   const month = String(today.getMonth() + 1).padStart(2, '0');
-  
+
   const prefix = `PO-${branchCode}-${year}${month}`;
-  
+
   // Find the last purchase order with this prefix
   const lastPurchase = await Purchase.findOne({
     purchaseNumber: { $regex: `^${prefix}` }

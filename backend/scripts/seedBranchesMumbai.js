@@ -191,7 +191,7 @@ const seedMumbaiBranches = async () => {
     if (existingBranches.length > 0) {
       console.log('⚠️  Warning: Branches already exist in database');
       console.log(`📊 Found ${existingBranches.length} existing branches`);
-      
+
       const readline = require('readline').createInterface({
         input: process.stdin,
         output: process.stdout
@@ -200,7 +200,7 @@ const seedMumbaiBranches = async () => {
       const answer = await new Promise(resolve => {
         readline.question('\n❓ Do you want to DELETE all existing branches and create new ones? (yes/no): ', resolve);
       });
-      
+
       readline.close();
 
       if (answer.toLowerCase() !== 'yes') {
@@ -216,7 +216,7 @@ const seedMumbaiBranches = async () => {
 
     // Get or create a system user for createdBy
     let systemUser = await User.findOne({ role: 'Admin' }).limit(1);
-    
+
     if (!systemUser) {
       console.log('⚠️  No admin user found, creating temporary system user...');
       const bcrypt = require('bcryptjs');
@@ -235,15 +235,15 @@ const seedMumbaiBranches = async () => {
 
     // Create new Mumbai branches
     console.log('📝 Creating 3 Mumbai branches...\n');
-    
+
     const createdBranches = [];
     for (const branchData of mumbaiBranches) {
       // Add createdBy field
       branchData.createdBy = systemUser._id;
-      
+
       const branch = await Branch.create(branchData);
       createdBranches.push(branch);
-      
+
       console.log(`✅ Created: ${branch.name}`);
       console.log(`   Code: ${branch.code}`);
       console.log(`   City: ${branch.address.city}, ${branch.address.state}`);
@@ -255,7 +255,7 @@ const seedMumbaiBranches = async () => {
 
     console.log('📊 Summary:');
     console.log(`   Total Branches Created: ${createdBranches.length}`);
-    console.log(`   All branches in Mumbai, Maharashtra`);
+    console.log('   All branches in Mumbai, Maharashtra');
     console.log('');
 
     console.log('🎉 Mumbai Branches Seeding Completed Successfully!');
@@ -281,7 +281,7 @@ const seedMumbaiBranches = async () => {
 // Run if called directly
 if (require.main === module) {
   const database = require('../src/config/database');
-  
+
   database.connect()
     .then(async () => {
       await seedMumbaiBranches();

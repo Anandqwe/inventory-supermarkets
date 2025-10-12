@@ -9,13 +9,23 @@ const TokenUtils = require('../utils/tokenUtils');
 const ResponseUtils = require('../utils/responseUtils');
 const ValidationUtils = require('../utils/validationUtils');
 const { asyncHandler } = require('../middleware/errorHandler');
+const { logger } = require('../utils/logger');
+const {
+  ROLE_PERMISSIONS,
+  normalizeRoleName,
+  isBranchScopedRole,
+  hasCrossBranchAccess,
+  getRolePermissions,
+} = require('../../../shared/permissions');
 
 class AuthController {
   /**
    * Register new user (Admin only)
    */
   static register = asyncHandler(async (req, res) => {
-    const { email, password, firstName, lastName, phone, role = 'cashier', branch } = req.body;
+    const { email, password, firstName, lastName, phone, role: requestedRole = 'Cashier', branch } = req.body;
+
+    const normalizedRole = normalizeRoleName(requestedRole) || 'Cashier';
 
     // Validate required fields
     const validation = ValidationUtils.validateRequiredFields(req.body, ['email', 'password', 'firstName', 'lastName']);
@@ -46,13 +56,53 @@ class AuthController {
     }
 
     // Only admin can create other admins
-    if (role === 'admin' && req.user?.role !== 'admin') {
-      return ResponseUtils.forbidden(res, 'Only admins can create admin accounts');
+    const creatorRole = req.user?.role;
+
+    if (!ROLE_PERMISSIONS[normalizedRole]) {
+      return ResponseUtils.error(res, 'Invalid role specified', 400);
     }
 
-    // Validate branch requirement for non-Admin users
-    if (role !== 'Admin' && !branch) {
-      return ResponseUtils.error(res, 'Branch is required for non-Admin users', 400);
+    const roleCreationMatrix = {
+      Admin: Object.keys(ROLE_PERMISSIONS),
+      'Regional Manager': ['Store Manager', 'Inventory Manager', 'Cashier'],
+      'Store Manager': ['Inventory Manager', 'Cashier'],
+    };
+
+    const allowedRoles = roleCreationMatrix[creatorRole] || [];
+
+    if (!allowedRoles.includes(normalizedRole)) {
+      return ResponseUtils.forbidden(res, 'You are not authorized to create this role');
+    }
+
+    if (['Admin', 'Regional Manager', 'Viewer'].includes(normalizedRole) && creatorRole !== 'Admin') {
+      return ResponseUtils.forbidden(res, 'Only admins can create this role');
+    }
+
+    const branchScoped = isBranchScopedRole(normalizedRole);
+    const creatorBranchId = req.user?.branch && (req.user.branch._id || req.user.branch);
+
+    if (branchScoped) {
+      let targetBranchId = branch;
+
+      if (!hasCrossBranchAccess(creatorRole)) {
+        targetBranchId = creatorBranchId;
+      }
+
+      if (!targetBranchId) {
+        return ResponseUtils.error(res, 'Branch is required for branch-scoped roles', 400);
+      }
+
+      if (!hasCrossBranchAccess(creatorRole) && creatorBranchId.toString() !== targetBranchId.toString()) {
+        return ResponseUtils.forbidden(res, 'Cannot assign users to other branches');
+      }
+
+      if (!ValidationUtils.isValidObjectId(targetBranchId)) {
+        return ResponseUtils.error(res, 'Invalid branch identifier', 400);
+      }
+
+      req.body.branch = targetBranchId;
+    } else {
+      req.body.branch = undefined;
     }
 
     // Create new user
@@ -62,9 +112,10 @@ class AuthController {
       firstName: ValidationUtils.sanitizeString(firstName),
       lastName: ValidationUtils.sanitizeString(lastName),
       phone: phone ? phone.replace(/\s+/g, '') : undefined,
-      role,
-      branch: role === 'Admin' ? undefined : branch,
-      createdBy: req.user?.id
+      role: normalizedRole,
+      branch: req.body.branch,
+      createdBy: req.user?.id,
+      permissions: getRolePermissions(normalizedRole)
     });
 
     await user.save();
@@ -94,8 +145,10 @@ class AuthController {
       return ResponseUtils.validationError(res, validation.errors.map(err => ({ message: err })));
     }
 
-    // Find user with password field
-    const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
+    // Find user with password field and populate branch
+    const user = await User.findOne({ email: email.toLowerCase() })
+      .select('+password')
+      .populate('branch', 'name code address');
     if (!user) {
       return ResponseUtils.unauthorized(res, 'Invalid email or password');
     }
@@ -131,7 +184,9 @@ class AuthController {
    * Get current user profile
    */
   static getProfile = asyncHandler(async (req, res) => {
-    const user = await User.findById(req.user.id).select('-password');
+    const user = await User.findById(req.user.id)
+      .select('-password')
+      .populate('branch', 'name code address');
     if (!user) {
       return ResponseUtils.notFound(res, 'User not found');
     }
@@ -143,7 +198,7 @@ class AuthController {
    * Update user profile
    */
   static updateProfile = asyncHandler(async (req, res) => {
-    const { fullName, firstName, lastName, phone } = req.body;
+    const { fullName, firstName, lastName, phone, address, email } = req.body;
     const updates = {};
 
     if (fullName) {
@@ -158,9 +213,26 @@ class AuthController {
 
     if (phone) {
       if (!ValidationUtils.isValidPhone(phone)) {
-        return ResponseUtils.error(res, 'Invalid phone number format', 400);
+        return ResponseUtils.error(res, 'Invalid phone number format. Use 10-digit Indian number (e.g., 9876543210 or +91 9876543210)', 400);
       }
-      updates.phone = phone.replace(/\s+/g, '');
+      // Clean phone number: remove spaces, +, and country code, keep only 10 digits
+      const cleanedPhone = phone
+        .replace(/\s+/g, '')        // Remove spaces
+        .replace(/^\+91/, '')       // Remove +91 prefix
+        .replace(/^91/, '')         // Remove 91 prefix
+        .replace(/^\+/, '');        // Remove any other + prefix
+      
+      updates.phone = cleanedPhone;
+    }
+
+    if (address) {
+      updates.address = ValidationUtils.sanitizeString(address);
+    }
+
+    // Note: Email updates are typically not allowed or require verification
+    // Keeping email read-only for security reasons
+    if (email && email !== req.user.email) {
+      return ResponseUtils.error(res, 'Email address cannot be changed. Please contact an administrator.', 400);
     }
 
     const user = await User.findByIdAndUpdate(
@@ -225,7 +297,7 @@ class AuthController {
   static logout = asyncHandler(async (req, res) => {
     // In a stateless JWT system, logout is handled client-side
     // Here we can log the logout event
-    console.log(`User ${req.user.id} logged out at ${new Date().toISOString()}`);
+    logger.info(`User ${req.user.id} logged out`, { userId: req.user.id, timestamp: new Date().toISOString() });
     
     ResponseUtils.success(res, null, 'Logged out successfully');
   });
@@ -249,7 +321,7 @@ class AuthController {
    * Get all users (Admin/Manager only)
    */
   static getAllUsers = asyncHandler(async (req, res) => {
-    const { page = 1, limit = 10, search, role, isActive } = req.query;
+  const { page = 1, limit = 10, search, role, isActive } = req.query;
     
     // Validate pagination
     const pagination = ValidationUtils.validatePagination({ page, limit });
@@ -265,12 +337,19 @@ class AuthController {
       ];
     }
     
-    if (role && ['admin', 'manager', 'cashier'].includes(role)) {
-      filter.role = role;
+    if (role) {
+      const normalizedRole = normalizeRoleName(role);
+      if (normalizedRole && ROLE_PERMISSIONS[normalizedRole]) {
+        filter.role = normalizedRole;
+      }
     }
     
     if (isActive !== undefined) {
       filter.isActive = isActive === 'true';
+    }
+
+    if (!hasCrossBranchAccess(req.user.role)) {
+      filter.branch = req.user.branch?._id || req.user.branch;
     }
 
     // Get users with pagination
@@ -282,7 +361,8 @@ class AuthController {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(pagination.limit)
-        .populate('createdBy', 'fullName email'),
+        .populate('createdBy', 'fullName email')
+        .populate('branch', 'name code'),
       User.countDocuments(filter)
     ]);
 
@@ -299,17 +379,32 @@ class AuthController {
       return ResponseUtils.error(res, 'Invalid user ID', 400);
     }
 
-    const user = await User.findById(userId);
+  const user = await User.findById(userId);
     if (!user) {
       return ResponseUtils.notFound(res, 'User not found');
     }
 
-    // Prevent deactivating self
+    if (user.role === 'Admin' && req.user.role !== 'Admin') {
+      return ResponseUtils.forbidden(res, 'Only admins can manage other admin accounts');
+    }
+
+    if (user.role === 'Regional Manager' && req.user.role !== 'Admin') {
+      return ResponseUtils.forbidden(res, 'Only admins can manage regional managers');
+    }
+
+    if (!hasCrossBranchAccess(req.user.role)) {
+      const targetBranchId = user.branch && (user.branch._id || user.branch);
+      const requesterBranchId = req.user.branch && (req.user.branch._id || req.user.branch);
+
+      if (!targetBranchId || targetBranchId.toString() !== requesterBranchId?.toString()) {
+        return ResponseUtils.forbidden(res, 'Cannot manage users from other branches');
+      }
+    }
+
     if (user.id === req.user.id) {
       return ResponseUtils.error(res, 'Cannot deactivate your own account', 400);
     }
 
-    // Toggle active status
     user.isActive = !user.isActive;
     await user.save();
 

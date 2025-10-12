@@ -10,30 +10,30 @@ const options = {
       description: 'A comprehensive inventory management system for supermarkets with multi-branch support',
       contact: {
         name: 'API Support',
-        email: 'support@inventoryapi.com',
+        email: 'support@inventoryapi.com'
       },
       license: {
         name: 'MIT',
-        url: 'https://opensource.org/licenses/MIT',
-      },
+        url: 'https://opensource.org/licenses/MIT'
+      }
     },
     servers: [
       {
         url: 'http://localhost:5000',
-        description: 'Development server',
+        description: 'Development server'
       },
       {
         url: 'https://api.inventorymanagement.com',
-        description: 'Production server',
-      },
+        description: 'Production server'
+      }
     ],
     components: {
       securitySchemes: {
         BearerAuth: {
           type: 'http',
           scheme: 'bearer',
-          bearerFormat: 'JWT',
-        },
+          bearerFormat: 'JWT'
+        }
       },
       schemas: {
         // Schemas are defined inline in route files for better maintainability
@@ -43,11 +43,11 @@ const options = {
           properties: {
             success: {
               type: 'boolean',
-              example: false,
+              example: false
             },
             message: {
               type: 'string',
-              description: 'Error message',
+              description: 'Error message'
             },
             errors: {
               type: 'array',
@@ -56,26 +56,26 @@ const options = {
                 properties: {
                   field: {
                     type: 'string',
-                    description: 'Field that caused the error',
+                    description: 'Field that caused the error'
                   },
                   message: {
                     type: 'string',
-                    description: 'Error message for the field',
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
+                    description: 'Error message for the field'
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     },
     security: [
       {
-        BearerAuth: [],
-      },
-    ],
+        BearerAuth: []
+      }
+    ]
   },
-  apis: ['./src/routes/*.js'], // paths to files containing OpenAPI definitions
+  apis: ['./src/routes/*.js'] // paths to files containing OpenAPI definitions
 };
 
 const specs = swaggerJsdoc(options);
@@ -86,6 +86,6 @@ module.exports = {
   setup: swaggerUi.setup(specs, {
     explorer: true,
     customCss: '.swagger-ui .topbar { display: none }',
-    customSiteTitle: 'Inventory Management API Documentation',
-  }),
+    customSiteTitle: 'Inventory Management API Documentation'
+  })
 };

@@ -1,16 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'react-hot-toast';
 import { 
   UserIcon, 
   Cog6ToothIcon as SettingsIcon, 
   BuildingOfficeIcon as Building2, 
-  CalculatorIcon as Calculator, 
   ShieldCheckIcon as Shield, 
   BellIcon as Bell, 
-  SwatchIcon as Palette, 
-  GlobeAltIcon as Globe, 
-  BookmarkIcon as Save, 
-  ArrowUpTrayIcon as Upload, 
   XMarkIcon as X, 
   PlusIcon as Plus, 
   PencilIcon as Edit, 
@@ -21,19 +17,14 @@ import {
   EnvelopeIcon as Mail, 
   PhoneIcon as Phone, 
   MapPinIcon as MapPin, 
-  CreditCardIcon as CreditCard, 
-  PercentBadgeIcon as Percent, 
   CheckIcon as Check,
   ComputerDesktopIcon as Monitor, 
   MoonIcon as Moon, 
   SunIcon as Sun, 
   ArrowPathIcon as RefreshCw, 
-  ArrowDownTrayIcon as Download, 
-  ArchiveBoxIcon as Archive,
-  CogIcon,
-  UsersIcon,
-  PencilIcon,
-  UserPlusIcon
+  BookmarkIcon as Save,
+  UserPlusIcon,
+  BuildingStorefrontIcon
 } from '@heroicons/react/24/outline';
 
 import { Button } from '../components/ui/Button';
@@ -42,275 +33,214 @@ import { Badge } from '../components/ui/Badge';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { LoadingSpinner } from '../components/LoadingSpinner';
-import Toast from '../components/Toast';
 import { PageHeader } from '../components/shell/PageHeader';
 import { useAuth } from '../contexts/AuthContext';
-import { settingsAPI, masterDataAPI } from '../utils/api';
+import { settingsAPI, masterDataAPI, authAPI } from '../utils/api';
+import { Skeleton } from '../components/ui/Skeleton';
+import { EmptyState } from '../components/ui/EmptyState';
 
-// Mock API functions for demo purposes  
-const legacySettingsAPI = {
-  getUserProfile: async () => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return {
-      id: '1',
-      firstName: 'John',
-      lastName: 'Doe',
-      email: 'john.doe@company.com',
-      phone: '+1 234 567 8900',
-      avatar: null,
-      role: 'manager',
-      branch: 'main-store',
-      address: '123 Business St, City, State 12345',
-      dateJoined: '2023-01-15',
-      lastLogin: '2024-01-15T10:30:00Z',
-      permissions: ['manage_products', 'view_reports', 'manage_sales'],
-      preferences: {
-        theme: 'system',
-        language: 'en',
-        notifications: {
-          email: true,
-          push: true,
-          lowStock: true,
-          salesAlerts: true
-        },
-        dashboard: {
-          defaultView: 'overview',
-          autoRefresh: true,
-          refreshInterval: 300
-        }
-      }
-    };
-  },
-
-  updateUserProfile: async (data) => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    return { success: true };
-  },
-
-  getSystemSettings: async () => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return {
-      company: {
-        name: 'SuperMart Solutions',
-        address: '456 Corporate Blvd, Business City, State 54321',
-        phone: '+1 555 123 4567',
-        email: 'info@supermart.com',
-        website: 'www.supermart.com',
-        logo: null,
-        taxId: 'TAX123456789'
-      },
-      currency: {
-        code: 'INR',
-        symbol: '₹',
-        decimalPlaces: 2
-      },
-      tax: {
-        defaultGstRate: 18,
-        includeInPrice: false,
-        categories: [
-          { name: 'Food Items', rate: 5 },
-          { name: 'Electronics', rate: 18 },
-          { name: 'Clothing', rate: 12 }
-        ]
-      },
-      receipt: {
-        showLogo: true,
-        showCompanyInfo: true,
-        showTaxInfo: true,
-        footerMessage: 'Thank you for shopping with us!',
-        template: 'standard'
-      },
-      backup: {
-        autoBackup: true,
-        frequency: 'daily',
-        retention: 30
-      }
-    };
-  },
-
-  updateSystemSettings: async (data) => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    return { success: true };
-  },
-
-  getBranches: async () => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return [
-      {
-        id: 'main-store',
-        name: 'Main Store',
-        code: 'MS001',
-        address: '123 Main St, City, State 12345',
-        phone: '+1 234 567 8901',
-        email: 'main@supermart.com',
-        manager: 'John Doe',
-        isActive: true,
-        createdAt: '2023-01-01'
-      },
-      {
-        id: 'downtown',
-        name: 'Downtown Branch',
-        code: 'DT002',
-        address: '789 Downtown Ave, City, State 12345',
-        phone: '+1 234 567 8902',
-        email: 'downtown@supermart.com',
-        manager: 'Jane Smith',
-        isActive: true,
-        createdAt: '2023-06-15'
-      }
-    ];
-  },
-
-  createBranch: async (data) => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    return { success: true };
-  },
-
-  updateBranch: async (id, data) => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    return { success: true };
-  },
-
-  getUsers: async () => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return [
-      {
-        id: '1',
-        name: 'John Doe',
-        email: 'john.doe@company.com',
-        role: 'manager',
-        branch: 'Main Store',
-        isActive: true,
-        lastLogin: '2024-01-15T10:30:00Z'
-      },
-      {
-        id: '2',
-        name: 'Jane Smith',
-        email: 'jane.smith@company.com',
-        role: 'cashier',
-        branch: 'Downtown',
-        isActive: true,
-        lastLogin: '2024-01-14T16:45:00Z'
-      }
-    ];
-  }
-};
 
 // Settings & Configuration Component
 function Settings() {
   const [activeTab, setActiveTab] = useState('profile');
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showBranchModal, setShowBranchModal] = useState(false);
+  const [showUserModal, setShowUserModal] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState(null);
-  const [toast, setToast] = useState(null);
+  const [selectedUser, setSelectedUser] = useState(null);
   const { user } = useAuth();
-
   const queryClient = useQueryClient();
 
+  // Check if user has admin/manager permissions (case-insensitive)
+  // Roles: Admin, Regional Manager, Store Manager, Inventory Manager, Cashier, Viewer
+  const userRole = user?.role?.toLowerCase();
+  const canManageUsers = userRole === 'admin' || userRole?.includes('manager');
+  const isAdmin = userRole === 'admin';
+
   // Queries
-  const { data: userProfile, isLoading: profileLoading } = useQuery({
+  const { data: userProfile, isLoading: profileLoading, refetch: refetchProfile } = useQuery({
     queryKey: ['user-profile'],
-    queryFn: settingsAPI.getUserProfile,
+    queryFn: async () => {
+      console.log('Fetching user profile...');
+      const result = await settingsAPI.getUserProfile();
+      console.log('User profile data:', result);
+      return result;
+    },
     enabled: activeTab === 'profile'
   });
 
-  const { data: systemSettings, isLoading: systemLoading } = useQuery({
-    queryKey: ['system-settings'],
-    queryFn: legacySettingsAPI.getSystemSettings,
-    enabled: activeTab === 'system' || activeTab === 'tax'
-  });
-
-  const { data: branches, isLoading: branchesLoading } = useQuery({
-    queryKey: ['branches'],
-    queryFn: masterDataAPI.getBranches,
+  const { data: branchesData, isLoading: branchesLoading, refetch: refetchBranches } = useQuery({
+    queryKey: ['branches-all'],
+    queryFn: async () => {
+      console.log('Fetching branches...');
+      const result = await masterDataAPI.getBranches({ limit: 100 });
+      console.log('Branches data:', result);
+      return result;
+    },
     enabled: activeTab === 'branches'
   });
 
-  const { data: users, isLoading: usersLoading } = useQuery({
-    queryKey: ['users'],
-    queryFn: legacySettingsAPI.getUsers,
-    enabled: activeTab === 'users'
+  const { data: usersData, isLoading: usersLoading, refetch: refetchUsers } = useQuery({
+    queryKey: ['users-all'],
+    queryFn: async () => {
+      console.log('Fetching users...');
+      const result = await authAPI.getAllUsers();
+      console.log('Users data:', result);
+      return result;
+    },
+    enabled: activeTab === 'users' && canManageUsers
   });
+
+  const branches = branchesData?.data || [];
+  const users = usersData?.data || [];
 
   // Mutations
   const updateProfileMutation = useMutation({
-    mutationFn: settingsAPI.updateUserProfile,
+    mutationFn: (data) => {
+      console.log('Updating profile with data:', data);
+      return settingsAPI.updateUserProfile(data);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries(['user-profile']);
-      setToast({ type: 'success', message: 'Profile updated successfully' });
+      toast.success('Profile updated successfully');
+      console.log('Profile update successful');
     },
-    onError: () => {
-      setToast({ type: 'error', message: 'Failed to update profile' });
-    }
-  });
-
-  const updateSystemMutation = useMutation({
-    mutationFn: legacySettingsAPI.updateSystemSettings,
-    onSuccess: () => {
-      queryClient.invalidateQueries(['system-settings']);
-      setToast({ type: 'success', message: 'Settings updated successfully' });
-    },
-    onError: () => {
-      setToast({ type: 'error', message: 'Failed to update settings' });
+    onError: (error) => {
+      console.error('Profile update error:', error);
+      console.error('Error response:', error.response?.data);
+      toast.error(error.response?.data?.message || 'Failed to update profile');
     }
   });
 
   const createBranchMutation = useMutation({
-    mutationFn: masterDataAPI.createBranch,
+    mutationFn: (data) => {
+      console.log('Creating branch with data:', data);
+      return masterDataAPI.createBranch(data);
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries(['branches']);
+      queryClient.invalidateQueries(['branches-all']);
       setShowBranchModal(false);
       setSelectedBranch(null);
-      setToast({ type: 'success', message: 'Branch created successfully' });
+      toast.success('Branch created successfully');
+      console.log('Branch created successfully');
     },
-    onError: () => {
-      setToast({ type: 'error', message: 'Failed to create branch' });
+    onError: (error) => {
+      console.error('Branch creation error:', error);
+      console.error('Error response:', error.response?.data);
+      toast.error(error.response?.data?.message || 'Failed to create branch');
+    }
+  });
+
+  const updateBranchMutation = useMutation({
+    mutationFn: ({ id, data }) => {
+      console.log('Updating branch ID:', id, 'with data:', data);
+      return masterDataAPI.updateBranch(id, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['branches-all']);
+      setShowBranchModal(false);
+      setSelectedBranch(null);
+      toast.success('Branch updated successfully');
+      console.log('Branch updated successfully');
+    },
+    onError: (error) => {
+      console.error('Branch update error:', error);
+      console.error('Error response:', error.response?.data);
+      toast.error(error.response?.data?.message || 'Failed to update branch');
+    }
+  });
+
+  const deleteBranchMutation = useMutation({
+    mutationFn: (id) => {
+      console.log('Deleting branch ID:', id);
+      return masterDataAPI.deleteBranch(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['branches-all']);
+      toast.success('Branch deleted successfully');
+      console.log('Branch deleted successfully');
+    },
+    onError: (error) => {
+      console.error('Branch deletion error:', error);
+      console.error('Error response:', error.response?.data);
+      toast.error(error.response?.data?.message || 'Failed to delete branch');
+    }
+  });
+
+  const toggleUserStatusMutation = useMutation({
+    mutationFn: (userId) => {
+      console.log('Toggling status for user ID:', userId);
+      return authAPI.toggleUserStatus(userId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['users-all']);
+      toast.success('User status updated successfully');
+      console.log('User status toggled successfully');
+    },
+    onError: (error) => {
+      console.error('Toggle user status error:', error);
+      console.error('Error response:', error.response?.data);
+      toast.error(error.response?.data?.message || 'Failed to update user status');
     }
   });
 
   // Tab configuration
   const tabs = [
-    { id: 'profile', label: 'Profile', icon: UserIcon },
-    { id: 'system', label: 'System', icon: SettingsIcon },
-    { id: 'branches', label: 'Branches', icon: Building2 },
-    { id: 'tax', label: 'Tax Config', icon: Calculator },
-    { id: 'users', label: 'Users', icon: Shield }
-  ];
+    { id: 'profile', label: 'My Profile', icon: UserIcon, show: true },
+    { id: 'system', label: 'System Settings', icon: SettingsIcon, show: isAdmin },
+    { id: 'branches', label: 'Branches', icon: Building2, show: canManageUsers },
+    { id: 'users', label: 'User Management', icon: Shield, show: canManageUsers }
+  ].filter(tab => tab.show);
+
 
   // Profile Tab
   const ProfileTab = () => {
-    const [formData, setFormData] = useState({});
-    const [showPassword, setShowPassword] = useState(false);
+    const [formData, setFormData] = useState({
+      firstName: '',
+      lastName: '',
+      email: '',
+      phone: '',
+      address: ''
+    });
 
     useEffect(() => {
-      if (userProfile) {
-        setFormData(userProfile);
+      if (userProfile?.data) {
+        setFormData({
+          firstName: userProfile.data.firstName || '',
+          lastName: userProfile.data.lastName || '',
+          email: userProfile.data.email || '',
+          phone: userProfile.data.phone || '',
+          address: userProfile.data.address || ''
+        });
       }
     }, [userProfile]);
 
     const handleSubmit = (e) => {
       e.preventDefault();
-      updateProfileMutation.mutate(formData);
+      // Only send fields that can be updated (exclude email)
+      const updateData = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        phone: formData.phone,
+        address: formData.address
+      };
+      updateProfileMutation.mutate(updateData);
     };
 
     const handleChange = (field, value) => {
       setFormData(prev => ({ ...prev, [field]: value }));
     };
 
-    const handlePreferenceChange = (category, field, value) => {
-      setFormData(prev => ({
-        ...prev,
-        preferences: {
-          ...prev.preferences,
-          [category]: {
-            ...prev.preferences[category],
-            [field]: value
-          }
-        }
-      }));
-    };
+    if (profileLoading) {
+      return (
+        <div className="space-y-6">
+          <Skeleton variant="card" />
+          <Skeleton variant="card" />
+        </div>
+      );
+    }
 
-    if (profileLoading) return <LoadingSpinner />;
+    const profile = userProfile?.data;
 
     return (
       <div className="space-y-6">
@@ -318,10 +248,30 @@ function Settings() {
           {/* Personal Information */}
           <Card className="p-6">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-medium">Personal Information</h3>
-              <Button type="submit" disabled={updateProfileMutation.isPending}>
-                {updateProfileMutation.isPending ? <LoadingSpinner size="sm" /> : <Save className="h-4 w-4 mr-2" />}
-                Save Changes
+              <div>
+                <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100">
+                  Personal Information
+                </h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                  Update your personal details and contact information
+                </p>
+              </div>
+              <Button 
+                type="submit" 
+                disabled={updateProfileMutation.isPending}
+                className="flex items-center gap-2"
+              >
+                {updateProfileMutation.isPending ? (
+                  <>
+                    <LoadingSpinner size="sm" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4" />
+                    Save Changes
+                  </>
+                )}
               </Button>
             </div>
 
@@ -331,9 +281,10 @@ function Settings() {
                   First Name
                 </label>
                 <Input
-                  value={formData.firstName || ''}
+                  value={formData.firstName}
                   onChange={(e) => handleChange('firstName', e.target.value)}
                   placeholder="Enter first name"
+                  required
                 />
               </div>
 
@@ -342,9 +293,10 @@ function Settings() {
                   Last Name
                 </label>
                 <Input
-                  value={formData.lastName || ''}
+                  value={formData.lastName}
                   onChange={(e) => handleChange('lastName', e.target.value)}
                   placeholder="Enter last name"
+                  required
                 />
               </div>
 
@@ -354,10 +306,14 @@ function Settings() {
                 </label>
                 <Input
                   type="email"
-                  value={formData.email || ''}
-                  onChange={(e) => handleChange('email', e.target.value)}
+                  value={formData.email}
                   placeholder="Enter email"
+                  disabled
+                  className="bg-slate-100 dark:bg-slate-800 cursor-not-allowed"
                 />
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Email cannot be changed. Contact an administrator if needed.
+                </p>
               </div>
 
               <div>
@@ -365,10 +321,13 @@ function Settings() {
                   Phone
                 </label>
                 <Input
-                  value={formData.phone || ''}
+                  value={formData.phone}
                   onChange={(e) => handleChange('phone', e.target.value)}
-                  placeholder="Enter phone number"
+                  placeholder="+91 9876543210 or 9876543210"
                 />
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Indian mobile number (10 digits). Formats: 9876543210, +91 9876543210
+                </p>
               </div>
 
               <div className="md:col-span-2">
@@ -376,128 +335,90 @@ function Settings() {
                   Address
                 </label>
                 <textarea
-                  value={formData.address || ''}
+                  value={formData.address}
                   onChange={(e) => handleChange('address', e.target.value)}
                   placeholder="Enter address"
                   rows={3}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700"
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-800 dark:text-slate-100"
                 />
+              </div>
+            </div>
+          </Card>
+
+          {/* Account Information */}
+          <Card className="p-6">
+            <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-6">
+              Account Information
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                <div>
+                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Role</p>
+                  <p className="text-lg font-semibold text-slate-900 dark:text-slate-100 capitalize">
+                    {profile?.role || 'N/A'}
+                  </p>
+                </div>
+                <Badge variant={
+                  profile?.role?.toLowerCase() === 'admin' ? 'primary' : 
+                  profile?.role?.toLowerCase().includes('manager') ? 'warning' : 
+                  'secondary'
+                }>
+                  {profile?.role?.toUpperCase() || 'N/A'}
+                </Badge>
+              </div>
+
+              <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                <div>
+                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Branch</p>
+                  <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                    {profile?.branch?.name || 'N/A'}
+                  </p>
+                </div>
+                <Building2 className="h-8 w-8 text-slate-400" />
+              </div>
+
+              <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                <div>
+                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Status</p>
+                  <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                    {profile?.isActive ? 'Active' : 'Inactive'}
+                  </p>
+                </div>
+                <Badge variant={profile?.isActive ? 'success' : 'secondary'}>
+                  {profile?.isActive ? 'ACTIVE' : 'INACTIVE'}
+                </Badge>
+              </div>
+
+              <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                <div>
+                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Last Login</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                    {profile?.lastLogin 
+                      ? new Date(profile.lastLogin).toLocaleString() 
+                      : 'N/A'}
+                  </p>
+                </div>
               </div>
             </div>
 
             <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="font-medium">Password</h4>
-                  <p className="text-sm text-slate-600 dark:text-slate-400">
-                    Change your account password
+                  <h4 className="font-medium text-slate-900 dark:text-slate-100">Security</h4>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                    Change your account password to keep your account secure
                   </p>
                 </div>
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setShowPasswordModal(true)}
+                  className="flex items-center gap-2"
                 >
-                  <Key className="h-4 w-4 mr-2" />
+                  <Key className="h-4 w-4" />
                   Change Password
                 </Button>
-              </div>
-            </div>
-          </Card>
-
-          {/* Preferences */}
-          <Card className="p-6">
-            <h3 className="text-lg font-medium mb-6">Preferences</h3>
-            
-            <div className="space-y-6">
-              {/* Theme */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
-                  Theme
-                </label>
-                <div className="flex gap-3">
-                  {[
-                    { value: 'light', label: 'Light', icon: Sun },
-                    { value: 'dark', label: 'Dark', icon: Moon },
-                    { value: 'system', label: 'System', icon: Monitor }
-                  ].map((theme) => {
-                    const Icon = theme.icon;
-                    return (
-                      <button
-                        key={theme.value}
-                        type="button"
-                        onClick={() => handlePreferenceChange('theme', 'theme', theme.value)}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
-                          formData.preferences?.theme === theme.value
-                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-600'
-                            : 'border-slate-300 hover:border-slate-400'
-                        }`}
-                      >
-                        <Icon className="h-4 w-4" />
-                        {theme.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Notifications */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
-                  Notifications
-                </label>
-                <div className="space-y-3">
-                  {[
-                    { key: 'email', label: 'Email Notifications' },
-                    { key: 'push', label: 'Push Notifications' },
-                    { key: 'lowStock', label: 'Low Stock Alerts' },
-                    { key: 'salesAlerts', label: 'Sales Alerts' }
-                  ].map((notification) => (
-                    <label key={notification.key} className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={formData.preferences?.notifications?.[notification.key] || false}
-                        onChange={(e) => handlePreferenceChange('notifications', notification.key, e.target.checked)}
-                        className="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300 rounded"
-                      />
-                      {notification.label}
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Dashboard */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
-                  Dashboard Settings
-                </label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm text-slate-600 dark:text-slate-400 mb-1">
-                      Default View
-                    </label>
-                    <select
-                      value={formData.preferences?.dashboard?.defaultView || 'overview'}
-                      onChange={(e) => handlePreferenceChange('dashboard', 'defaultView', e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700"
-                    >
-                      <option value="overview">Overview</option>
-                      <option value="sales">Sales</option>
-                      <option value="inventory">Inventory</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={formData.preferences?.dashboard?.autoRefresh || false}
-                        onChange={(e) => handlePreferenceChange('dashboard', 'autoRefresh', e.target.checked)}
-                        className="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300 rounded"
-                      />
-                      Auto Refresh Dashboard
-                    </label>
-                  </div>
-                </div>
               </div>
             </div>
           </Card>
@@ -506,29 +427,42 @@ function Settings() {
     );
   };
 
+
   // System Settings Tab
   const SystemTab = () => {
-    const [formData, setFormData] = useState({});
+    const [formData, setFormData] = useState({
+      companyName: 'Mumbai Supermart',
+      companyAddress: '123 Business Street, Mumbai, Maharashtra 400001',
+      companyPhone: '+91 22 1234 5678',
+      companyEmail: 'info@mumbaisupermart.com',
+      companyWebsite: 'www.mumbaisupermart.com',
+      taxId: 'GST123456789',
+      currency: 'INR',
+      defaultGstRate: 18,
+      lowStockThreshold: 10,
+      receiptFooter: 'Thank you for shopping with us! Visit again!',
+      emailNotifications: true,
+      lowStockAlerts: true,
+      autoBackup: true,
+      backupFrequency: 'daily'
+    });
 
-    useEffect(() => {
-      if (systemSettings) {
-        setFormData(systemSettings);
-      }
-    }, [systemSettings]);
+    const [saving, setSaving] = useState(false);
 
-    const handleSubmit = (e) => {
+    const handleChange = (field, value) => {
+      setFormData(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleSubmit = async (e) => {
       e.preventDefault();
-      updateSystemMutation.mutate(formData);
+      setSaving(true);
+      
+      // Simulate API call (replace with actual API when backend is ready)
+      setTimeout(() => {
+        toast.success('System settings saved successfully');
+        setSaving(false);
+      }, 1000);
     };
-
-    const handleCompanyChange = (field, value) => {
-      setFormData(prev => ({
-        ...prev,
-        company: { ...prev.company, [field]: value }
-      }));
-    };
-
-    if (systemLoading) return <LoadingSpinner />;
 
     return (
       <div className="space-y-6">
@@ -536,10 +470,26 @@ function Settings() {
           {/* Company Information */}
           <Card className="p-6">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-medium">Company Information</h3>
-              <Button type="submit" disabled={updateSystemMutation.isPending}>
-                {updateSystemMutation.isPending ? <LoadingSpinner size="sm" /> : <Save className="h-4 w-4 mr-2" />}
-                Save Changes
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  Company Information
+                </h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                  Configure your company details and contact information
+                </p>
+              </div>
+              <Button type="submit" disabled={saving} className="flex items-center gap-2">
+                {saving ? (
+                  <>
+                    <LoadingSpinner size="sm" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4" />
+                    Save Changes
+                  </>
+                )}
               </Button>
             </div>
 
@@ -549,43 +499,44 @@ function Settings() {
                   Company Name
                 </label>
                 <Input
-                  value={formData.company?.name || ''}
-                  onChange={(e) => handleCompanyChange('name', e.target.value)}
+                  value={formData.companyName}
+                  onChange={(e) => handleChange('companyName', e.target.value)}
                   placeholder="Enter company name"
+                  required
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Tax ID
+                  GST/Tax ID
                 </label>
                 <Input
-                  value={formData.company?.taxId || ''}
-                  onChange={(e) => handleCompanyChange('taxId', e.target.value)}
-                  placeholder="Enter tax ID"
+                  value={formData.taxId}
+                  onChange={(e) => handleChange('taxId', e.target.value)}
+                  placeholder="Enter GST/Tax ID"
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Phone
+                  Phone Number
                 </label>
                 <Input
-                  value={formData.company?.phone || ''}
-                  onChange={(e) => handleCompanyChange('phone', e.target.value)}
+                  value={formData.companyPhone}
+                  onChange={(e) => handleChange('companyPhone', e.target.value)}
                   placeholder="Enter phone number"
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Email
+                  Email Address
                 </label>
                 <Input
                   type="email"
-                  value={formData.company?.email || ''}
-                  onChange={(e) => handleCompanyChange('email', e.target.value)}
-                  placeholder="Enter email"
+                  value={formData.companyEmail}
+                  onChange={(e) => handleChange('companyEmail', e.target.value)}
+                  placeholder="Enter email address"
                 />
               </div>
 
@@ -594,66 +545,81 @@ function Settings() {
                   Website
                 </label>
                 <Input
-                  value={formData.company?.website || ''}
-                  onChange={(e) => handleCompanyChange('website', e.target.value)}
-                  placeholder="Enter website URL"
+                  value={formData.companyWebsite}
+                  onChange={(e) => handleChange('companyWebsite', e.target.value)}
+                  placeholder="www.example.com"
                 />
               </div>
 
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Address
-                </label>
-                <textarea
-                  value={formData.company?.address || ''}
-                  onChange={(e) => handleCompanyChange('address', e.target.value)}
-                  placeholder="Enter company address"
-                  rows={3}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700"
-                />
-              </div>
-            </div>
-          </Card>
-
-          {/* Currency & Receipt Settings */}
-          <Card className="p-6">
-            <h3 className="text-lg font-medium mb-6">Currency & Receipt Settings</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Currency
                 </label>
                 <select
-                  value={formData.currency?.code || 'INR'}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    currency: { ...prev.currency, code: e.target.value }
-                  }))}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700"
+                  value={formData.currency}
+                  onChange={(e) => handleChange('currency', e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-800 dark:text-slate-100"
                 >
                   <option value="INR">Indian Rupee (₹)</option>
                   <option value="USD">US Dollar ($)</option>
                   <option value="EUR">Euro (€)</option>
+                  <option value="GBP">British Pound (£)</option>
                 </select>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Company Address
+                </label>
+                <textarea
+                  value={formData.companyAddress}
+                  onChange={(e) => handleChange('companyAddress', e.target.value)}
+                  placeholder="Enter complete address"
+                  rows={3}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-800 dark:text-slate-100"
+                />
+              </div>
+            </div>
+          </Card>
+
+          {/* Business Settings */}
+          <Card className="p-6">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-6">
+              Business Settings
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Default GST Rate (%)
+                </label>
+                <Input
+                  type="number"
+                  value={formData.defaultGstRate}
+                  onChange={(e) => handleChange('defaultGstRate', parseFloat(e.target.value))}
+                  min="0"
+                  max="100"
+                  step="0.1"
+                />
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Default tax rate applied to products (can be overridden per product)
+                </p>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Receipt Template
+                  Low Stock Alert Threshold
                 </label>
-                <select
-                  value={formData.receipt?.template || 'standard'}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    receipt: { ...prev.receipt, template: e.target.value }
-                  }))}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700"
-                >
-                  <option value="standard">Standard</option>
-                  <option value="thermal">Thermal Printer</option>
-                  <option value="detailed">Detailed</option>
-                </select>
+                <Input
+                  type="number"
+                  value={formData.lowStockThreshold}
+                  onChange={(e) => handleChange('lowStockThreshold', parseInt(e.target.value))}
+                  min="1"
+                  max="1000"
+                />
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Alert when product quantity falls below this number
+                </p>
               </div>
 
               <div className="md:col-span-2">
@@ -661,116 +627,98 @@ function Settings() {
                   Receipt Footer Message
                 </label>
                 <Input
-                  value={formData.receipt?.footerMessage || ''}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    receipt: { ...prev.receipt, footerMessage: e.target.value }
-                  }))}
-                  placeholder="Thank you message"
+                  value={formData.receiptFooter}
+                  onChange={(e) => handleChange('receiptFooter', e.target.value)}
+                  placeholder="Thank you message for receipts"
+                  maxLength={100}
                 />
               </div>
             </div>
+          </Card>
 
-            <div className="mt-6 space-y-3">
-              <label className="flex items-center">
+          {/* Notification Settings */}
+          <Card className="p-6">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-6">
+              Notification Settings
+            </h3>
+
+            <div className="space-y-4">
+              <label className="flex items-center justify-between p-4 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
+                <div>
+                  <div className="font-medium text-slate-900 dark:text-slate-100">Email Notifications</div>
+                  <div className="text-sm text-slate-500 dark:text-slate-400">
+                    Receive general system notifications via email
+                  </div>
+                </div>
                 <input
                   type="checkbox"
-                  checked={formData.receipt?.showLogo || false}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    receipt: { ...prev.receipt, showLogo: e.target.checked }
-                  }))}
-                  className="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300 rounded"
+                  checked={formData.emailNotifications}
+                  onChange={(e) => handleChange('emailNotifications', e.target.checked)}
+                  className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-slate-300 rounded"
                 />
-                Show company logo on receipts
               </label>
-              <label className="flex items-center">
+
+              <label className="flex items-center justify-between p-4 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
+                <div>
+                  <div className="font-medium text-slate-900 dark:text-slate-100">Low Stock Alerts</div>
+                  <div className="text-sm text-slate-500 dark:text-slate-400">
+                    Get notified when products are running low
+                  </div>
+                </div>
                 <input
                   type="checkbox"
-                  checked={formData.receipt?.showCompanyInfo || false}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    receipt: { ...prev.receipt, showCompanyInfo: e.target.checked }
-                  }))}
-                  className="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300 rounded"
+                  checked={formData.lowStockAlerts}
+                  onChange={(e) => handleChange('lowStockAlerts', e.target.checked)}
+                  className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-slate-300 rounded"
                 />
-                Show company information
-              </label>
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={formData.receipt?.showTaxInfo || false}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    receipt: { ...prev.receipt, showTaxInfo: e.target.checked }
-                  }))}
-                  className="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300 rounded"
-                />
-                Show tax information
               </label>
             </div>
           </Card>
 
           {/* Backup Settings */}
           <Card className="p-6">
-            <h3 className="text-lg font-medium mb-6">Backup Settings</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="flex items-center mb-4">
-                  <input
-                    type="checkbox"
-                    checked={formData.backup?.autoBackup || false}
-                    onChange={(e) => setFormData(prev => ({
-                      ...prev,
-                      backup: { ...prev.backup, autoBackup: e.target.checked }
-                    }))}
-                    className="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300 rounded"
-                  />
-                  Enable automatic backups
-                </label>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-6">
+              Backup & Data Management
+            </h3>
 
+            <div className="space-y-6">
+              <label className="flex items-center justify-between p-4 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
+                <div>
+                  <div className="font-medium text-slate-900 dark:text-slate-100">Automatic Backups</div>
+                  <div className="text-sm text-slate-500 dark:text-slate-400">
+                    Enable scheduled automatic database backups
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={formData.autoBackup}
+                  onChange={(e) => handleChange('autoBackup', e.target.checked)}
+                  className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-slate-300 rounded"
+                />
+              </label>
+
+              {formData.autoBackup && (
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     Backup Frequency
                   </label>
                   <select
-                    value={formData.backup?.frequency || 'daily'}
-                    disabled={!formData.backup?.autoBackup}
-                    onChange={(e) => setFormData(prev => ({
-                      ...prev,
-                      backup: { ...prev.backup, frequency: e.target.value }
-                    }))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700 disabled:opacity-50"
+                    value={formData.backupFrequency}
+                    onChange={(e) => handleChange('backupFrequency', e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-800 dark:text-slate-100"
                   >
                     <option value="daily">Daily</option>
                     <option value="weekly">Weekly</option>
                     <option value="monthly">Monthly</option>
                   </select>
                 </div>
-              </div>
+              )}
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Retention Period (Days)
-                </label>
-                <Input
-                  type="number"
-                  value={formData.backup?.retention || 30}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    backup: { ...prev.backup, retention: parseInt(e.target.value) }
-                  }))}
-                  min="1"
-                  max="365"
-                />
-
-                <div className="mt-4">
-                  <Button type="button" variant="outline" className="w-full">
-                    <Download className="h-4 w-4 mr-2" />
-                    Create Backup Now
-                  </Button>
-                </div>
+              <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+                <Button type="button" variant="outline" className="w-full">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Create Backup Now
+                </Button>
               </div>
             </div>
           </Card>
@@ -781,112 +729,300 @@ function Settings() {
 
   // Branches Tab
   const BranchesTab = () => {
-    if (branchesLoading) return <LoadingSpinner />;
+    const handleEdit = (branch) => {
+      setSelectedBranch(branch);
+      setShowBranchModal(true);
+    };
 
-    const columns = [
-      {
-        accessorKey: 'name',
-        header: 'Branch Name',
-        cell: ({ row }) => (
-          <div>
-            <div className="font-medium">{row.original.name}</div>
-            <div className="text-sm text-slate-500">{row.original.code}</div>
-          </div>
-        )
-      },
-      {
-        accessorKey: 'manager',
-        header: 'Manager',
-      },
-      {
-        accessorKey: 'phone',
-        header: 'Contact',
-        cell: ({ row }) => (
-          <div>
-            <div className="text-sm">{row.original.phone}</div>
-            <div className="text-sm text-slate-500">{row.original.email}</div>
-          </div>
-        )
-      },
-      {
-        accessorKey: 'isActive',
-        header: 'Status',
-        cell: ({ getValue }) => (
-          <Badge variant={getValue() ? 'success' : 'secondary'}>
-            {getValue() ? 'Active' : 'Inactive'}
-          </Badge>
-        )
-      },
-      {
-        id: 'actions',
-        header: 'Actions',
-        cell: ({ row }) => (
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setSelectedBranch(row.original);
-                setShowBranchModal(true);
-              }}
-            >
-              <Edit className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="sm" className="text-red-600">
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
-        )
+    const handleDelete = async (branchId) => {
+      if (window.confirm('Are you sure you want to delete this branch? This action cannot be undone.')) {
+        deleteBranchMutation.mutate(branchId);
       }
-    ];
+    };
+
+    if (branchesLoading) {
+      return (
+        <div className="space-y-4">
+          <Skeleton variant="card" />
+          <Skeleton variant="table" />
+        </div>
+      );
+    }
 
     return (
       <div className="space-y-6">
         <Card className="p-6">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-medium">Branch Management</h3>
+            <div>
+              <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100">
+                Branch Management
+              </h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                Manage store locations across different cities
+              </p>
+            </div>
             <Button
               variant="primary"
               onClick={() => {
                 setSelectedBranch(null);
                 setShowBranchModal(true);
               }}
+              className="flex items-center gap-2"
             >
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="h-4 w-4" />
               Add Branch
             </Button>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
-              <thead className="bg-slate-50 dark:bg-slate-800">
-                <tr>
-                  {columns.map((column) => (
-                    <th
-                      key={column.accessorKey || column.id}
-                      className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider"
-                    >
-                      {column.header}
+          {branches.length === 0 ? (
+            <EmptyState
+              title="No branches found"
+              description="Create your first branch to start managing multiple store locations"
+              icon={Building2}
+              action={
+                <Button
+                  onClick={() => {
+                    setSelectedBranch(null);
+                    setShowBranchModal(true);
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add First Branch
+                </Button>
+              }
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+                <thead className="bg-slate-50 dark:bg-slate-800">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      Branch Details
                     </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-slate-900 divide-y divide-slate-200 dark:divide-slate-700">
-                {branches?.map((branch) => (
-                  <tr key={branch.id}>
-                    {columns.map((column) => (
-                      <td
-                        key={column.accessorKey || column.id}
-                        className="px-6 py-4 whitespace-nowrap text-sm text-slate-900 dark:text-slate-100"
-                      >
-                        {column.cell ? column.cell({ row: { original: branch }, getValue: () => branch[column.accessorKey] }) : branch[column.accessorKey]}
-                      </td>
-                    ))}
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      Contact
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      Type
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      Actions
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="bg-white dark:bg-slate-900 divide-y divide-slate-200 dark:divide-slate-700">
+                  {branches.map((branch) => (
+                    <tr key={branch._id} className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-10 w-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                            <Building2 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                          </div>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                              {branch.name}
+                            </div>
+                            <div className="text-sm text-slate-500 dark:text-slate-400">
+                              {branch.code}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-slate-900 dark:text-slate-100">
+                          {branch.phone}
+                        </div>
+                        <div className="text-sm text-slate-500 dark:text-slate-400">
+                          {branch.email}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <Badge variant="secondary">
+                          {branch.type || 'Supermarket'}
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <Badge variant={branch.isActive ? 'success' : 'secondary'}>
+                          {branch.isActive ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEdit(branch)}
+                            className="text-blue-600 hover:text-blue-900"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          {isAdmin && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(branch._id)}
+                              className="text-red-600 hover:text-red-900"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+      </div>
+    );
+  };
+
+
+  // Users Tab
+  const UsersTab = () => {
+    const handleToggleStatus = async (userId) => {
+      if (window.confirm('Are you sure you want to change this user\'s status?')) {
+        toggleUserStatusMutation.mutate(userId);
+      }
+    };
+
+    if (usersLoading) {
+      return (
+        <div className="space-y-4">
+          <Skeleton variant="card" />
+          <Skeleton variant="table" />
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-6">
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100">
+                User Management
+              </h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                Manage user accounts, roles, and permissions
+              </p>
+            </div>
+            <Button
+              variant="primary"
+              onClick={() => setShowUserModal(true)}
+              className="flex items-center gap-2"
+            >
+              <UserPlusIcon className="h-4 w-4" />
+              Add User
+            </Button>
           </div>
+
+          {users.length === 0 ? (
+            <EmptyState
+              title="No users found"
+              description="Add users to manage access to the system"
+              icon={Shield}
+              action={
+                <Button onClick={() => setShowUserModal(true)}>
+                  <UserPlusIcon className="h-4 w-4 mr-2" />
+                  Add First User
+                </Button>
+              }
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+                <thead className="bg-slate-50 dark:bg-slate-800">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      User
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      Role
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      Branch
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      Last Login
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-slate-900 divide-y divide-slate-200 dark:divide-slate-700">
+                  {users.map((user) => (
+                    <tr key={user._id} className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center">
+                            <span className="text-white font-semibold text-sm">
+                              {user.firstName?.[0]}{user.lastName?.[0]}
+                            </span>
+                          </div>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                              {user.firstName} {user.lastName}
+                            </div>
+                            <div className="text-sm text-slate-500 dark:text-slate-400">
+                              {user.email}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <Badge 
+                          variant={
+                            user.role?.toLowerCase() === 'admin' ? 'primary' : 
+                            user.role?.toLowerCase().includes('manager') ? 'warning' : 
+                            'secondary'
+                          }
+                        >
+                          {user.role?.toUpperCase()}
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900 dark:text-slate-100">
+                        {user.branch?.name || 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <Badge variant={user.isActive ? 'success' : 'secondary'}>
+                          {user.isActive ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
+                        {user.lastLogin 
+                          ? new Date(user.lastLogin).toLocaleDateString() 
+                          : 'Never'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex items-center justify-end gap-2">
+                          {isAdmin && user._id !== userProfile?.data?._id && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleToggleStatus(user._id)}
+                              className={user.isActive ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'}
+                            >
+                              {user.isActive ? 'Deactivate' : 'Activate'}
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </Card>
       </div>
     );
@@ -900,70 +1036,8 @@ function Settings() {
         return <SystemTab />;
       case 'branches':
         return <BranchesTab />;
-      case 'tax':
-        return (
-          <Card className="p-6">
-            <div className="text-center py-12">
-              <CogIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">
-                Tax Configuration
-              </h3>
-              <p className="text-slate-500 dark:text-slate-400 mb-4">
-                Configure GST rates, tax categories, and compliance settings.
-              </p>
-              <div className="max-w-md mx-auto space-y-4">
-                <div className="flex justify-between items-center p-3 border border-slate-200 dark:border-slate-700 rounded-lg">
-                  <span className="text-sm font-medium">Default GST Rate</span>
-                  <Badge variant="secondary">18%</Badge>
-                </div>
-                <div className="flex justify-between items-center p-3 border border-slate-200 dark:border-slate-700 rounded-lg">
-                  <span className="text-sm font-medium">Essential Items GST</span>
-                  <Badge variant="secondary">5%</Badge>
-                </div>
-                <div className="flex justify-between items-center p-3 border border-slate-200 dark:border-slate-700 rounded-lg">
-                  <span className="text-sm font-medium">Luxury Items GST</span>
-                  <Badge variant="secondary">28%</Badge>
-                </div>
-                <Button variant="outline" className="w-full">
-                  <PencilIcon className="h-4 w-4 mr-2" />
-                  Modify Tax Rates
-                </Button>
-              </div>
-            </div>
-          </Card>
-        );
       case 'users':
-        return (
-          <Card className="p-6">
-            <div className="text-center py-12">
-              <UsersIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">
-                User Management
-              </h3>
-              <p className="text-slate-500 dark:text-slate-400 mb-4">
-                Manage user accounts, roles, and permissions.
-              </p>
-              <div className="max-w-md mx-auto space-y-4">
-                <div className="flex justify-between items-center p-3 border border-slate-200 dark:border-slate-700 rounded-lg">
-                  <span className="text-sm font-medium">Total Users</span>
-                  <Badge variant="primary">3</Badge>
-                </div>
-                <div className="flex justify-between items-center p-3 border border-slate-200 dark:border-slate-700 rounded-lg">
-                  <span className="text-sm font-medium">Active Sessions</span>
-                  <Badge variant="success">1</Badge>
-                </div>
-                <div className="flex justify-between items-center p-3 border border-slate-200 dark:border-slate-700 rounded-lg">
-                  <span className="text-sm font-medium">Admin Users</span>
-                  <Badge variant="warning">1</Badge>
-                </div>
-                <Button variant="outline" className="w-full">
-                  <UserPlusIcon className="h-4 w-4 mr-2" />
-                  Add New User
-                </Button>
-              </div>
-            </div>
-          </Card>
-        );
+        return <UsersTab />;
       default:
         return null;
     }
@@ -975,31 +1049,37 @@ function Settings() {
         title="Settings & Configuration"
         description="Manage your profile, system settings, and business configuration"
       >
-        <Button variant="outline">
-          <RefreshCw className="h-4 w-4 mr-2" />
+        <Button 
+          variant="outline"
+          onClick={() => {
+            refetchProfile();
+            refetchBranches();
+            refetchUsers();
+          }}
+          className="flex items-center gap-2"
+        >
+          <RefreshCw className="h-4 w-4" />
           Refresh
         </Button>
       </PageHeader>
 
       {/* Navigation Tabs */}
-      <div className="border-b border-slate-200 dark:border-slate-700">
-        <nav className="-mb-px flex space-x-8">
+      <div className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 sticky top-0 z-10">
+        <nav className="-mb-px flex space-x-8 px-4">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2 ${
                   activeTab === tab.id
                     ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                     : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-300'
                 }`}
               >
-                <div className="flex items-center gap-2">
-                  <Icon className="h-4 w-4" />
-                  {tab.label}
-                </div>
+                <Icon className="h-5 w-5" />
+                {tab.label}
               </button>
             );
           })}
@@ -1007,7 +1087,9 @@ function Settings() {
       </div>
 
       {/* Tab Content */}
-      {renderTabContent()}
+      <div className="px-4">
+        {renderTabContent()}
+      </div>
 
       {/* Modals */}
       <PasswordChangeModal
@@ -1024,25 +1106,17 @@ function Settings() {
         branch={selectedBranch}
         onSubmit={(data) => {
           if (selectedBranch) {
-            // Update branch
+            updateBranchMutation.mutate({ id: selectedBranch._id, data });
           } else {
             createBranchMutation.mutate(data);
           }
         }}
-        isLoading={createBranchMutation.isPending}
+        isLoading={createBranchMutation.isPending || updateBranchMutation.isPending}
       />
-
-      {/* Toast */}
-      {toast && (
-        <Toast
-          type={toast.type}
-          message={toast.message}
-          onClose={() => setToast(null)}
-        />
-      )}
     </div>
   );
 }
+
 
 // Password Change Modal
 function PasswordChangeModal({ isOpen, onClose }) {
@@ -1056,15 +1130,35 @@ function PasswordChangeModal({ isOpen, onClose }) {
     new: false,
     confirm: false
   });
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    
     if (formData.newPassword !== formData.confirmPassword) {
-      alert('Passwords do not match');
+      toast.error('New passwords do not match');
       return;
     }
-    // Handle password change
-    onClose();
+
+    if (formData.newPassword.length < 8) {
+      toast.error('New password must be at least 8 characters long');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await settingsAPI.changePassword({
+        currentPassword: formData.currentPassword,
+        newPassword: formData.newPassword
+      });
+      toast.success('Password changed successfully');
+      setFormData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      onClose();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to change password');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -1085,7 +1179,7 @@ function PasswordChangeModal({ isOpen, onClose }) {
             <button
               type="button"
               onClick={() => setShowPasswords(prev => ({ ...prev, current: !prev.current }))}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2"
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
             >
               {showPasswords.current ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
@@ -1101,13 +1195,14 @@ function PasswordChangeModal({ isOpen, onClose }) {
               type={showPasswords.new ? 'text' : 'password'}
               value={formData.newPassword}
               onChange={(e) => setFormData(prev => ({ ...prev, newPassword: e.target.value }))}
-              placeholder="Enter new password"
+              placeholder="Enter new password (min 8 characters)"
               required
+              minLength={8}
             />
             <button
               type="button"
               onClick={() => setShowPasswords(prev => ({ ...prev, new: !prev.new }))}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2"
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
             >
               {showPasswords.new ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
@@ -1129,7 +1224,7 @@ function PasswordChangeModal({ isOpen, onClose }) {
             <button
               type="button"
               onClick={() => setShowPasswords(prev => ({ ...prev, confirm: !prev.confirm }))}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2"
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
             >
               {showPasswords.confirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
@@ -1137,11 +1232,18 @@ function PasswordChangeModal({ isOpen, onClose }) {
         </div>
 
         <div className="flex justify-end gap-3 pt-4">
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
             Cancel
           </Button>
-          <Button type="submit" variant="primary">
-            Change Password
+          <Button type="submit" variant="primary" disabled={loading}>
+            {loading ? (
+              <>
+                <LoadingSpinner size="sm" />
+                Changing...
+              </>
+            ) : (
+              'Change Password'
+            )}
           </Button>
         </div>
       </form>
@@ -1157,12 +1259,23 @@ function BranchModal({ isOpen, onClose, branch, onSubmit, isLoading }) {
     address: '',
     phone: '',
     email: '',
-    manager: ''
+    type: 'Supermarket',
+    manager: '',
+    isActive: true
   });
 
   useEffect(() => {
     if (branch) {
-      setFormData(branch);
+      setFormData({
+        name: branch.name || '',
+        code: branch.code || '',
+        address: branch.address || '',
+        phone: branch.phone || '',
+        email: branch.email || '',
+        type: branch.type || 'Supermarket',
+        manager: branch.manager || '',
+        isActive: branch.isActive !== undefined ? branch.isActive : true
+      });
     } else {
       setFormData({
         name: '',
@@ -1170,10 +1283,12 @@ function BranchModal({ isOpen, onClose, branch, onSubmit, isLoading }) {
         address: '',
         phone: '',
         email: '',
-        manager: ''
+        type: 'Supermarket',
+        manager: '',
+        isActive: true
       });
     }
-  }, [branch]);
+  }, [branch, isOpen]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -1185,44 +1300,61 @@ function BranchModal({ isOpen, onClose, branch, onSubmit, isLoading }) {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={branch ? 'Edit Branch' : 'Add Branch'}>
+    <Modal isOpen={isOpen} onClose={onClose} title={branch ? 'Edit Branch' : 'Add New Branch'}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Branch Name
+              Branch Name <span className="text-red-500">*</span>
             </label>
             <Input
               value={formData.name}
               onChange={(e) => handleChange('name', e.target.value)}
-              placeholder="Enter branch name"
+              placeholder="e.g., Mumbai Central"
               required
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Branch Code
+              Branch Code <span className="text-red-500">*</span>
             </label>
             <Input
               value={formData.code}
-              onChange={(e) => handleChange('code', e.target.value)}
-              placeholder="Enter branch code"
+              onChange={(e) => handleChange('code', e.target.value.toUpperCase())}
+              placeholder="e.g., MUM001"
               required
+              maxLength={10}
             />
           </div>
         </div>
 
         <div>
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Address
+            Type <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={formData.type}
+            onChange={(e) => handleChange('type', e.target.value)}
+            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-800 dark:text-slate-100"
+            required
+          >
+            <option value="Hypermarket">Hypermarket</option>
+            <option value="Supermarket">Supermarket</option>
+            <option value="Convenience Store">Convenience Store</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            Address <span className="text-red-500">*</span>
           </label>
           <textarea
             value={formData.address}
             onChange={(e) => handleChange('address', e.target.value)}
-            placeholder="Enter branch address"
+            placeholder="Enter complete branch address"
             rows={3}
-            className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700"
+            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-800 dark:text-slate-100"
             required
           />
         </div>
@@ -1230,25 +1362,25 @@ function BranchModal({ isOpen, onClose, branch, onSubmit, isLoading }) {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Phone
+              Phone <span className="text-red-500">*</span>
             </label>
             <Input
               value={formData.phone}
               onChange={(e) => handleChange('phone', e.target.value)}
-              placeholder="Enter phone number"
+              placeholder="+91 XXXXXXXXXX"
               required
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Email
+              Email <span className="text-red-500">*</span>
             </label>
             <Input
               type="email"
               value={formData.email}
               onChange={(e) => handleChange('email', e.target.value)}
-              placeholder="Enter email"
+              placeholder="branch@company.com"
               required
             />
           </div>
@@ -1262,16 +1394,34 @@ function BranchModal({ isOpen, onClose, branch, onSubmit, isLoading }) {
             value={formData.manager}
             onChange={(e) => handleChange('manager', e.target.value)}
             placeholder="Enter manager name"
-            required
           />
         </div>
 
-        <div className="flex justify-end gap-3 pt-4">
-          <Button type="button" variant="outline" onClick={onClose}>
+        <div className="flex items-center">
+          <input
+            type="checkbox"
+            checked={formData.isActive}
+            onChange={(e) => handleChange('isActive', e.target.checked)}
+            className="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300 rounded"
+          />
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            Active Branch
+          </label>
+        </div>
+
+        <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+          <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
             Cancel
           </Button>
           <Button type="submit" variant="primary" disabled={isLoading}>
-            {isLoading ? <LoadingSpinner size="sm" /> : (branch ? 'Update Branch' : 'Create Branch')}
+            {isLoading ? (
+              <>
+                <LoadingSpinner size="sm" />
+                {branch ? 'Updating...' : 'Creating...'}
+              </>
+            ) : (
+              <>{branch ? 'Update Branch' : 'Create Branch'}</>
+            )}
           </Button>
         </div>
       </form>

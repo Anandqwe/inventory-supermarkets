@@ -6,7 +6,7 @@ const { validationResult } = require('express-validator');
  * Provides endpoints for viewing audit logs and security analytics
  */
 class SecurityController {
-  
+
   /**
    * Get audit logs with filtering
    */
@@ -388,7 +388,7 @@ class SecurityController {
             successful,
             failed,
             total: successful + failed,
-            successRate: successful + failed > 0 ? 
+            successRate: successful + failed > 0 ?
               ((successful / (successful + failed)) * 100).toFixed(2) : 0
           },
           byIP,

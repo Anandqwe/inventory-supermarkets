@@ -15,7 +15,7 @@ async function updateSalesDates() {
     // Get all sales
     const allSales = await Sale.find({}).sort({ createdAt: 1 });
     console.log(`\n📊 Total sales found: ${allSales.length}`);
-    
+
     if (allSales.length === 0) {
       console.log('❌ No sales found. Please run seed:sales first.');
       return;
@@ -30,7 +30,7 @@ async function updateSalesDates() {
     const today = new Date();
     today.setHours(23, 59, 59, 999); // End of today
     const daysToShift = Math.floor((today - newestSale.createdAt) / (1000 * 60 * 60 * 24));
-    
+
     console.log(`\n🔄 Shifting all sales by ${daysToShift} days forward...`);
     console.log(`   Current newest sale: ${newestSale.createdAt.toLocaleDateString()}`);
     console.log(`   Target: ${today.toLocaleDateString()} (today)`);
@@ -38,27 +38,27 @@ async function updateSalesDates() {
 
     let updated = 0;
     const batchSize = 100;
-    
+
     for (let i = 0; i < allSales.length; i += batchSize) {
       const batch = allSales.slice(i, i + batchSize);
-      
+
       for (const sale of batch) {
         const newDate = new Date(sale.createdAt);
         newDate.setDate(newDate.getDate() + daysToShift);
-        
+
         // Disable timestamps and update directly
         await Sale.findByIdAndUpdate(
           sale._id,
-          { 
+          {
             createdAt: newDate,
             updatedAt: newDate
           },
           { timestamps: false } // Disable automatic timestamp updates
         );
-        
+
         updated++;
       }
-      
+
       if ((i / batchSize) % 5 === 0) {
         console.log(`   Progress: ${updated}/${allSales.length} sales updated...`);
       }

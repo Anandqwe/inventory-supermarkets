@@ -1,9 +1,20 @@
+const mongoose = require('mongoose');
 const Product = require('../models/Product');
 const Adjustment = require('../models/Adjustment');
 const Transfer = require('../models/Transfer');
 const Purchase = require('../models/Purchase');
 const Branch = require('../models/Branch');
 const { validationResult } = require('express-validator');
+const ResponseUtils = require('../utils/responseUtils');
+const ValidationUtils = require('../utils/validationUtils');
+const {
+  assertBranchWriteAccess,
+  assertBranchReadAccess,
+  getUserBranchId
+} = require('../middleware/branchScope');
+const { hasCrossBranchAccess } = require('../../../shared/permissions');
+
+const isAdminUser = (user = {}) => String(user?.role || '').toLowerCase() === 'admin';
 
 /**
  * Inventory Management Controller
@@ -17,67 +28,61 @@ class InventoryController {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          message: 'Validation failed',
-          errors: errors.array()
-        });
+        return ResponseUtils.validationError(res, errors.array());
       }
 
       const {
         branch: branchId,
-        items, // array of { product, currentQuantity, adjustedQuantity, unit, sku, productName }
-        type, // 'increase' | 'decrease' | 'correction'
+        items,
+        type,
         reason,
         notes
       } = req.body;
 
-      // Validate branch
-      const branch = await Branch.findById(branchId || req.user.branch._id);
+      const resolvedBranchId = branchId || getUserBranchId(req.user);
+
+      if (!resolvedBranchId) {
+        return ResponseUtils.error(res, 'Branch is required to create an adjustment', 400);
+      }
+
+      if (!ValidationUtils.isValidObjectId(resolvedBranchId)) {
+        return ResponseUtils.error(res, 'Invalid branch identifier', 400);
+      }
+
+      if (!assertBranchWriteAccess(resolvedBranchId, req.user)) {
+        return ResponseUtils.forbidden(res, 'Cannot adjust inventory for other branches');
+      }
+
+      const branch = await Branch.findById(resolvedBranchId);
       if (!branch) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid branch'
-        });
+        return ResponseUtils.error(res, 'Branch not found', 404);
       }
 
-      // Check branch access for non-admin users
-      if (req.user.role !== 'admin' && req.user.branch) {
-        if (req.user.branch._id.toString() !== branch._id.toString()) {
-          return res.status(403).json({
-            success: false,
-            message: 'Access denied - Can only adjust inventory for your assigned branch'
-          });
-        }
-      }
-
-      // Validate items
       if (!Array.isArray(items) || items.length === 0) {
-        return res.status(400).json({ success: false, message: 'No items provided for adjustment' });
+        return ResponseUtils.error(res, 'No items provided for adjustment', 400);
       }
 
-      // Generate adjustment number
       const adjustmentNumber = await generateAdjustmentNumber(branch.code);
 
-      // Start transaction
       const session = await Adjustment.db.startSession();
-      
+      let adjustmentRecord;
+
       try {
         await session.withTransaction(async () => {
-          // Build items array and update product stocks
           const adjItems = [];
+
           for (const item of items) {
-            const product = await Product.findById(item.product);
+            const product = await Product.findById(item.product).session(session);
             if (!product) {
               throw new Error(`Product not found: ${item.product}`);
             }
 
             const branchStock = product.stockByBranch.find(
-              stock => stock.branch.toString() === branch._id.toString()
+              (stock) => stock.branch.toString() === branch._id.toString()
             );
 
             const currentQuantity = branchStock ? branchStock.quantity : 0;
-            const adjustedQuantity = item.adjustedQuantity;
+            const adjustedQuantity = Number(item.adjustedQuantity ?? currentQuantity);
             const difference = adjustedQuantity - currentQuantity;
 
             adjItems.push({
@@ -91,7 +96,6 @@ class InventoryController {
               reason
             });
 
-            // Apply stock update
             if (branchStock) {
               await Product.updateOne(
                 { _id: product._id, 'stockByBranch.branch': branch._id },
@@ -122,46 +126,41 @@ class InventoryController {
             }
           }
 
-          // Create adjustment record
-          const adjustment = new Adjustment({
-            adjustmentNumber,
-            branch: branch._id,
-            items: adjItems,
-            type,
-            reason,
-            notes,
-            createdBy: req.user.userId
-          });
+          const [createdAdjustment] = await Adjustment.create(
+            [
+              {
+                adjustmentNumber,
+                branch: branch._id,
+                items: adjItems,
+                type,
+                reason,
+                notes,
+                createdBy: req.user.userId
+              }
+            ],
+            { session }
+          );
 
-          await adjustment.save({ session });
+          adjustmentRecord = createdAdjustment;
         });
-
-        // Fetch complete adjustment data
-        const completeAdjustment = await Adjustment.findById(adjustment._id)
-          .populate('branch', 'name code')
-          .populate('items.product', 'name sku')
-          .populate('createdBy', 'firstName lastName')
-          .populate('approvedBy', 'firstName lastName');
-
-        res.status(201).json({
-          success: true,
-          message: 'Stock adjustment created successfully',
-          data: completeAdjustment
-        });
-
-      } catch (error) {
-        await session.endSession();
-        throw error;
       } finally {
         await session.endSession();
       }
 
+      if (!adjustmentRecord) {
+        return ResponseUtils.error(res, 'Failed to create stock adjustment', 500);
+      }
+
+      const completeAdjustment = await Adjustment.findById(adjustmentRecord._id)
+        .populate('branch', 'name code')
+        .populate('items.product', 'name sku')
+        .populate('createdBy', 'firstName lastName')
+        .populate('approvedBy', 'firstName lastName');
+
+      return ResponseUtils.success(res, completeAdjustment, 'Stock adjustment created successfully', 201);
     } catch (error) {
       console.error('Create adjustment error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error'
-      });
+      return ResponseUtils.error(res, 'Failed to create stock adjustment');
     }
   }
 
@@ -173,7 +172,6 @@ class InventoryController {
       const {
         page = 1,
         limit = 20,
-        branch,
         product,
         type,
         startDate,
@@ -185,27 +183,20 @@ class InventoryController {
         sortOrder = 'desc'
       } = req.query;
 
-      // Build filter
       const filter = {};
 
-      // Branch filter for RBAC
-      if (req.user.role !== 'admin' && req.user.branch) {
-        filter.branch = req.user.branch._id || req.user.branch;
-      } else if (branch) {
-        filter.branch = branch;
+      if (req.branchFilter) {
+        Object.assign(filter, req.branchFilter);
       }
 
-      // Product filter
-      if (product) {
-        filter.product = product;
+      if (product && ValidationUtils.isValidObjectId(product)) {
+        filter['items.product'] = product;
       }
 
-      // Type filter
       if (type) {
         filter.type = type;
       }
 
-      // Date range filter
       if (startDate || endDate) {
         filter.createdAt = {};
         if (startDate) {
@@ -218,17 +209,14 @@ class InventoryController {
         }
       }
 
-      // Reason filter
       if (reason) {
-        filter.reason = reason;
+        filter.reason = { $regex: reason, $options: 'i' };
       }
 
-      // Adjusted by filter
-      if (adjustedBy) {
-        filter.adjustedBy = adjustedBy;
+      if (adjustedBy && ValidationUtils.isValidObjectId(adjustedBy)) {
+        filter.createdBy = adjustedBy;
       }
 
-      // Search filter
       if (search) {
         const productSearch = await Product.find({
           $or: [
@@ -237,22 +225,21 @@ class InventoryController {
           ]
         }).select('_id');
 
+        const productIds = productSearch.map((p) => p._id);
+
         filter.$or = [
           { adjustmentNumber: { $regex: search, $options: 'i' } },
           { reason: { $regex: search, $options: 'i' } },
           { notes: { $regex: search, $options: 'i' } },
-          { product: { $in: productSearch.map(p => p._id) } }
+          { 'items.product': { $in: productIds } }
         ];
       }
 
-      // Pagination
-      const skip = (parseInt(page) - 1) * parseInt(limit);
-      
-      // Sort
-      const sort = {};
-      sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+      const { page: pageNumber, limit: pageSize } = ValidationUtils.validatePagination({ page, limit });
+      const skip = (pageNumber - 1) * pageSize;
 
-      // Execute query
+      const sort = { [sortBy]: sortOrder === 'asc' ? 1 : -1 };
+
       const [adjustments, total] = await Promise.all([
         Adjustment.find(filter)
           .populate('branch', 'name code')
@@ -261,28 +248,18 @@ class InventoryController {
           .populate('approvedBy', 'firstName lastName')
           .sort(sort)
           .skip(skip)
-          .limit(parseInt(limit)),
+          .limit(pageSize),
         Adjustment.countDocuments(filter)
       ]);
 
-      res.json({
-        success: true,
-        message: 'Stock adjustments retrieved successfully',
-        data: adjustments,
-        pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
-          total,
-          pages: Math.ceil(total / parseInt(limit))
-        }
-      });
-
+      return ResponseUtils.paginated(res, adjustments, {
+        page: pageNumber,
+        limit: pageSize,
+        total
+      }, 'Stock adjustments retrieved successfully');
     } catch (error) {
       console.error('Get adjustments error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error'
-      });
+      return ResponseUtils.error(res, 'Failed to fetch stock adjustments');
     }
   }
 
@@ -293,11 +270,7 @@ class InventoryController {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          message: 'Validation failed',
-          errors: errors.array()
-        });
+        return ResponseUtils.validationError(res, errors.array());
       }
 
       const {
@@ -308,6 +281,10 @@ class InventoryController {
         expectedDeliveryDate
       } = req.body;
 
+      if (!ValidationUtils.isValidObjectId(fromBranchId) || !ValidationUtils.isValidObjectId(toBranchId)) {
+        return ResponseUtils.error(res, 'Invalid branch identifier', 400);
+      }
+
       // Validate branches
       const [fromBranch, toBranch] = await Promise.all([
         Branch.findById(fromBranchId),
@@ -315,47 +292,32 @@ class InventoryController {
       ]);
 
       if (!fromBranch) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid source branch'
-        });
+        return ResponseUtils.error(res, 'Invalid source branch', 400);
       }
 
       if (!toBranch) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid destination branch'
-        });
+        return ResponseUtils.error(res, 'Invalid destination branch', 400);
       }
 
       if (fromBranchId === toBranchId) {
-        return res.status(400).json({
-          success: false,
-          message: 'Source and destination branches cannot be the same'
-        });
+        return ResponseUtils.error(res, 'Source and destination branches cannot be the same', 400);
       }
 
-      // Check branch access for non-admin users
-      if (req.user.role !== 'admin' && req.user.branch) {
-        if (req.user.branch._id.toString() !== fromBranchId) {
-          return res.status(403).json({
-            success: false,
-            message: 'Access denied - Can only create transfers from your assigned branch'
-          });
-        }
+      if (!assertBranchWriteAccess(fromBranchId, req.user)) {
+        return ResponseUtils.forbidden(res, 'Cannot create transfers from other branches');
       }
 
-      // Validate and process transfer items
+      if (!Array.isArray(items) || items.length === 0) {
+        return ResponseUtils.error(res, 'Transfer requires at least one item', 400);
+      }
+
       const processedItems = [];
-      
+
       for (const item of items) {
         // Validate product
         const product = await Product.findById(item.product);
         if (!product) {
-          return res.status(400).json({
-            success: false,
-            message: `Product not found: ${item.product}`
-          });
+          return ResponseUtils.error(res, `Product not found: ${item.product}`, 400);
         }
 
         // Check stock availability in source branch
@@ -364,10 +326,11 @@ class InventoryController {
         );
 
         if (!fromBranchStock || fromBranchStock.quantity < item.quantity) {
-          return res.status(400).json({
-            success: false,
-            message: `Insufficient stock for ${product.name} in source branch. Available: ${fromBranchStock?.quantity || 0}`
-          });
+          return ResponseUtils.error(
+            res,
+            `Insufficient stock for ${product.name} in source branch. Available: ${fromBranchStock?.quantity || 0}`,
+            400
+          );
         }
 
         processedItems.push({
@@ -399,23 +362,15 @@ class InventoryController {
       await transfer.save();
 
       // Populate the response
-  const populatedTransfer = await Transfer.findById(transfer._id)
-  .populate('fromBranch', 'name code')
-  .populate('toBranch', 'name code')
-  .populate('createdBy', 'firstName lastName');
+      const populatedTransfer = await Transfer.findById(transfer._id)
+        .populate('fromBranch', 'name code')
+        .populate('toBranch', 'name code')
+        .populate('createdBy', 'firstName lastName');
 
-      res.status(201).json({
-        success: true,
-        message: 'Transfer created successfully',
-        data: populatedTransfer
-      });
-
+      return ResponseUtils.success(res, populatedTransfer, 'Transfer created successfully', 201);
     } catch (error) {
       console.error('Create transfer error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error'
-      });
+      return ResponseUtils.error(res, 'Failed to create stock transfer');
     }
   }
 
@@ -427,23 +382,27 @@ class InventoryController {
       const { id } = req.params;
       const { status, notes, receivedItems } = req.body;
 
-      const transfer = await Transfer.findById(id);
-      if (!transfer) {
-        return res.status(404).json({
-          success: false,
-          message: 'Transfer not found'
-        });
+      if (!ValidationUtils.isValidObjectId(id)) {
+        return ResponseUtils.error(res, 'Invalid transfer identifier', 400);
       }
 
-      // Check branch access for non-admin users
-      if (req.user.role !== 'admin' && req.user.branch) {
-        const allowedBranches = [transfer.fromBranch.toString(), transfer.toBranch.toString()];
-        if (!allowedBranches.includes(req.user.branch._id.toString())) {
-          return res.status(403).json({
-            success: false,
-            message: 'Access denied - Transfer not related to your branch'
-          });
-        }
+      const transfer = await Transfer.findById(id);
+      if (!transfer) {
+        return ResponseUtils.notFound(res, 'Transfer not found');
+      }
+
+      const relatedBranches = [transfer.fromBranch, transfer.toBranch].filter(Boolean);
+      const hasBranchAccess = relatedBranches.some((branchId) => assertBranchReadAccess(branchId, req.user));
+
+      if (!hasBranchAccess) {
+        return ResponseUtils.forbidden(res, 'Transfer not related to your branch');
+      }
+
+      if (!status) {
+        return ResponseUtils.validationError(res, [{
+          path: 'status',
+          message: 'Status is required'
+        }]);
       }
 
       // Validate status transition
@@ -454,16 +413,74 @@ class InventoryController {
         'cancelled': []
       };
 
-      if (!validTransitions[transfer.status].includes(status)) {
-        return res.status(400).json({
-          success: false,
-          message: `Cannot change status from ${transfer.status} to ${status}`
-        });
+      const allowedStatuses = validTransitions[transfer.status] || [];
+
+      if (!allowedStatuses.includes(status)) {
+        return ResponseUtils.error(
+          res,
+          `Cannot change status from ${transfer.status} to ${status}`,
+          400
+        );
       }
+
+      // Ensure caller can write to the relevant branch for this status change
+      const requiresToBranchAccess = status === 'received';
+      const targetBranchId = requiresToBranchAccess ? transfer.toBranch : transfer.fromBranch;
+      if (!assertBranchWriteAccess(targetBranchId, req.user)) {
+        return ResponseUtils.forbidden(res, 'Insufficient branch permissions to update transfer status');
+      }
+
+      let normalizedReceivedItems = Array.isArray(receivedItems) ? receivedItems : null;
+      if (normalizedReceivedItems && normalizedReceivedItems.length > 0) {
+        const errors = [];
+        const sanitized = [];
+
+        for (const item of normalizedReceivedItems) {
+          if (!item || !ValidationUtils.isValidObjectId(item.product)) {
+            errors.push({ path: 'receivedItems.product', message: 'Invalid product identifier' });
+            continue;
+          }
+
+          const matchingTransferItem = transfer.items.find((transferItem) => String(transferItem.product) === String(item.product));
+          if (!matchingTransferItem) {
+            errors.push({ path: 'receivedItems.product', message: 'Received item not part of transfer', value: item.product });
+            continue;
+          }
+
+          const quantity = Number(item.quantity);
+          if (!Number.isFinite(quantity) || quantity <= 0) {
+            errors.push({ path: 'receivedItems.quantity', message: 'Quantity must be a positive number', value: item.quantity });
+            continue;
+          }
+
+          if (quantity > Number(matchingTransferItem.quantity || 0)) {
+            errors.push({ path: 'receivedItems.quantity', message: 'Quantity exceeds amount shipped', value: item.quantity });
+            continue;
+          }
+
+          sanitized.push({
+            product: matchingTransferItem.product,
+            quantity,
+            sku: matchingTransferItem.sku,
+            name: matchingTransferItem.name,
+            unitCost: matchingTransferItem.unitCost
+          });
+        }
+
+        if (errors.length > 0) {
+          return ResponseUtils.validationError(res, errors);
+        }
+
+        normalizedReceivedItems = sanitized;
+      } else {
+        normalizedReceivedItems = null;
+      }
+
+      const previousStatus = transfer.status;
 
       // Start transaction for status updates that affect inventory
       const session = await Transfer.db.startSession();
-      
+
       try {
         await session.withTransaction(async () => {
           // Update transfer status
@@ -472,93 +489,113 @@ class InventoryController {
 
           // Handle specific status updates
           switch (status) {
-            case 'shipped':
-              transfer.shippedAt = new Date();
-              transfer.shippedBy = req.user.userId;
-              
-              // Reserve stock in source branch (reduce quantity)
+          case 'shipped':
+            transfer.shippedAt = new Date();
+            transfer.shippedBy = req.user.userId;
+
+            // Reserve stock in source branch (reduce quantity)
+            for (const item of transfer.items) {
+              const quantity = Number(item.quantity) || 0;
+              if (quantity <= 0) {
+                continue;
+              }
+
+              await Product.updateOne(
+                {
+                  _id: item.product,
+                  'stockByBranch.branch': transfer.fromBranch
+                },
+                {
+                  $inc: { 'stockByBranch.$.quantity': -quantity },
+                  $set: { 'stockByBranch.$.lastUpdated': new Date() }
+                },
+                { session }
+              );
+            }
+            break;
+
+          case 'received':
+            transfer.receivedAt = new Date();
+            transfer.receivedBy = req.user.userId;
+            transfer.receivedItems = normalizedReceivedItems && normalizedReceivedItems.length > 0
+              ? normalizedReceivedItems
+              : transfer.items;
+
+            // Add stock to destination branch
+            for (const item of transfer.receivedItems) {
+              const normalizedQuantity = Number(item.quantity) || 0;
+              if (normalizedQuantity <= 0) {
+                continue;
+              }
+
+              const product = await Product.findById(item.product).session(session);
+              if (!product) {
+                throw new Error(`Product not found for received item: ${item.product}`);
+              }
+              const toBranchStock = product.stockByBranch.find(
+                stock => stock.branch.toString() === transfer.toBranch.toString()
+              );
+
+              if (toBranchStock) {
+                // Update existing stock
+                await Product.updateOne(
+                  {
+                    _id: item.product,
+                    'stockByBranch.branch': transfer.toBranch
+                  },
+                  {
+                    $inc: { 'stockByBranch.$.quantity': normalizedQuantity },
+                    $set: { 'stockByBranch.$.lastUpdated': new Date() }
+                  },
+                  { session }
+                );
+              } else {
+                // Add new branch stock
+                await Product.updateOne(
+                  { _id: item.product },
+                  {
+                    $push: {
+                      stockByBranch: {
+                        branch: transfer.toBranch,
+                        quantity: normalizedQuantity,
+                        minLevel: 0,
+                        maxLevel: 100,
+                        lastUpdated: new Date()
+                      }
+                    }
+                  },
+                  { session }
+                );
+              }
+            }
+            break;
+
+          case 'cancelled':
+            transfer.cancelledAt = new Date();
+            transfer.cancelledBy = req.user.userId;
+
+            // If was shipped, restore stock to source branch
+            if (previousStatus === 'shipped') {
               for (const item of transfer.items) {
+                const quantity = Number(item.quantity) || 0;
+                if (quantity <= 0) {
+                  continue;
+                }
+
                 await Product.updateOne(
                   {
                     _id: item.product,
                     'stockByBranch.branch': transfer.fromBranch
                   },
                   {
-                    $inc: { 'stockByBranch.$.quantity': -item.quantity },
+                    $inc: { 'stockByBranch.$.quantity': quantity },
                     $set: { 'stockByBranch.$.lastUpdated': new Date() }
                   },
                   { session }
                 );
               }
-              break;
-
-            case 'received':
-              transfer.receivedAt = new Date();
-              transfer.receivedBy = req.user.userId;
-              transfer.receivedItems = receivedItems || transfer.items;
-
-              // Add stock to destination branch
-              for (const item of transfer.receivedItems) {
-                const product = await Product.findById(item.product);
-                const toBranchStock = product.stockByBranch.find(
-                  stock => stock.branch.toString() === transfer.toBranch.toString()
-                );
-
-                if (toBranchStock) {
-                  // Update existing stock
-                  await Product.updateOne(
-                    {
-                      _id: item.product,
-                      'stockByBranch.branch': transfer.toBranch
-                    },
-                    {
-                      $inc: { 'stockByBranch.$.quantity': item.quantity },
-                      $set: { 'stockByBranch.$.lastUpdated': new Date() }
-                    },
-                    { session }
-                  );
-                } else {
-                  // Add new branch stock
-                  await Product.updateOne(
-                    { _id: item.product },
-                    {
-                      $push: {
-                        stockByBranch: {
-                          branch: transfer.toBranch,
-                          quantity: item.quantity,
-                          minLevel: 0,
-                          maxLevel: 100,
-                          lastUpdated: new Date()
-                        }
-                      }
-                    },
-                    { session }
-                  );
-                }
-              }
-              break;
-
-            case 'cancelled':
-              transfer.cancelledAt = new Date();
-              transfer.cancelledBy = req.user.userId;
-              
-              // If was shipped, restore stock to source branch
-              if (transfer.status === 'shipped') {
-                for (const item of transfer.items) {
-                  await Product.updateOne(
-                    {
-                      _id: item.product,
-                      'stockByBranch.branch': transfer.fromBranch
-                    },
-                    {
-                      $inc: { 'stockByBranch.$.quantity': item.quantity },
-                      $set: { 'stockByBranch.$.lastUpdated': new Date() }
-                    },
-                    { session }
-                  );
-                }
-              }
-              break;
+            }
+            break;
           }
 
           await transfer.save({ session });
@@ -572,25 +609,19 @@ class InventoryController {
           .populate('approvedBy', 'firstName lastName')
           .populate('receivedBy', 'firstName lastName');
 
-        res.json({
-          success: true,
-          message: `Transfer ${status} successfully`,
-          data: updatedTransfer
-        });
+        return ResponseUtils.success(
+          res,
+          updatedTransfer,
+          `Transfer ${status} successfully`
+        );
 
-      } catch (error) {
-        await session.endSession();
-        throw error;
       } finally {
         await session.endSession();
       }
 
     } catch (error) {
       console.error('Update transfer status error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error'
-      });
+      return ResponseUtils.error(res, 'Failed to update transfer status');
     }
   }
 
@@ -612,57 +643,75 @@ class InventoryController {
         sortOrder = 'desc'
       } = req.query;
 
-      // Build filter
-      const filter = {};
+      const resolvedBranchIds = req.resolvedBranchIds || [];
+      const hasGlobalAccess = hasCrossBranchAccess(req.user?.role);
+      const andConditions = [];
 
-      // Branch filter for RBAC
-      if (req.user.role !== 'admin' && req.user.branch) {
-        const branchId = req.user.branch._id || req.user.branch;
-        filter.$or = [
-          { fromBranch: branchId },
-          { toBranch: branchId }
-        ];
-      } else {
-        if (fromBranch) filter.fromBranch = fromBranch;
-        if (toBranch) filter.toBranch = toBranch;
+      if (!hasGlobalAccess) {
+        const userBranchId = getUserBranchId(req.user);
+        if (!userBranchId) {
+          return ResponseUtils.forbidden(res, 'Branch assignment required to view transfers');
+        }
+
+        andConditions.push({
+          $or: [
+            { fromBranch: userBranchId },
+            { toBranch: userBranchId }
+          ]
+        });
+      } else if (resolvedBranchIds.length > 0) {
+        andConditions.push({
+          $or: [
+            { fromBranch: { $in: resolvedBranchIds } },
+            { toBranch: { $in: resolvedBranchIds } }
+          ]
+        });
       }
 
-      // Status filter
+      if (fromBranch && ValidationUtils.isValidObjectId(fromBranch)) {
+        andConditions.push({ fromBranch });
+      }
+
+      if (toBranch && ValidationUtils.isValidObjectId(toBranch)) {
+        andConditions.push({ toBranch });
+      }
+
       if (status) {
-        filter.status = status;
+        andConditions.push({ status });
       }
 
-      // Date range filter
       if (startDate || endDate) {
-        filter.createdAt = {};
+        const dateRange = {};
         if (startDate) {
-          filter.createdAt.$gte = new Date(startDate);
+          dateRange.$gte = new Date(startDate);
         }
         if (endDate) {
           const endOfDay = new Date(endDate);
           endOfDay.setHours(23, 59, 59, 999);
-          filter.createdAt.$lte = endOfDay;
+          dateRange.$lte = endOfDay;
         }
+
+        andConditions.push({ createdAt: dateRange });
       }
 
-      // Search filter
       if (search) {
-        filter.$or = [
-          { transferNumber: { $regex: search, $options: 'i' } },
-          { 'items.name': { $regex: search, $options: 'i' } },
-          { 'items.sku': { $regex: search, $options: 'i' } },
-          { notes: { $regex: search, $options: 'i' } }
-        ];
+        andConditions.push({
+          $or: [
+            { transferNumber: { $regex: search, $options: 'i' } },
+            { 'items.name': { $regex: search, $options: 'i' } },
+            { 'items.sku': { $regex: search, $options: 'i' } },
+            { notes: { $regex: search, $options: 'i' } }
+          ]
+        });
       }
 
-      // Pagination
-      const skip = (parseInt(page) - 1) * parseInt(limit);
-      
-      // Sort
-      const sort = {};
-      sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+      const filter = andConditions.length > 0 ? { $and: andConditions } : {};
 
-      // Execute query
+      const { page: pageNumber, limit: pageSize } = ValidationUtils.validatePagination({ page, limit });
+      const skip = (pageNumber - 1) * pageSize;
+
+      const sort = { [sortBy]: sortOrder === 'desc' ? -1 : 1 };
+
       const [transfers, total] = await Promise.all([
         Transfer.find(filter)
           .populate('fromBranch', 'name code')
@@ -673,28 +722,18 @@ class InventoryController {
           .populate('receivedBy', 'firstName lastName')
           .sort(sort)
           .skip(skip)
-          .limit(parseInt(limit)),
+          .limit(pageSize),
         Transfer.countDocuments(filter)
       ]);
 
-      res.json({
-        success: true,
-        message: 'Transfers retrieved successfully',
-        data: transfers,
-        pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
-          total,
-          pages: Math.ceil(total / parseInt(limit))
-        }
-      });
-
+      return ResponseUtils.paginated(res, transfers, {
+        page: pageNumber,
+        limit: pageSize,
+        total
+      }, 'Transfers retrieved successfully');
     } catch (error) {
       console.error('Get transfers error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error'
-      });
+      return ResponseUtils.error(res, 'Failed to fetch stock transfers');
     }
   }
 
@@ -703,26 +742,29 @@ class InventoryController {
    */
   static async getInventorySummary(req, res) {
     try {
-      const { branch } = req.query;
-
-      // Build filter
-      const filter = { isActive: true };
-
-      // Branch filter for RBAC
-      let branchFilter;
-      if (req.user.role !== 'admin' && req.user.branch) {
-        branchFilter = req.user.branch._id;
-      } else if (branch) {
-        branchFilter = branch;
-      }
-
+      const resolvedBranchIds = req.resolvedBranchIds || [];
       const pipeline = [
-        { $match: filter },
+        { $match: { isActive: true } },
         { $unwind: '$stockByBranch' }
       ];
 
-      if (branchFilter) {
-        pipeline.push({ $match: { 'stockByBranch.branch': branchFilter } });
+      if (resolvedBranchIds.length > 0) {
+        pipeline.push({
+          $match: {
+            'stockByBranch.branch': { $in: resolvedBranchIds.map((id) => new mongoose.Types.ObjectId(id)) }
+          }
+        });
+      } else if (!hasCrossBranchAccess(req.user?.role)) {
+        const userBranchId = getUserBranchId(req.user);
+        if (!userBranchId) {
+          return ResponseUtils.forbidden(res, 'Branch assignment required to view inventory summary');
+        }
+
+        pipeline.push({
+          $match: {
+            'stockByBranch.branch': new mongoose.Types.ObjectId(userBranchId)
+          }
+        });
       }
 
       pipeline.push(
@@ -796,18 +838,11 @@ class InventoryController {
 
       const summary = await Product.aggregate(pipeline);
 
-      res.json({
-        success: true,
-        message: 'Inventory summary retrieved successfully',
-        data: summary
-      });
+      return ResponseUtils.success(res, summary, 'Inventory summary retrieved successfully');
 
     } catch (error) {
       console.error('Get inventory summary error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error'
-      });
+      return ResponseUtils.error(res, 'Failed to get inventory summary');
     }
   }
 
@@ -819,7 +854,6 @@ class InventoryController {
       const {
         page = 1,
         limit = 20,
-        branch,
         category,
         sortBy = 'name',
         sortOrder = 'asc'
@@ -836,16 +870,21 @@ class InventoryController {
         filter.category = category;
       }
 
-      // Branch filter for RBAC
-      let branchFilter = null;
-      if (req.user.role !== 'admin' && req.user.branch) {
-        branchFilter = req.user.branch._id;
-      } else if (branch) {
-        branchFilter = branch;
+      const resolvedBranchIds = req.resolvedBranchIds || [];
+      const hasGlobalAccess = hasCrossBranchAccess(req.user?.role);
+      const branchFilters = resolvedBranchIds.map(String);
+
+      if (!hasGlobalAccess && branchFilters.length === 0) {
+        const userBranchId = getUserBranchId(req.user);
+        if (!userBranchId) {
+          return ResponseUtils.forbidden(res, 'Branch assignment required to view low stock items');
+        }
+
+        branchFilters.push(userBranchId.toString());
       }
 
       // Get all active products
-      let query = Product.find(filter)
+      const query = Product.find(filter)
         .populate('category', 'name')
         .populate('brand', 'name')
         .populate('unit', 'name symbol')
@@ -857,11 +896,12 @@ class InventoryController {
 
       // Filter products with low stock in any branch (or specific branch)
       const lowStockItems = [];
-      
+
       for (const product of allProducts) {
         for (const stock of product.stockByBranch) {
           // Check if this branch should be included
-          if (branchFilter && stock.branch._id.toString() !== branchFilter.toString()) {
+          const branchId = stock.branch?._id ? stock.branch._id.toString() : stock.branch?.toString();
+          if (branchFilters.length > 0 && (!branchId || !branchFilters.includes(branchId))) {
             continue;
           }
 
@@ -884,54 +924,58 @@ class InventoryController {
               stockStatus: 'low',
               reorderQuantity: Math.max((stock.maxStockLevel || stock.reorderLevel * 3) - stock.quantity, 0),
               stockValue: stock.quantity * (product.pricing?.costPrice || 0),
-              urgency: stock.quantity === 0 ? 'critical' : 
-                       stock.quantity <= (stock.reorderLevel * 0.5) ? 'high' : 'medium'
+              urgency: stock.quantity === 0 ? 'critical' :
+                stock.quantity <= (stock.reorderLevel * 0.5) ? 'high' : 'medium'
             });
           }
         }
       }
 
       // Sort the results
+      const direction = sortOrder === 'desc' ? -1 : 1;
       lowStockItems.sort((a, b) => {
-        if (sortOrder === 'desc') {
-          return b[sortBy] > a[sortBy] ? 1 : -1;
+        const aVal = a?.[sortBy];
+        const bVal = b?.[sortBy];
+
+        if (aVal === bVal) {
+          return 0;
         }
-        return a[sortBy] > b[sortBy] ? 1 : -1;
+
+        if (aVal === undefined || aVal === null) {
+          return 1 * direction;
+        }
+
+        if (bVal === undefined || bVal === null) {
+          return -1 * direction;
+        }
+
+        return aVal > bVal ? direction : -direction;
       });
 
       // Paginate
+      const { page: pageNumber, limit: pageSize } = ValidationUtils.validatePagination({ page, limit });
       const total = lowStockItems.length;
-      const startIndex = (page - 1) * limit;
-      const paginatedItems = lowStockItems.slice(startIndex, startIndex + parseInt(limit));
+      const startIndex = (pageNumber - 1) * pageSize;
+      const paginatedItems = lowStockItems.slice(startIndex, startIndex + pageSize);
 
-      res.json({
-        success: true,
-        message: 'Low stock items retrieved successfully',
-        data: {
-          products: paginatedItems,
-          pagination: {
-            currentPage: parseInt(page),
-            totalPages: Math.ceil(total / limit),
-            totalItems: total,
-            itemsPerPage: parseInt(limit),
-            hasNext: page < Math.ceil(total / limit),
-            hasPrev: page > 1
-          },
-          summary: {
-            totalLowStockItems: total,
-            criticalItems: lowStockItems.filter(item => item.urgency === 'critical').length,
-            highUrgencyItems: lowStockItems.filter(item => item.urgency === 'high').length
-          }
+      const responsePayload = {
+        products: paginatedItems,
+        summary: {
+          totalLowStockItems: total,
+          criticalItems: lowStockItems.filter((item) => item.urgency === 'critical').length,
+          highUrgencyItems: lowStockItems.filter((item) => item.urgency === 'high').length
         }
-      });
+      };
+
+      return ResponseUtils.paginated(res, responsePayload, {
+        page: pageNumber,
+        limit: pageSize,
+        total
+      }, 'Low stock items retrieved successfully');
 
     } catch (error) {
       console.error('Error getting low stock items:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to get low stock items',
-        error: error.message
-      });
+      return ResponseUtils.error(res, 'Failed to get low stock items');
     }
   }
 }
@@ -944,9 +988,9 @@ async function generateAdjustmentNumber(branchCode) {
   const year = today.getFullYear();
   const month = String(today.getMonth() + 1).padStart(2, '0');
   const day = String(today.getDate()).padStart(2, '0');
-  
+
   const prefix = `ADJ-${branchCode}-${year}${month}${day}`;
-  
+
   const lastAdjustment = await Adjustment.findOne({
     adjustmentNumber: { $regex: `^${prefix}` }
   }).sort({ adjustmentNumber: -1 });
@@ -969,9 +1013,9 @@ async function generateTransferNumber(fromBranchCode, toBranchCode) {
   const today = new Date();
   const year = today.getFullYear();
   const month = String(today.getMonth() + 1).padStart(2, '0');
-  
+
   const prefix = `TXF-${fromBranchCode}${toBranchCode}-${year}${month}`;
-  
+
   const lastTransfer = await Transfer.findOne({
     transferNumber: { $regex: `^${prefix}` }
   }).sort({ transferNumber: -1 });

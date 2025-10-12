@@ -35,6 +35,8 @@ import {
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import ProductModal from '../components/ProductModal';
 import DeleteModal from '../components/DeleteModal';
+import { PermissionGuard, ViewerBlock } from '../components/PermissionGuard';
+import { PERMISSIONS } from '../../../shared/permissions';
 import { cn } from '../utils/cn';
 import { productsAPI } from '../utils/api';
 
@@ -373,30 +375,38 @@ function Products() {
       header: 'Actions',
       cell: ({ row }) => (
         <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleEditProduct(row.original)}
-            className="h-8 w-8 p-0"
-          >
-            <PencilIcon className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleDuplicateProduct(row.original)}
-            className="h-8 w-8 p-0"
-          >
-            <DocumentDuplicateIcon className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleDeleteClick(row.original)}
-            className="h-8 w-8 p-0 text-red-600 hover:text-red-500"
-          >
-            <TrashIcon className="h-4 w-4" />
-          </Button>
+          <ViewerBlock>
+            <PermissionGuard permission={PERMISSIONS.PRODUCTS.UPDATE}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleEditProduct(row.original)}
+                className="h-8 w-8 p-0"
+              >
+                <PencilIcon className="h-4 w-4" />
+              </Button>
+            </PermissionGuard>
+            <PermissionGuard permission={PERMISSIONS.PRODUCTS.CREATE}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleDuplicateProduct(row.original)}
+                className="h-8 w-8 p-0"
+              >
+                <DocumentDuplicateIcon className="h-4 w-4" />
+              </Button>
+            </PermissionGuard>
+            <PermissionGuard permission={PERMISSIONS.PRODUCTS.DELETE}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleDeleteClick(row.original)}
+                className="h-8 w-8 p-0 text-red-600 hover:text-red-500"
+              >
+                <TrashIcon className="h-4 w-4" />
+              </Button>
+            </PermissionGuard>
+          </ViewerBlock>
         </div>
       ),
       enableSorting: false,
@@ -617,46 +627,52 @@ function Products() {
           </div>
 
           {/* Export/Import - Hidden on mobile */}
-          <div className="hidden md:flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExportCSV}
-              disabled={loading}
-            >
-              <ArrowDownTrayIcon className={cn("h-4 w-4", loading && "animate-spin")} />
-              <span className="hidden lg:inline ml-1">{loading ? 'Exporting...' : 'Export'}</span>
-            </Button>
-            
-            <label 
-              htmlFor="csv-import"
-              className={cn(
-                "inline-flex items-center justify-center rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                "border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800",
-                "hover:bg-surface-50 dark:hover:bg-surface-700 cursor-pointer",
-                loading && "opacity-50 pointer-events-none cursor-not-allowed"
-              )}
-            >
-              <ArrowUpTrayIcon className="h-4 w-4" />
-              <span className="hidden lg:inline ml-1">{loading ? 'Importing...' : 'Import'}</span>
-              <input
-                id="csv-import"
-                type="file"
-                accept=".csv"
-                onChange={handleImportCSV}
-                className="hidden"
+          <PermissionGuard permission={PERMISSIONS.PRODUCTS.EXPORT}>
+            <div className="hidden md:flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportCSV}
                 disabled={loading}
-              />
-            </label>
-          </div>
+              >
+                <ArrowDownTrayIcon className={cn("h-4 w-4", loading && "animate-spin")} />
+                <span className="hidden lg:inline ml-1">{loading ? 'Exporting...' : 'Export'}</span>
+              </Button>
+              
+              <PermissionGuard permission={PERMISSIONS.PRODUCTS.IMPORT}>
+                <label 
+                  htmlFor="csv-import"
+                  className={cn(
+                    "inline-flex items-center justify-center rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                    "border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800",
+                    "hover:bg-surface-50 dark:hover:bg-surface-700 cursor-pointer",
+                    loading && "opacity-50 pointer-events-none cursor-not-allowed"
+                  )}
+                >
+                  <ArrowUpTrayIcon className="h-4 w-4" />
+                  <span className="hidden lg:inline ml-1">{loading ? 'Importing...' : 'Import'}</span>
+                  <input
+                    id="csv-import"
+                    type="file"
+                    accept=".csv"
+                    onChange={handleImportCSV}
+                    className="hidden"
+                    disabled={loading}
+                  />
+                </label>
+              </PermissionGuard>
+            </div>
+          </PermissionGuard>
 
-          <Button
-            onClick={() => setShowModal(true)}
-            className="bg-blue-600 hover:bg-blue-700 flex-1 sm:flex-none"
-          >
-            <PlusIcon className="h-4 w-4 mr-1" />
-            Add Product
-          </Button>
+          <PermissionGuard permission={PERMISSIONS.PRODUCTS.CREATE}>
+            <Button
+              onClick={() => setShowModal(true)}
+              className="bg-blue-600 hover:bg-blue-700 flex-1 sm:flex-none"
+            >
+              <PlusIcon className="h-4 w-4 mr-1" />
+              Add Product
+            </Button>
+          </PermissionGuard>
         </div>
       </div>
 

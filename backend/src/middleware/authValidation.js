@@ -9,7 +9,7 @@ const loginValidation = [
     .isEmail()
     .normalizeEmail()
     .withMessage('Please provide a valid email address'),
-  
+
   body('password')
     .notEmpty()
     .withMessage('Password is required')
@@ -22,13 +22,13 @@ const registerValidation = [
     .isEmail()
     .normalizeEmail()
     .withMessage('Please provide a valid email address'),
-  
+
   body('password')
     .isLength({ min: 8 })
     .withMessage('Password must be at least 8 characters long')
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
     .withMessage('Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'),
-  
+
   body('firstName')
     .trim()
     .notEmpty()
@@ -37,7 +37,7 @@ const registerValidation = [
     .withMessage('First name must be between 2 and 50 characters')
     .matches(/^[a-zA-Z\s]+$/)
     .withMessage('First name can only contain letters and spaces'),
-  
+
   body('lastName')
     .trim()
     .notEmpty()
@@ -46,22 +46,22 @@ const registerValidation = [
     .withMessage('Last name must be between 2 and 50 characters')
     .matches(/^[a-zA-Z\s]+$/)
     .withMessage('Last name can only contain letters and spaces'),
-  
+
   body('phone')
     .optional()
     .isMobilePhone()
     .withMessage('Please provide a valid phone number'),
-  
+
   body('role')
     .optional()
     .isIn(['admin', 'manager', 'cashier', 'viewer'])
     .withMessage('Role must be one of: admin, manager, cashier, viewer'),
-  
+
   body('branch')
     .optional()
     .isMongoId()
     .withMessage('Branch must be a valid ID'),
-  
+
   body('permissions')
     .optional()
     .isArray()
@@ -75,7 +75,7 @@ const registerValidation = [
         'view_reports', 'export_data',
         'manage_settings'
       ];
-      
+
       if (!permissions.every(permission => validPermissions.includes(permission))) {
         throw new Error('Invalid permission provided');
       }
@@ -91,7 +91,7 @@ const updateProfileValidation = [
     .withMessage('First name must be between 2 and 50 characters')
     .matches(/^[a-zA-Z\s]+$/)
     .withMessage('First name can only contain letters and spaces'),
-  
+
   body('lastName')
     .optional()
     .trim()
@@ -99,7 +99,7 @@ const updateProfileValidation = [
     .withMessage('Last name must be between 2 and 50 characters')
     .matches(/^[a-zA-Z\s]+$/)
     .withMessage('Last name can only contain letters and spaces'),
-  
+
   body('phone')
     .optional()
     .isMobilePhone()
@@ -110,7 +110,7 @@ const changePasswordValidation = [
   body('currentPassword')
     .notEmpty()
     .withMessage('Current password is required'),
-  
+
   body('newPassword')
     .isLength({ min: 8 })
     .withMessage('New password must be at least 8 characters long')

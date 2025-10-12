@@ -89,7 +89,7 @@ const saleSchema = new mongoose.Schema({
     index: true
   },
   items: [saleItemSchema],
-  
+
   // Customer Information
   customer: {
     type: mongoose.Schema.Types.ObjectId,
@@ -107,7 +107,7 @@ const saleSchema = new mongoose.Schema({
   customerAddress: {
     type: String
   },
-  
+
   // Financial Details
   subtotal: {
     type: Number,
@@ -146,7 +146,7 @@ const saleSchema = new mongoose.Schema({
     required: true,
     min: 0
   },
-  
+
   // Payment Information
   paymentMethod: {
     type: String,
@@ -167,7 +167,7 @@ const saleSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
-  
+
   // Status and Tracking
   status: {
     type: String,
@@ -180,7 +180,7 @@ const saleSchema = new mongoose.Schema({
     enum: ['retail', 'wholesale', 'online', 'return'],
     default: 'retail'
   },
-  
+
   // Refund Information
   refundedAmount: {
     type: Number,
@@ -197,7 +197,7 @@ const saleSchema = new mongoose.Schema({
   refundedAt: {
     type: Date
   },
-  
+
   // Notes and References
   notes: {
     type: String,
@@ -207,7 +207,7 @@ const saleSchema = new mongoose.Schema({
     type: String,
     maxlength: [500, 'Internal notes cannot exceed 500 characters']
   },
-  
+
   // Delivery Information
   deliveryInfo: {
     type: {
@@ -219,7 +219,7 @@ const saleSchema = new mongoose.Schema({
     deliveredDate: Date,
     trackingNumber: String
   },
-  
+
   // Staff Information
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
@@ -231,7 +231,7 @@ const saleSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   },
-  
+
   // Audit Trail
   auditLog: [{
     action: String,
@@ -288,15 +288,15 @@ saleSchema.pre('save', async function(next) {
     const count = await this.constructor.countDocuments();
     this.saleNumber = `SALE-${String(count + 1).padStart(6, '0')}`;
   }
-  
+
   // Calculate amount due
   this.amountDue = Math.max(0, this.total - this.amountPaid);
-  
+
   // Update updatedBy
   if (!this.isNew && this.isModified() && this.updatedBy) {
     this.updatedBy = this.updatedBy;
   }
-  
+
   next();
 });
 
@@ -304,12 +304,12 @@ saleSchema.pre('save', async function(next) {
 saleSchema.methods.addPayment = function(paymentData) {
   this.payments.push(paymentData);
   this.amountPaid = this.payments.reduce((sum, payment) => sum + payment.amount, 0);
-  
+
   if (this.amountPaid >= this.total) {
     this.status = 'completed';
     this.changeAmount = this.amountPaid - this.total;
   }
-  
+
   return this.save();
 };
 
@@ -317,18 +317,18 @@ saleSchema.methods.processRefund = function(amount, reason, refundedBy) {
   if (amount > (this.total - this.refundedAmount)) {
     throw new Error('Refund amount cannot exceed sale total');
   }
-  
+
   this.refundedAmount += amount;
   this.refundReason = reason;
   this.refundedBy = refundedBy;
   this.refundedAt = new Date();
-  
+
   if (this.refundedAmount >= this.total) {
     this.status = 'refunded';
   } else if (this.refundedAmount > 0) {
     this.status = 'partially_refunded';
   }
-  
+
   // Add to audit log
   this.auditLog.push({
     action: 'refund_processed',
@@ -339,7 +339,7 @@ saleSchema.methods.processRefund = function(amount, reason, refundedBy) {
       previousStatus: this.status
     }
   });
-  
+
   return this.save();
 };
 
@@ -347,45 +347,45 @@ saleSchema.methods.cancel = function(cancelledBy, reason) {
   if (this.status === 'completed') {
     throw new Error('Cannot cancel a completed sale. Process a refund instead.');
   }
-  
+
   this.status = 'cancelled';
   this.auditLog.push({
     action: 'sale_cancelled',
     performedBy: cancelledBy,
     details: { reason }
   });
-  
+
   return this.save();
 };
 
 // Static methods
 saleSchema.statics.getSalesReport = function(filters) {
   const pipeline = [];
-  
+
   // Match stage
   const matchStage = { $match: {} };
-  
+
   if (filters.startDate && filters.endDate) {
     matchStage.$match.createdAt = {
       $gte: new Date(filters.startDate),
       $lte: new Date(filters.endDate)
     };
   }
-  
+
   if (filters.branch) {
     matchStage.$match.branch = mongoose.Types.ObjectId(filters.branch);
   }
-  
+
   if (filters.status) {
     matchStage.$match.status = filters.status;
   }
-  
+
   if (filters.paymentMethod) {
     matchStage.$match.paymentMethod = filters.paymentMethod;
   }
-  
+
   pipeline.push(matchStage);
-  
+
   // Group stage for aggregation
   pipeline.push({
     $group: {
@@ -397,32 +397,32 @@ saleSchema.statics.getSalesReport = function(filters) {
       averageOrderValue: { $avg: '$total' }
     }
   });
-  
+
   return this.aggregate(pipeline);
 };
 
 saleSchema.statics.getTopProducts = function(filters = {}) {
   const pipeline = [];
-  
+
   // Match stage
   const matchStage = { $match: { status: { $in: ['completed', 'partially_refunded'] } } };
-  
+
   if (filters.startDate && filters.endDate) {
     matchStage.$match.createdAt = {
       $gte: new Date(filters.startDate),
       $lte: new Date(filters.endDate)
     };
   }
-  
+
   if (filters.branch) {
     matchStage.$match.branch = mongoose.Types.ObjectId(filters.branch);
   }
-  
+
   pipeline.push(matchStage);
-  
+
   // Unwind items
   pipeline.push({ $unwind: '$items' });
-  
+
   // Group by product
   pipeline.push({
     $group: {
@@ -434,13 +434,13 @@ saleSchema.statics.getTopProducts = function(filters = {}) {
       salesCount: { $sum: 1 }
     }
   });
-  
+
   // Sort by revenue
   pipeline.push({ $sort: { totalRevenue: -1 } });
-  
+
   // Limit results
   pipeline.push({ $limit: filters.limit || 10 });
-  
+
   return this.aggregate(pipeline);
 };
 

@@ -42,42 +42,42 @@ const transferSchema = new mongoose.Schema({
     required: true
   },
   items: [transferItemSchema],
-  
+
   status: {
     type: String,
     enum: ['pending', 'in_transit', 'completed', 'cancelled'],
     default: 'pending'
   },
-  
+
   reason: {
     type: String,
     enum: ['restock', 'demand', 'expiry', 'other'],
     required: true
   },
-  
+
   notes: {
     type: String,
     maxlength: [500, 'Notes cannot exceed 500 characters']
   },
-  
+
   transferDate: {
     type: Date,
     default: Date.now
   },
-  
+
   completedDate: Date,
-  
+
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
   },
-  
+
   approvedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   },
-  
+
   receivedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
@@ -133,17 +133,17 @@ transferSchema.statics.generateTransferNumber = async function() {
   const year = today.getFullYear();
   const month = String(today.getMonth() + 1).padStart(2, '0');
   const prefix = `TR${year}${month}`;
-  
+
   const lastTransfer = await this.findOne({
     transferNumber: { $regex: `^${prefix}` }
   }).sort({ transferNumber: -1 });
-  
+
   let nextNumber = 1;
   if (lastTransfer) {
     const lastNumber = parseInt(lastTransfer.transferNumber.substring(prefix.length));
     nextNumber = lastNumber + 1;
   }
-  
+
   return `${prefix}${String(nextNumber).padStart(4, '0')}`;
 };
 

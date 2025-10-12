@@ -39,11 +39,11 @@ async function updateSalesDates() {
 
     for (let i = 0; i < allSales.length; i += batchSize) {
       const batch = allSales.slice(i, i + batchSize);
-      
+
       const bulkOps = batch.map(sale => {
         const newDate = new Date(sale.createdAt);
         newDate.setDate(newDate.getDate() + daysToShift);
-        
+
         return {
           updateOne: {
             filter: { _id: sale._id },
@@ -59,7 +59,7 @@ async function updateSalesDates() {
 
       const result = await salesCollection.bulkWrite(bulkOps);
       updated += result.modifiedCount;
-      
+
       if (i % 500 === 0) {
         console.log(`   Progress: ${updated}/${allSales.length}...`);
       }

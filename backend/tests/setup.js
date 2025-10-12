@@ -12,12 +12,12 @@ beforeAll(async () => {
   // Use MongoDB Memory Server for testing
   mongoServer = await MongoMemoryServer.create();
   const uri = mongoServer.getUri();
-  
+
   // Close any existing connection
   if (mongoose.connection.readyState !== 0) {
     await mongoose.disconnect();
   }
-  
+
   // Connect to test database
   await mongoose.connect(uri);
 }, 30000); // 30 second timeout
@@ -25,7 +25,7 @@ beforeAll(async () => {
 // Clean up after each test
 afterEach(async () => {
   const collections = mongoose.connection.collections;
-  
+
   for (const key in collections) {
     const collection = collections[key];
     await collection.deleteMany({});
@@ -44,7 +44,7 @@ global.testHelpers = {
   // Create test user
   createTestUser: async (overrides = {}) => {
     const User = require('../src/models/User');
-    
+
     const userData = {
       firstName: 'Test',
       lastName: 'User',
@@ -56,21 +56,21 @@ global.testHelpers = {
       isActive: true,
       ...overrides
     };
-    
+
     return await User.create(userData);
   },
-  
+
   // Create test category
   createTestCategory: async (overrides = {}) => {
     const Category = require('../src/models/Category');
-    
+
     // Create a user if not provided
     let createdBy = overrides.createdBy;
     if (!createdBy) {
       const testUser = await global.testHelpers.createTestUser({ role: 'Admin' });
       createdBy = testUser._id;
     }
-    
+
     const categoryData = {
       name: 'Test Category',
       code: `TC${Math.floor(Math.random() * 10000)}`.substring(0, 8), // Ensure max 8 chars within 2-10 limit
@@ -79,21 +79,21 @@ global.testHelpers = {
       createdBy,
       ...overrides
     };
-    
+
     return await Category.create(categoryData);
   },
 
   // Create test unit
   createTestUnit: async (overrides = {}) => {
     const Unit = require('../src/models/Unit');
-    
+
     // Create a user if not provided
     let createdBy = overrides.createdBy;
     if (!createdBy) {
       const testUser = await global.testHelpers.createTestUser({ role: 'Admin' });
       createdBy = testUser._id;
     }
-    
+
     const unitData = {
       name: 'Test Unit',
       code: `${String.fromCharCode(65 + Math.floor(Math.random() * 26))}${String.fromCharCode(65 + Math.floor(Math.random() * 26))}${String.fromCharCode(65 + Math.floor(Math.random() * 26))}`,  // Generates ABC, XYZ, etc.
@@ -103,21 +103,21 @@ global.testHelpers = {
       createdBy,
       ...overrides
     };
-    
+
     return await Unit.create(unitData);
   },
 
   // Create test brand
   createTestBrand: async (overrides = {}) => {
     const Brand = require('../src/models/Brand');
-    
+
     // Create a user if not provided
     let createdBy = overrides.createdBy;
     if (!createdBy) {
       const testUser = await global.testHelpers.createTestUser({ role: 'Admin' });
       createdBy = testUser._id;
     }
-    
+
     const brandData = {
       name: 'Test Brand',
       code: `TB${Math.floor(Math.random() * 10000)}`.substring(0, 8), // Ensure max 8 chars within 2-10 limit
@@ -126,21 +126,21 @@ global.testHelpers = {
       createdBy,
       ...overrides
     };
-    
+
     return await Brand.create(brandData);
   },
 
   // Create test branch
   createTestBranch: async (overrides = {}) => {
     const Branch = require('../src/models/Branch');
-    
+
     // Create a user if not provided
     let createdBy = overrides.createdBy;
     if (!createdBy) {
       const testUser = await global.testHelpers.createTestUser({ role: 'Admin' });
       createdBy = testUser._id;
     }
-    
+
     const branchData = {
       name: 'Test Branch',
       code: `BR${Math.floor(Math.random() * 10000)}`.substring(0, 8), // Ensure max 8 chars within 2-10 limit
@@ -148,7 +148,7 @@ global.testHelpers = {
         street: 'Test Street',
         city: 'Test City',
         state: 'Test State',
-        zipCode: '123456',
+        pincode: '123456',
         country: 'India'
       },
       contact: {
@@ -159,41 +159,41 @@ global.testHelpers = {
       createdBy,
       ...overrides
     };
-    
+
     return await Branch.create(branchData);
   },
 
   // Create test product
   createTestProduct: async (overrides = {}) => {
     const Product = require('../src/models/Product');
-    
+
     // Create necessary dependencies if not provided
     let category, unit, brand, branch, adminUser;
-    
+
     // Create a single admin user for all dependencies if needed
     if (!overrides.category || !overrides.unit || !overrides.brand || !overrides.stockByBranch) {
-      adminUser = await global.testHelpers.createTestUser({ 
+      adminUser = await global.testHelpers.createTestUser({
         role: 'Admin',
         email: `product-admin-${Date.now()}@example.com`
       });
     }
-    
+
     if (!overrides.category) {
       category = await global.testHelpers.createTestCategory({ createdBy: adminUser._id });
     }
-    
+
     if (!overrides.unit) {
       unit = await global.testHelpers.createTestUnit({ createdBy: adminUser._id });
     }
-    
+
     if (!overrides.brand) {
       brand = await global.testHelpers.createTestBrand({ createdBy: adminUser._id });
     }
-    
+
     if (!overrides.stockByBranch) {
       branch = await global.testHelpers.createTestBranch({ createdBy: adminUser._id });
     }
-    
+
     const productData = {
       name: 'Test Product',
       sku: `TEST-${Math.floor(Math.random() * 10000).toString().padStart(3, '0')}`,
@@ -217,14 +217,14 @@ global.testHelpers = {
       isActive: true,
       ...overrides
     };
-    
+
     return await Product.create(productData);
   },
-  
+
   // Create test sale
   createTestSale: async (overrides = {}) => {
     const Sale = require('../src/models/Sale');
-    
+
     const saleData = {
       saleNumber: `SALE-${Date.now()}`,
       branch: new mongoose.Types.ObjectId(),
@@ -251,22 +251,22 @@ global.testHelpers = {
       status: 'completed',
       ...overrides
     };
-    
+
     return await Sale.create(saleData);
   },
-  
+
   // Generate JWT token for testing
   generateTestToken: (userId, role = 'Cashier') => {
     const jwt = require('jsonwebtoken');
     return jwt.sign(
-      { 
+      {
         id: userId,
         email: 'test@example.com',
         role,
         fullName: 'Test User'
       },
       process.env.JWT_SECRET || 'test-secret-key',
-      { 
+      {
         expiresIn: '1h',
         issuer: 'inventory-supermarkets',
         audience: 'supermarket-users'

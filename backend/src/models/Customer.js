@@ -6,7 +6,7 @@ const customerSchema = new mongoose.Schema({
     unique: true,
     required: true
   },
-  
+
   // Basic Information
   firstName: {
     type: String,
@@ -20,7 +20,7 @@ const customerSchema = new mongoose.Schema({
     trim: true,
     maxlength: [50, 'Last name cannot exceed 50 characters']
   },
-  
+
   // Contact Information
   email: {
     type: String,
@@ -41,7 +41,7 @@ const customerSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
-  
+
   // Address Information
   addresses: [{
     type: {
@@ -79,7 +79,7 @@ const customerSchema = new mongoose.Schema({
       default: false
     }
   }],
-  
+
   // Business Information
   customerType: {
     type: String,
@@ -99,7 +99,7 @@ const customerSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
-  
+
   // Customer Classification
   customerGroup: {
     type: String,
@@ -117,7 +117,7 @@ const customerSchema = new mongoose.Schema({
     min: 0,
     max: 100
   },
-  
+
   // Purchase History Summary
   totalPurchases: {
     type: Number,
@@ -140,7 +140,7 @@ const customerSchema = new mongoose.Schema({
   firstPurchaseDate: {
     type: Date
   },
-  
+
   // Payment Information
   preferredPaymentMethod: {
     type: String,
@@ -150,7 +150,7 @@ const customerSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
-  
+
   // Status and Flags
   isActive: {
     type: Boolean,
@@ -164,14 +164,14 @@ const customerSchema = new mongoose.Schema({
   blacklistReason: {
     type: String
   },
-  
+
   // Branch Association
   registeredBranch: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Branch',
     required: true
   },
-  
+
   // Additional Information
   dateOfBirth: {
     type: Date
@@ -188,14 +188,14 @@ const customerSchema = new mongoose.Schema({
     trim: true,
     lowercase: true
   }],
-  
+
   // Marketing Preferences
   marketingConsent: {
     email: { type: Boolean, default: false },
     sms: { type: Boolean, default: false },
     phone: { type: Boolean, default: false }
   },
-  
+
   // Loyalty Program
   loyaltyPoints: {
     type: Number,
@@ -207,7 +207,7 @@ const customerSchema = new mongoose.Schema({
     enum: ['bronze', 'silver', 'gold', 'platinum'],
     default: 'bronze'
   },
-  
+
   // Tracking
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
@@ -245,7 +245,7 @@ customerSchema.virtual('defaultAddress').get(function() {
 });
 
 customerSchema.virtual('customerLifetimeValue').get(function() {
-  const daysSinceFirst = this.firstPurchaseDate ? 
+  const daysSinceFirst = this.firstPurchaseDate ?
     (new Date() - this.firstPurchaseDate) / (1000 * 60 * 60 * 24) : 0;
   return daysSinceFirst > 0 ? this.totalSpent / (daysSinceFirst / 365) : 0;
 });
@@ -260,12 +260,12 @@ customerSchema.pre('save', async function(next) {
     const count = await this.constructor.countDocuments();
     this.customerNumber = `CUST-${String(count + 1).padStart(6, '0')}`;
   }
-  
+
   // Update average order value
   if (this.totalPurchases > 0) {
     this.averageOrderValue = this.totalSpent / this.totalPurchases;
   }
-  
+
   // Update loyalty tier based on total spent
   if (this.totalSpent >= 100000) {
     this.loyaltyTier = 'platinum';
@@ -274,7 +274,7 @@ customerSchema.pre('save', async function(next) {
   } else if (this.totalSpent >= 20000) {
     this.loyaltyTier = 'silver';
   }
-  
+
   next();
 });
 
@@ -283,13 +283,13 @@ customerSchema.methods.addPurchase = function(amount, purchaseDate = new Date())
   this.totalPurchases += 1;
   this.totalSpent += amount;
   this.lastPurchaseDate = purchaseDate;
-  
+
   if (!this.firstPurchaseDate) {
     this.firstPurchaseDate = purchaseDate;
   }
-  
+
   this.averageOrderValue = this.totalSpent / this.totalPurchases;
-  
+
   return this.save();
 };
 
@@ -299,7 +299,7 @@ customerSchema.methods.addAddress = function(addressData) {
     this.addresses.forEach(addr => addr.isDefault = false);
     addressData.isDefault = true;
   }
-  
+
   this.addresses.push(addressData);
   return this.save();
 };
@@ -309,12 +309,12 @@ customerSchema.methods.updateAddress = function(addressId, updateData) {
   if (!address) {
     throw new Error('Address not found');
   }
-  
+
   // If setting as default, remove default from others
   if (updateData.isDefault) {
     this.addresses.forEach(addr => addr.isDefault = false);
   }
-  
+
   Object.assign(address, updateData);
   return this.save();
 };
@@ -328,7 +328,7 @@ customerSchema.methods.redeemLoyaltyPoints = function(points) {
   if (this.loyaltyPoints < points) {
     throw new Error('Insufficient loyalty points');
   }
-  
+
   this.loyaltyPoints -= points;
   return this.save();
 };
@@ -336,7 +336,7 @@ customerSchema.methods.redeemLoyaltyPoints = function(points) {
 // Static methods
 customerSchema.statics.searchCustomers = function(query, filters = {}) {
   const searchConditions = { isActive: true };
-  
+
   if (query) {
     searchConditions.$or = [
       { firstName: { $regex: query, $options: 'i' } },
@@ -346,19 +346,19 @@ customerSchema.statics.searchCustomers = function(query, filters = {}) {
       { customerNumber: { $regex: query, $options: 'i' } }
     ];
   }
-  
+
   if (filters.customerGroup) {
     searchConditions.customerGroup = filters.customerGroup;
   }
-  
+
   if (filters.registeredBranch) {
     searchConditions.registeredBranch = filters.registeredBranch;
   }
-  
+
   if (filters.loyaltyTier) {
     searchConditions.loyaltyTier = filters.loyaltyTier;
   }
-  
+
   return this.find(searchConditions)
     .populate('registeredBranch', 'name code')
     .sort({ totalSpent: -1 });
@@ -366,11 +366,11 @@ customerSchema.statics.searchCustomers = function(query, filters = {}) {
 
 customerSchema.statics.getTopCustomers = function(limit = 10, branchId = null) {
   const matchConditions = { isActive: true };
-  
+
   if (branchId) {
     matchConditions.registeredBranch = mongoose.Types.ObjectId(branchId);
   }
-  
+
   return this.find(matchConditions)
     .sort({ totalSpent: -1 })
     .limit(limit)
@@ -379,14 +379,14 @@ customerSchema.statics.getTopCustomers = function(limit = 10, branchId = null) {
 
 customerSchema.statics.getCustomerStats = function(branchId = null) {
   const pipeline = [];
-  
+
   const matchStage = { $match: { isActive: true } };
   if (branchId) {
     matchStage.$match.registeredBranch = mongoose.Types.ObjectId(branchId);
   }
-  
+
   pipeline.push(matchStage);
-  
+
   pipeline.push({
     $group: {
       _id: null,
@@ -401,7 +401,7 @@ customerSchema.statics.getCustomerStats = function(branchId = null) {
       }
     }
   });
-  
+
   return this.aggregate(pipeline);
 };
 

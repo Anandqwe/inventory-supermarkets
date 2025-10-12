@@ -7,18 +7,19 @@ const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
+const { logger } = require('./src/utils/logger');
 require('dotenv').config();
 
 // Import demo configuration
 const DEMO_CONFIG = require('./src/config/demo');
 
 // Import middleware
-const { 
-  errorHandler, 
-  notFoundHandler, 
-  requestLogger, 
+const {
+  errorHandler,
+  notFoundHandler,
+  requestLogger,
   securityHeaders,
-  corsOptions 
+  corsOptions
 } = require('./src/middleware/errorHandler');
 
 // Import routes
@@ -42,18 +43,18 @@ const app = express();
 
 // Connect to database
 mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('✅ Connected to MongoDB Atlas'))
-  .catch((err) => console.error('❌ MongoDB connection failed:', err.message));
+  .then(() => logger.info('✅ Connected to MongoDB Atlas'))
+  .catch((err) => logger.error('❌ MongoDB connection failed', { error: err.message }));
 
 // Security middleware
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
-    },
+      defaultSrc: ['\'self\''],
+      styleSrc: ['\'self\'', '\'unsafe-inline\''],
+      scriptSrc: ['\'self\''],
+      imgSrc: ['\'self\'', 'data:', 'https:']
+    }
   },
   crossOriginEmbedderPolicy: false
 }));
@@ -72,12 +73,12 @@ if (!DEMO_CONFIG.demoMode && DEMO_CONFIG.performance.rateLimitEnabled !== false)
       timestamp: new Date().toISOString()
     },
     standardHeaders: true,
-    legacyHeaders: false,
+    legacyHeaders: false
   });
 
   app.use('/api/', limiter);
 } else {
-  console.log('🔓 Rate limiting disabled for demo mode');
+  logger.info('🔓 Rate limiting disabled for demo mode');
 }
 
 // Stricter rate limiting for auth endpoints (also disabled in demo mode)
@@ -90,12 +91,12 @@ if (!DEMO_CONFIG.demoMode && DEMO_CONFIG.performance.rateLimitEnabled !== false)
       message: 'Too many login attempts, please try again later.',
       timestamp: new Date().toISOString()
     },
-    skipSuccessfulRequests: true,
+    skipSuccessfulRequests: true
   });
 
   app.use('/api/auth/login', authLimiter);
 } else {
-  console.log('🔓 Auth rate limiting disabled for demo mode');
+  logger.info('🔓 Auth rate limiting disabled for demo mode');
 }
 
 // CORS configuration
@@ -118,7 +119,7 @@ const healthLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // Limit each IP to 100 requests per windowMs
   standardHeaders: true,
-  legacyHeaders: false,
+  legacyHeaders: false
 });
 
 app.get('/health', healthLimiter, (req, res) => {
@@ -205,35 +206,33 @@ if (process.env.NODE_ENV !== 'test') {
   const PORT = process.env.PORT || 5000;
 
   const server = app.listen(PORT, () => {
-    console.log(`
-🚀 Server is running on port ${PORT}
-📝 Environment: ${process.env.NODE_ENV || 'development'}
-🌐 API Base URL: http://localhost:${PORT}
-📊 Dashboard: http://localhost:${PORT}/api/dashboard/overview
-🏥 Health Check: http://localhost:${PORT}/health
-    `);
+    logger.info(`🚀 Server is running on port ${PORT}`);
+    logger.info(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
+    logger.info(`🌐 API Base URL: http://localhost:${PORT}`);
+    logger.info(`📊 Dashboard: http://localhost:${PORT}/api/dashboard/overview`);
+    logger.info(`🏥 Health Check: http://localhost:${PORT}/health`);
   });
 
   // Graceful shutdown
   process.on('SIGTERM', () => {
-    console.log('SIGTERM signal received: closing HTTP server');
+    logger.info('SIGTERM signal received: closing HTTP server');
     server.close(() => {
-      console.log('HTTP server closed');
+      logger.info('HTTP server closed');
       process.exit(0);
     });
   });
 
   process.on('SIGINT', () => {
-    console.log('SIGINT signal received: closing HTTP server');
+    logger.info('SIGINT signal received: closing HTTP server');
     server.close(() => {
-      console.log('HTTP server closed');
+      logger.info('HTTP server closed');
       process.exit(0);
     });
   });
 
   // Handle unhandled promise rejections
   process.on('unhandledRejection', (err) => {
-    console.error('Unhandled Promise Rejection:', err);
+    logger.error('Unhandled Promise Rejection', { error: err.message, stack: err.stack });
     server.close(() => {
       process.exit(1);
     });
@@ -241,7 +240,7 @@ if (process.env.NODE_ENV !== 'test') {
 
   // Handle uncaught exceptions
   process.on('uncaughtException', (err) => {
-    console.error('Uncaught Exception:', err);
+    logger.error('Uncaught Exception', { error: err.message, stack: err.stack });
     process.exit(1);
   });
 }

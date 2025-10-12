@@ -28,7 +28,7 @@ async function removeOldCategories() {
 
     // Find all categories
     const allCategories = await Category.find({}).sort({ name: 1 });
-    
+
     console.log('\n📋 Total Categories in Database:', allCategories.length);
     console.log('\n📊 Current Categories:');
     allCategories.forEach((cat, index) => {
@@ -39,43 +39,43 @@ async function removeOldCategories() {
 
     // Find old categories to remove
     const oldCategories = allCategories.filter(cat => !ACTIVE_CATEGORIES.includes(cat.name));
-    
+
     if (oldCategories.length === 0) {
       console.log('\n✅ No old categories to remove. Database is clean!');
       return;
     }
 
     console.log(`\n🗑️  Found ${oldCategories.length} old categories to remove:\n`);
-    
+
     let totalRemoved = 0;
     let totalProductsUpdated = 0;
 
     // Process each old category
     for (const oldCat of oldCategories) {
       console.log(`📦 Processing "${oldCat.name}"...`);
-      
+
       // Check if any products use this category
       const productsCount = await Product.countDocuments({ category: oldCat._id });
-      
+
       if (productsCount > 0) {
         console.log(`   ⚠️  Warning: ${productsCount} products are using this category`);
-        console.log(`   🗑️  Deleting these products as they're from old seed data...`);
-        
+        console.log('   🗑️  Deleting these products as they\'re from old seed data...');
+
         // Delete products using this old category
         const deleteResult = await Product.deleteMany({ category: oldCat._id });
         console.log(`   ✅ Deleted ${deleteResult.deletedCount} products`);
         totalProductsUpdated += deleteResult.deletedCount;
       } else {
-        console.log(`   ℹ️  No products using this category`);
+        console.log('   ℹ️  No products using this category');
       }
-      
+
       // Delete the category
       await Category.deleteOne({ _id: oldCat._id });
       console.log(`   ✅ Removed category: ${oldCat.name}`);
       totalRemoved++;
     }
 
-    console.log(`\n✅ Cleanup Complete!`);
+    console.log('\n✅ Cleanup Complete!');
     console.log(`   📊 Categories removed: ${totalRemoved}`);
     console.log(`   📦 Products removed: ${totalProductsUpdated}`);
 
@@ -83,7 +83,7 @@ async function removeOldCategories() {
     console.log('\n🔍 Verification:');
     const finalCategories = await Category.find({}).sort({ name: 1 });
     console.log(`   📊 Total categories remaining: ${finalCategories.length}`);
-    
+
     console.log('\n📋 Final Category List:');
     finalCategories.forEach((cat, index) => {
       console.log(`   ${index + 1}. ${cat.name}`);
@@ -92,7 +92,7 @@ async function removeOldCategories() {
     // Check product counts
     const totalProducts = await Product.countDocuments({});
     console.log(`\n📦 Total products in database: ${totalProducts}`);
-    
+
     if (totalProducts === 0) {
       console.log('\n⚠️  WARNING: All products have been removed!');
       console.log('💡 You need to run: npm run seed:master');

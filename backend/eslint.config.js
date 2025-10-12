@@ -27,12 +27,12 @@ module.exports = [
       'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       'prefer-const': 'error',
       'no-var': 'error',
-      
+
       // Security
       'no-eval': 'error',
       'no-implied-eval': 'error',
       'no-new-func': 'error',
-      
+
       // Style
       'indent': ['error', 2],
       'quotes': ['error', 'single'],
@@ -40,12 +40,12 @@ module.exports = [
       'comma-dangle': ['error', 'never'],
       'eol-last': ['error', 'always'],
       'no-trailing-spaces': 'error',
-      
+
       // Node.js specific
       'no-path-concat': 'error',
       'no-process-exit': 'error',
       'handle-callback-err': 'error',
-      
+
       // Error Prevention
       'no-undef': 'error',
       'no-unreachable': 'error',

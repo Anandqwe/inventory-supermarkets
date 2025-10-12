@@ -1,12 +1,16 @@
 import React, { Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AppShell } from './components/shell';
 import ErrorBoundary from './components/ErrorBoundary';
 import { PageLoader } from './components/LoadingSpinner';
 import Toast from './components/Toast';
+import { PermissionRoute } from './components/RouteGuards';
+import AccessDenied from './components/AccessDenied';
+import { PERMISSIONS } from '../../shared/permissions';
 
 // Lazy load pages for better performance
 const Login = React.lazy(() => import('./pages/Login'));
@@ -29,7 +33,7 @@ const queryClient = new QueryClient({
 });
 
 // Protected Route Component with enhanced error handling
-function ProtectedRoute({ children }) {
+function ProtectedRoute({ children, permission = null, permissions = null }) {
   const { isAuthenticated, loading } = useAuth();
   
   if (loading) {
@@ -40,10 +44,21 @@ function ProtectedRoute({ children }) {
     return <Navigate to="/login" replace />;
   }
   
+  // Wrap in AppShell and use PermissionRoute for permission checking
   return (
     <ErrorBoundary>
       <AppShell>
-        {children}
+        {permission || permissions ? (
+          <PermissionRoute 
+            permission={permission} 
+            permissions={permissions}
+            showAccessDenied={true}
+          >
+            {children}
+          </PermissionRoute>
+        ) : (
+          children
+        )}
       </AppShell>
     </ErrorBoundary>
   );
@@ -74,6 +89,40 @@ function SuspenseWrapper({ children, fallback }) {
     <Suspense fallback={fallback || <PageLoader />}>
       {children}
     </Suspense>
+  );
+}
+
+// Toast Configuration Component
+function ToastConfig() {
+  const { theme } = useAuth(); // Get theme from context if available
+  const isDark = theme === 'dark' || document.documentElement.classList.contains('dark');
+  
+  return (
+    <Toaster 
+      position="top-right"
+      toastOptions={{
+        duration: 4000,
+        style: {
+          background: isDark ? '#1e293b' : '#ffffff',
+          color: isDark ? '#f1f5f9' : '#0f172a',
+          border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
+        },
+        success: {
+          duration: 3000,
+          iconTheme: {
+            primary: '#10b981',
+            secondary: '#fff',
+          },
+        },
+        error: {
+          duration: 4000,
+          iconTheme: {
+            primary: '#ef4444',
+            secondary: '#fff',
+          },
+        },
+      }}
+    />
   );
 }
 
@@ -121,11 +170,11 @@ function App() {
                   } 
                 />
                 
-                {/* Protected Routes */}
+                {/* Protected Routes with Permission Checks */}
                 <Route 
                   path="/" 
                   element={
-                    <ProtectedRoute>
+                    <ProtectedRoute permission={PERMISSIONS.DASHBOARD.READ}>
                       <SuspenseWrapper fallback={<PageLoader message="Loading dashboard..." />}>
                         <Dashboard />
                       </SuspenseWrapper>
@@ -136,7 +185,7 @@ function App() {
                 <Route 
                   path="/products" 
                   element={
-                    <ProtectedRoute>
+                    <ProtectedRoute permission={PERMISSIONS.PRODUCTS.READ}>
                       <SuspenseWrapper fallback={<PageLoader message="Loading products..." />}>
                         <Products />
                       </SuspenseWrapper>
@@ -147,7 +196,7 @@ function App() {
                 <Route 
                   path="/sales" 
                   element={
-                    <ProtectedRoute>
+                    <ProtectedRoute permissions={[PERMISSIONS.SALES.READ, PERMISSIONS.SALES.CREATE]}>
                       <SuspenseWrapper fallback={<PageLoader message="Loading sales..." />}>
                         <Sales />
                       </SuspenseWrapper>
@@ -158,7 +207,7 @@ function App() {
                 <Route 
                   path="/inventory" 
                   element={
-                    <ProtectedRoute>
+                    <ProtectedRoute permission={PERMISSIONS.INVENTORY.READ}>
                       <SuspenseWrapper fallback={<PageLoader message="Loading inventory..." />}>
                         <Inventory />
                       </SuspenseWrapper>
@@ -169,7 +218,7 @@ function App() {
                 <Route 
                   path="/reports" 
                   element={
-                    <ProtectedRoute>
+                    <ProtectedRoute permission={PERMISSIONS.REPORTS.READ}>
                       <SuspenseWrapper fallback={<PageLoader message="Loading reports..." />}>
                         <Reports />
                       </SuspenseWrapper>
@@ -180,10 +229,20 @@ function App() {
                 <Route 
                   path="/settings" 
                   element={
-                    <ProtectedRoute>
+                    <ProtectedRoute permission={PERMISSIONS.PROFILE.READ}>
                       <SuspenseWrapper fallback={<PageLoader message="Loading settings..." />}>
                         <Settings />
                       </SuspenseWrapper>
+                    </ProtectedRoute>
+                  } 
+                />
+                
+                {/* Access Denied Route */}
+                <Route 
+                  path="/access-denied" 
+                  element={
+                    <ProtectedRoute>
+                      <AccessDenied />
                     </ProtectedRoute>
                   } 
                 />
@@ -194,6 +253,7 @@ function App() {
               
               {/* Global Toast Notifications */}
               <Toast />
+              <ToastConfig />
             </Router>
           </AuthProvider>
         </ThemeProvider>

@@ -7,7 +7,6 @@ import {
   ChartBarIcon, 
   ChartPieIcon, 
   DocumentTextIcon, 
-  ArrowDownTrayIcon, 
   CalendarDaysIcon, 
   FunnelIcon, 
   ArrowPathIcon, 
@@ -44,7 +43,6 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Input } from '../components/ui/Input';
-import { Modal } from '../components/ui/Modal';
 import { DataTable } from '../components/ui/DataTable';
 import { StatCard } from '../components/ui/StatCard';
 import { LoadingSpinner } from '../components/LoadingSpinner';
@@ -80,7 +78,6 @@ function EnhancedReports() {
     category: '',
     product: ''
   });
-  const [showExportModal, setShowExportModal] = useState(false);
   const [toast, setToast] = useState(null);
   const [showCategoryTable, setShowCategoryTable] = useState(false);
 
@@ -241,288 +238,6 @@ function EnhancedReports() {
     { id: 'inventory', label: 'Inventory', icon: CubeIcon },
     { id: 'customer', label: 'Customer', icon: UsersIcon }
   ];
-
-  // Export functionality
-  const handleExport = async (format, includeCharts = false) => {
-    try {
-      setToast({ type: 'info', message: `Exporting ${format.toUpperCase()} report${includeCharts ? ' with charts' : ''}...` });
-      setShowExportModal(false);
-
-      let data, reportType;
-      
-      // Get current tab data
-      if (activeTab === 'sales') {
-        data = salesData;
-        reportType = 'Sales Analytics';
-      } else if (activeTab === 'financial') {
-        data = profitData;
-        reportType = 'Financial Analysis';
-      } else if (activeTab === 'inventory') {
-        data = inventoryData;
-        reportType = 'Inventory Report';
-      } else if (activeTab === 'customer') {
-        data = customerData;
-        reportType = 'Customer Analysis';
-      }
-
-      if (!data) {
-        setToast({ type: 'error', message: 'No data available to export' });
-        return;
-      }
-
-      // Export as CSV (client-side)
-      if (format === 'csv') {
-        exportToCSV(data, reportType, includeCharts);
-        setToast({ type: 'success', message: 'CSV report exported successfully!' });
-      } else {
-        // For Excel and PDF, make API call to backend
-        const apiCall = activeTab === 'sales' ? reportsAPI.getSalesReport 
-          : activeTab === 'financial' ? reportsAPI.getProfitAnalysis
-          : activeTab === 'inventory' ? reportsAPI.getInventoryReport
-          : reportsAPI.getCustomerAnalysis;
-
-        const response = await apiCall({
-          startDate: dateRange.startDate,
-          endDate: dateRange.endDate,
-          branchId: filters.branch || undefined,
-          format: format
-        });
-        
-        // Handle file download from backend
-        const blob = new Blob([response], { type: format === 'excel' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'application/pdf' });
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${reportType.replace(/\s+/g, '-')}-${dateRange.startDate}-to-${dateRange.endDate}.${format === 'excel' ? 'xlsx' : 'pdf'}`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-      }
-
-      setToast({ type: 'success', message: `${format.toUpperCase()} report exported successfully` });
-    } catch (error) {
-      console.error('Export error:', error);
-      setToast({ type: 'error', message: 'Export failed. Please try again.' });
-    }
-  };
-
-  // Export to CSV function
-  const exportToCSV = (data, reportType, includeCharts = false) => {
-    let csvContent = '';
-    const filename = `${reportType.replace(/\s+/g, '-')}-${dateRange.startDate}-to-${dateRange.endDate}.csv`;
-
-    // Add BOM for proper UTF-8 encoding in Excel
-    csvContent = '\uFEFF';
-    
-    // Add report header
-    csvContent += `"${reportType}"\n`;
-    csvContent += `"Period: ${dateRange.startDate} to ${dateRange.endDate}"\n`;
-    csvContent += `"Generated: ${new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}"\n`;
-    
-    // Get branch name safely
-    const branchName = filters.branch 
-      ? (branchesData?.branches?.find(b => b._id === filters.branch)?.name || 'Selected Branch')
-      : 'All Branches';
-    csvContent += `"Branch: ${branchName}"\n`;
-    
-    // Note about charts (CSV format limitation)
-    if (includeCharts) {
-      csvContent += `"Note: Chart visualizations are included in Excel and PDF exports only"\n`;
-    }
-    csvContent += '\n';
-
-    // Add data based on report type
-    if (activeTab === 'sales' && data.summary) {
-      // Summary section
-      csvContent += '"Summary"\n';
-      csvContent += `"Total Sales","${data.summary.totalSales || 0}"\n`;
-      csvContent += `"Total Revenue","₹${(data.summary.totalRevenue || 0).toFixed(2)}"\n`;
-      csvContent += `"Total Cost","₹${(data.summary.totalCost || 0).toFixed(2)}"\n`;
-      csvContent += `"Gross Profit","₹${(data.summary.grossProfit || 0).toFixed(2)}"\n`;
-      csvContent += `"Profit Margin","${(data.summary.profitMargin || 0).toFixed(2)}%"\n`;
-      csvContent += '\n';
-
-      // Daily breakdown
-      if (data.timeGroupedData && data.timeGroupedData.length > 0) {
-        csvContent += '"Daily Breakdown"\n';
-        csvContent += '"Date","Sales Count","Revenue (₹)","Cost (₹)","Profit (₹)","Margin (%)"\n';
-        
-        data.timeGroupedData.forEach(d => {
-          const margin = d.revenue > 0 ? ((d.profit / d.revenue) * 100) : 0;
-          csvContent += `"${d.period || d.date || 'N/A'}",`;
-          csvContent += `"${d.sales || 0}",`;
-          csvContent += `"${(d.revenue || 0).toFixed(2)}",`;
-          csvContent += `"${(d.cost || 0).toFixed(2)}",`;
-          csvContent += `"${(d.profit || 0).toFixed(2)}",`;
-          csvContent += `"${margin.toFixed(2)}"\n`;
-        });
-        
-        // Add totals row
-        const totals = data.timeGroupedData.reduce((acc, d) => ({
-          sales: acc.sales + (d.sales || 0),
-          revenue: acc.revenue + (d.revenue || 0),
-          cost: acc.cost + (d.cost || 0),
-          profit: acc.profit + (d.profit || 0)
-        }), { sales: 0, revenue: 0, cost: 0, profit: 0 });
-        
-        const totalMargin = totals.revenue > 0 ? ((totals.profit / totals.revenue) * 100) : 0;
-        csvContent += '\n';
-        csvContent += `"TOTAL","${totals.sales}","${totals.revenue.toFixed(2)}","${totals.cost.toFixed(2)}","${totals.profit.toFixed(2)}","${totalMargin.toFixed(2)}"\n`;
-      }
-      
-      // Category performance
-      if (data.categoryPerformance && data.categoryPerformance.length > 0) {
-        csvContent += '\n"Category Performance"\n';
-        csvContent += '"Category","Products","Total Sales","Revenue (₹)","Average Price (₹)","Stock Level"\n';
-        
-        data.categoryPerformance.forEach(cat => {
-          csvContent += `"${cat.categoryName || cat.category || 'N/A'}",`;
-          csvContent += `"${cat.productCount || 0}",`;
-          csvContent += `"${cat.totalSales || 0}",`;
-          csvContent += `"${(cat.revenue || 0).toFixed(2)}",`;
-          csvContent += `"${(cat.averagePrice || 0).toFixed(2)}",`;
-          csvContent += `"${cat.totalStock || 0}"\n`;
-        });
-      }
-      
-    } else if (activeTab === 'financial' && data.summary) {
-      // Summary section
-      csvContent += '"Financial Summary"\n';
-      csvContent += `"Total Revenue","₹${(data.summary.totalRevenue || 0).toFixed(2)}"\n`;
-      csvContent += `"Total Cost","₹${(data.summary.totalCost || 0).toFixed(2)}"\n`;
-      csvContent += `"Gross Profit","₹${(data.summary.grossProfit || 0).toFixed(2)}"\n`;
-      csvContent += `"Net Profit","₹${(data.summary.netProfit || 0).toFixed(2)}"\n`;
-      csvContent += `"Profit Margin","${(data.summary.profitMargin || 0).toFixed(2)}%"\n`;
-      csvContent += `"Average Margin","${(data.summary.averageMargin || 0).toFixed(2)}%"\n`;
-      csvContent += '\n';
-      
-      // Profit trend
-      if (data.profitTrend && data.profitTrend.length > 0) {
-        csvContent += '"Profit Trend"\n';
-        csvContent += '"Period","Revenue (₹)","Cost (₹)","Profit (₹)","Margin (%)"\n';
-        
-        data.profitTrend.forEach(p => {
-          const margin = p.revenue > 0 ? ((p.profit / p.revenue) * 100) : 0;
-          csvContent += `"${p.period || 'N/A'}",`;
-          csvContent += `"${(p.revenue || 0).toFixed(2)}",`;
-          csvContent += `"${(p.cost || 0).toFixed(2)}",`;
-          csvContent += `"${(p.profit || 0).toFixed(2)}",`;
-          csvContent += `"${margin.toFixed(2)}"\n`;
-        });
-      }
-      
-      // Payment methods
-      if (data.paymentMethods && data.paymentMethods.length > 0) {
-        csvContent += '\n"Payment Methods"\n';
-        csvContent += '"Method","Count","Amount (₹)","Percentage (%)"\n';
-        
-        const totalAmount = data.paymentMethods.reduce((sum, p) => sum + (p.amount || 0), 0);
-        data.paymentMethods.forEach(p => {
-          const percentage = totalAmount > 0 ? ((p.amount / totalAmount) * 100) : 0;
-          csvContent += `"${p.method || 'N/A'}",`;
-          csvContent += `"${p.count || 0}",`;
-          csvContent += `"${(p.amount || 0).toFixed(2)}",`;
-          csvContent += `"${percentage.toFixed(2)}"\n`;
-        });
-      }
-      
-    } else if (activeTab === 'inventory' && data.summary) {
-      // Summary section
-      csvContent += '"Inventory Summary"\n';
-      csvContent += `"Total Products","${data.summary.totalProducts || 0}"\n`;
-      csvContent += `"Total Stock Value","₹${(data.summary.totalStockValue || 0).toFixed(2)}"\n`;
-      csvContent += `"Low Stock Items","${data.summary.lowStockProducts || 0}"\n`;
-      csvContent += `"Out of Stock","${data.summary.outOfStockProducts || 0}"\n`;
-      csvContent += `"Average Stock Level","${(data.summary.averageStockLevel || 0).toFixed(2)}"\n`;
-      csvContent += '\n';
-      
-      // Category distribution
-      if (data.categoryDistribution && data.categoryDistribution.length > 0) {
-        csvContent += '"Category Distribution"\n';
-        csvContent += '"Category","Product Count","Total Stock","Stock Value (₹)","Percentage (%)"\n';
-        
-        const totalValue = data.categoryDistribution.reduce((sum, c) => sum + (c.value || 0), 0);
-        data.categoryDistribution.forEach(cat => {
-          const percentage = totalValue > 0 ? ((cat.value / totalValue) * 100) : 0;
-          csvContent += `"${cat.categoryName || cat.category || 'N/A'}",`;
-          csvContent += `"${cat.productCount || 0}",`;
-          csvContent += `"${cat.totalStock || 0}",`;
-          csvContent += `"${(cat.value || 0).toFixed(2)}",`;
-          csvContent += `"${percentage.toFixed(2)}"\n`;
-        });
-      }
-      
-      // Top products
-      if (data.topProducts && data.topProducts.length > 0) {
-        csvContent += '\n"Top Products by Stock Value"\n';
-        csvContent += '"Product","SKU","Category","Stock","Price (₹)","Value (₹)"\n';
-        
-        data.topProducts.forEach(p => {
-          csvContent += `"${p.name || 'N/A'}",`;
-          csvContent += `"${p.sku || 'N/A'}",`;
-          csvContent += `"${p.category?.name || 'N/A'}",`;
-          csvContent += `"${p.stock || 0}",`;
-          csvContent += `"${(p.sellingPrice || 0).toFixed(2)}",`;
-          csvContent += `"${((p.stock || 0) * (p.sellingPrice || 0)).toFixed(2)}"\n`;
-        });
-      }
-      
-    } else if (activeTab === 'customer' && data.summary) {
-      // Summary section
-      csvContent += '"Customer Analysis"\n';
-      csvContent += `"Total Customers","${data.summary.totalCustomers || 0}"\n`;
-      csvContent += `"Registered Customers","${data.summary.registeredCustomers || 0}"\n`;
-      csvContent += `"Walk-in Customers","${data.summary.walkinCustomers || 0}"\n`;
-      csvContent += `"Total Revenue","₹${(data.summary.totalRevenue || 0).toFixed(2)}"\n`;
-      csvContent += `"Average Order Value","₹${(data.summary.averageOrderValue || 0).toFixed(2)}"\n`;
-      csvContent += `"Average Purchase Frequency","${(data.summary.averagePurchaseFrequency || 0).toFixed(2)}"\n`;
-      csvContent += '\n';
-      
-      // Top customers
-      if (data.topCustomers && data.topCustomers.length > 0) {
-        csvContent += '"Top Customers"\n';
-        csvContent += '"Name","Email","Phone","Total Purchases","Total Spent (₹)","Average Order (₹)","Last Purchase"\n';
-        
-        data.topCustomers.forEach(c => {
-          const avgOrder = c.totalPurchases > 0 ? (c.totalSpent / c.totalPurchases) : 0;
-          csvContent += `"${c.name || 'Walk-in Customer'}",`;
-          csvContent += `"${c.email || 'N/A'}",`;
-          csvContent += `"${c.phone || 'N/A'}",`;
-          csvContent += `"${c.totalPurchases || 0}",`;
-          csvContent += `"${(c.totalSpent || 0).toFixed(2)}",`;
-          csvContent += `"${avgOrder.toFixed(2)}",`;
-          csvContent += `"${c.lastPurchase ? new Date(c.lastPurchase).toLocaleDateString('en-IN') : 'N/A'}"\n`;
-        });
-      }
-      
-      // Purchase frequency
-      if (data.purchaseFrequency && data.purchaseFrequency.length > 0) {
-        csvContent += '\n"Purchase Frequency Distribution"\n';
-        csvContent += '"Frequency Range","Customer Count","Percentage (%)"\n';
-        
-        const totalCustomers = data.purchaseFrequency.reduce((sum, f) => sum + (f.count || 0), 0);
-        data.purchaseFrequency.forEach(f => {
-          const percentage = totalCustomers > 0 ? ((f.count / totalCustomers) * 100) : 0;
-          csvContent += `"${f.range || 'N/A'}",`;
-          csvContent += `"${f.count || 0}",`;
-          csvContent += `"${percentage.toFixed(2)}"\n`;
-        });
-      }
-    }
-
-    // Create and download file
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', filename);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
 
   // Refresh data function
   const handleRefreshData = () => {
@@ -1339,26 +1054,15 @@ function EnhancedReports() {
         title="Advanced Reports & Analytics"
         description="Comprehensive business intelligence and performance insights"
       >
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
-          <Button 
-            variant="outline" 
-            onClick={() => setShowExportModal(true)}
-            className="w-full sm:w-auto"
-          >
-            <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
-            <span className="hidden xs:inline">Export</span>
-            <span className="xs:hidden">Export</span>
-          </Button>
-          <Button 
-            variant="primary" 
-            onClick={handleRefreshData}
-            className="w-full sm:w-auto"
-          >
-            <ArrowPathIcon className="h-4 w-4 mr-2" />
-            <span className="hidden xs:inline">Refresh Data</span>
-            <span className="xs:hidden">Refresh</span>
-          </Button>
-        </div>
+        <Button 
+          variant="primary" 
+          onClick={handleRefreshData}
+          className="w-full sm:w-auto"
+        >
+          <ArrowPathIcon className="h-4 w-4 mr-2" />
+          <span className="hidden xs:inline">Refresh Data</span>
+          <span className="xs:hidden">Refresh</span>
+        </Button>
       </PageHeader>
 
       {/* Filters */}
@@ -1451,13 +1155,6 @@ function EnhancedReports() {
       {/* Tab Content */}
       {renderTabContent()}
 
-      {/* Export Modal */}
-      <ExportModal
-        isOpen={showExportModal}
-        onClose={() => setShowExportModal(false)}
-        onExport={handleExport}
-      />
-
       {/* Toast */}
       {toast && (
         <Toast
@@ -1467,82 +1164,6 @@ function EnhancedReports() {
         />
       )}
     </div>
-  );
-}
-
-// Export Modal Component
-function ExportModal({ isOpen, onClose, onExport }) {
-  const [exportType, setExportType] = useState('pdf');
-  const [includeCharts, setIncludeCharts] = useState(true);
-
-  const handleExport = () => {
-    onExport(exportType, includeCharts);
-  };
-
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Export Report">
-      <div className="space-y-6">
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Export Format
-          </label>
-          <div className="space-y-2">
-            <label className="flex items-center">
-              <input
-                type="radio"
-                value="pdf"
-                checked={exportType === 'pdf'}
-                onChange={(e) => setExportType(e.target.value)}
-                className="mr-2"
-              />
-              PDF Document
-            </label>
-            <label className="flex items-center">
-              <input
-                type="radio"
-                value="excel"
-                checked={exportType === 'excel'}
-                onChange={(e) => setExportType(e.target.value)}
-                className="mr-2"
-              />
-              Excel Spreadsheet
-            </label>
-            <label className="flex items-center">
-              <input
-                type="radio"
-                value="csv"
-                checked={exportType === 'csv'}
-                onChange={(e) => setExportType(e.target.value)}
-                className="mr-2"
-              />
-              CSV File
-            </label>
-          </div>
-        </div>
-
-        <div>
-          <label className="flex items-center">
-            <input
-              type="checkbox"
-              checked={includeCharts}
-              onChange={(e) => setIncludeCharts(e.target.checked)}
-              className="mr-2"
-            />
-            Include Charts and Visualizations
-          </label>
-        </div>
-
-        <div className="flex justify-end gap-3">
-          <Button type="button" variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="button" variant="primary" onClick={handleExport}>
-            <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
-            Export Report
-          </Button>
-        </div>
-      </div>
-    </Modal>
   );
 }
 

@@ -79,7 +79,10 @@ function Sales() {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [savedTransactions, setSavedTransactions] = useState([]);
   const [showSavedTransactions, setShowSavedTransactions] = useState(false);
-  const [selectedBranch, setSelectedBranch] = useState(''); // For admin to select branch
+  // Initialize selectedBranch from user's branch for non-admin users
+  const [selectedBranch, setSelectedBranch] = useState(
+    user?.branch?._id || user?.branch || ''
+  );
   const [showMobileCart, setShowMobileCart] = useState(false); // Mobile cart drawer
   const [pagination, setPagination] = useState({
     pageIndex: 0,
@@ -158,7 +161,7 @@ function Sales() {
     queryKey: ['pos-products', pagination, searchTerm, categoryFilter, selectedBranch],
     queryFn: fetchProducts,
     staleTime: 30000,
-    enabled: !!selectedBranch, // Only fetch if branch is selected
+    enabled: !!selectedBranch || !!user?.branch, // Enable if branch is selected OR user has a branch
   });
 
   const { data: categoriesData } = useQuery({
@@ -219,11 +222,16 @@ function Sales() {
   // Extract branches from the response
   const branches = branchesData?.branches || [];
 
-  // Set default branch on load (first available branch or user's branch)
+  // Set default branch on load (use user's branch or first available branch)
   useEffect(() => {
-    if (!selectedBranch && branches.length > 0) {
-      const defaultBranch = user?.branch?._id || user?.branch || branches[0]?._id;
-      setSelectedBranch(defaultBranch);
+    // If user already has a branch assigned, ensure it's set
+    if (!selectedBranch && user?.branch) {
+      const userBranchId = user.branch._id || user.branch;
+      setSelectedBranch(userBranchId);
+    }
+    // For admins without a branch, set to first available branch
+    else if (!selectedBranch && !user?.branch && branches.length > 0) {
+      setSelectedBranch(branches[0]?._id);
     }
   }, [branches, user, selectedBranch]);
 

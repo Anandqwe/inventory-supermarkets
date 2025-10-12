@@ -1,5 +1,6 @@
 // Professional UI Components Library
 export { Button, buttonVariants } from './Button';
+export { ProtectedButton } from './ProtectedButton';
 export { Input, PriceInput, NumberInput, inputVariants } from './Input';
 export { Badge, StatusBadge, NotificationBadge, CategoryBadge, badgeVariants } from './Badge';
 export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from './Card';

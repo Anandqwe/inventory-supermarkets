@@ -32,8 +32,8 @@ describe('Products API', () => {
   describe('GET /api/products', () => {
     it('should get all products for authorized user', async () => {
       // Create test products
-      await global.testHelpers.createTestProduct({ 
-        name: 'Product 1', 
+      await global.testHelpers.createTestProduct({
+        name: 'Product 1',
         sku: 'SKU-001',
         category: testCategory._id,
         unit: testUnit._id,
@@ -45,8 +45,8 @@ describe('Products API', () => {
           maxStockLevel: 1000
         }]
       });
-      await global.testHelpers.createTestProduct({ 
-        name: 'Product 2', 
+      await global.testHelpers.createTestProduct({
+        name: 'Product 2',
         sku: 'SKU-002',
         category: testCategory._id,
         unit: testUnit._id,
@@ -73,8 +73,8 @@ describe('Products API', () => {
     it('should support pagination', async () => {
       // Create multiple products
       for (let i = 1; i <= 15; i++) {
-        await global.testHelpers.createTestProduct({ 
-          name: `Product ${i}`, 
+        await global.testHelpers.createTestProduct({
+          name: `Product ${i}`,
           sku: `SKU-${i.toString().padStart(3, '0')}`,
           category: testCategory._id,
           unit: testUnit._id,
@@ -185,7 +185,7 @@ describe('Products API', () => {
     });
 
     it('should not create product with duplicate SKU', async () => {
-      await global.testHelpers.createTestProduct({ 
+      await global.testHelpers.createTestProduct({
         sku: 'DUP-001',
         category: testCategory._id,
         unit: testUnit._id,

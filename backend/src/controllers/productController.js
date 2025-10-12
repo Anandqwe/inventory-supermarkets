@@ -8,12 +8,15 @@ const AuditLog = require('../models/AuditLog');
 const ResponseUtils = require('../utils/responseUtils');
 const ValidationUtils = require('../utils/validationUtils');
 const { asyncHandler } = require('../middleware/errorHandler');
+const { logger } = require('../utils/logger');
 const csv = require('csv-parser');
 const createCsvWriter = require('csv-writer').createObjectCsvWriter;
 const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
 const mongoose = require('mongoose');
+const { hasCrossBranchAccess } = require('../../../shared/permissions');
+const { assertBranchWriteAccess } = require('../middleware/branchScope');
 
 // Configure multer for file uploads
 const upload = multer({
@@ -316,7 +319,7 @@ class ProductController {
         filter.category = new mongoose.Types.ObjectId(category);
       } catch (e) {
         // Invalid ObjectId, skip filter
-        console.warn('Invalid category ObjectId:', category);
+        logger.warn('Invalid category ObjectId', { category, error: e.message });
       }
     }
 
@@ -326,7 +329,7 @@ class ProductController {
         filter.brand = new mongoose.Types.ObjectId(brand);
       } catch (e) {
         // Invalid ObjectId, skip filter
-        console.warn('Invalid brand ObjectId:', brand);
+        logger.warn('Invalid brand ObjectId', { brand, error: e.message });
       }
     }
 
@@ -337,9 +340,33 @@ class ProductController {
       if (maxPrice) filter['pricing.sellingPrice'].$lte = parseFloat(maxPrice);
     }
 
-    // Branch access filter for non-admin users
-    if (req.user.role !== 'admin' && req.user.branch) {
-      filter['stockByBranch.branch'] = req.user.branch;
+    let branchFilterId = null;
+
+    if (req.branchFilter && req.branchFilter['stockByBranch.branch']) {
+      branchFilterId = req.branchFilter['stockByBranch.branch'];
+    }
+
+    if (!branchFilterId && !hasCrossBranchAccess(req.user.role) && req.user.branch) {
+      branchFilterId = req.user.branch._id || req.user.branch;
+    }
+
+    if (!branchFilterId && branch) {
+      if (!hasCrossBranchAccess(req.user.role)) {
+        const requesterBranchId = req.user.branch && (req.user.branch._id || req.user.branch);
+        branchFilterId = requesterBranchId;
+      } else {
+        if (!ValidationUtils.isValidObjectId(branch)) {
+          return ResponseUtils.error(res, 'Invalid branch identifier', 400);
+        }
+        branchFilterId = new mongoose.Types.ObjectId(branch);
+      }
+    }
+
+    if (branchFilterId) {
+      const normalizedBranchId = branchFilterId instanceof mongoose.Types.ObjectId
+        ? branchFilterId
+        : new mongoose.Types.ObjectId(branchFilterId);
+      filter['stockByBranch.branch'] = normalizedBranchId;
     }
 
     const pageNum = parseInt(page);
@@ -348,8 +375,7 @@ class ProductController {
 
     // Debug logging
     if (process.env.NODE_ENV === 'development') {
-      console.log('Product Filter:', JSON.stringify(filter, null, 2));
-      console.log('Query params:', { page, limit, search, category, brand, stock, minPrice, maxPrice });
+      logger.debug('Product Filter', { filter, queryParams: { page, limit, search, category, brand, stock, minPrice, maxPrice } });
     }
 
     // Build aggregation pipeline
@@ -407,11 +433,10 @@ class ProductController {
       }
     }
 
-    // Branch-specific stock filter
-    if (branch) {
+    if (filter['stockByBranch.branch']) {
       pipeline.push({
         $match: {
-          'stockByBranch.branch': new mongoose.Types.ObjectId(branch)
+          'stockByBranch.branch': filter['stockByBranch.branch']
         }
       });
     }
@@ -708,10 +733,35 @@ class ProductController {
       const { branch, category, format = 'csv', search, stock, minPrice, maxPrice } = req.query;
       const filter = { isActive: true };
 
-      // Apply filters
-      if (branch) {
-        filter['stockByBranch.branch'] = branch;
+      let branchFilterId = null;
+
+      if (req.branchFilter && req.branchFilter['stockByBranch.branch']) {
+        branchFilterId = req.branchFilter['stockByBranch.branch'];
       }
+
+      if (!branchFilterId && branch) {
+        if (!hasCrossBranchAccess(req.user.role)) {
+          branchFilterId = req.user.branch && (req.user.branch._id || req.user.branch);
+        } else {
+          if (!ValidationUtils.isValidObjectId(branch)) {
+            return ResponseUtils.error(res, 'Invalid branch identifier', 400);
+          }
+          branchFilterId = new mongoose.Types.ObjectId(branch);
+        }
+      }
+
+      if (!branchFilterId && !hasCrossBranchAccess(req.user.role) && req.user.branch) {
+        branchFilterId = req.user.branch._id || req.user.branch;
+      }
+
+      const branchFilterString = branchFilterId ? branchFilterId.toString() : null;
+
+      if (branchFilterId) {
+        filter['stockByBranch.branch'] = branchFilterId instanceof mongoose.Types.ObjectId
+          ? branchFilterId
+          : new mongoose.Types.ObjectId(branchFilterId);
+      }
+
       if (category) {
         filter.category = category;
       }
@@ -730,11 +780,6 @@ class ProductController {
         filter['pricing.sellingPrice'] = {};
         if (minPrice) filter['pricing.sellingPrice'].$gte = parseFloat(minPrice);
         if (maxPrice) filter['pricing.sellingPrice'].$lte = parseFloat(maxPrice);
-      }
-
-      // Branch access filter for non-admin users
-      if (req.user.role !== 'admin' && req.user.branch) {
-        filter['stockByBranch.branch'] = req.user.branch;
       }
 
       let products = await Product.find(filter)
@@ -773,7 +818,7 @@ class ProductController {
           let branchStock = null;
           if (product.stockByBranch && Array.isArray(product.stockByBranch) && product.stockByBranch.length > 0) {
             branchStock = product.stockByBranch.find(
-              stock => !branch || (stock.branch && stock.branch._id && stock.branch._id.toString() === branch)
+              stock => !branchFilterString || (stock.branch && stock.branch._id && stock.branch._id.toString() === branchFilterString)
             );
             // If no specific branch found, use the first one
             if (!branchStock) {
@@ -836,7 +881,7 @@ class ProductController {
 
           await csvWriter.writeRecords(csvData);
         } catch (csvError) {
-          console.error('CSV Writer Error:', csvError);
+          logger.error('CSV Writer Error', { error: csvError.message, stack: csvError.stack });
           throw new Error(`CSV generation failed: ${csvError.message}`);
         }
 
@@ -876,9 +921,7 @@ class ProductController {
       }
 
     } catch (error) {
-      console.error('Export products error:', error);
-      console.error('Error stack:', error.stack);
-      console.error('Error message:', error.message);
+      logger.error('Export products error', { error: error.message, stack: error.stack });
       ResponseUtils.error(res, error.message || 'Failed to export products', 500);
     }
   });
@@ -1155,9 +1198,7 @@ class ProductController {
         ResponseUtils.success(res, results, 'CSV import completed');
 
       } catch (error) {
-        console.error('Import products error:', error);
-        console.error('Error stack:', error.stack);
-        console.error('Error message:', error.message);
+        logger.error('Import products error', { error: error.message, stack: error.stack });
         
         // Clean up uploaded file
         if (req.file) {
@@ -1188,14 +1229,34 @@ class ProductController {
       ]
     };
 
-    // Additional filters
     if (category) filter.category = category;
     if (brand) filter.brand = brand;
-    if (branch) filter['stockByBranch.branch'] = branch;
 
-    // Branch access filter for non-admin users
-    if (req.user.role !== 'admin' && req.user.branch) {
-      filter['stockByBranch.branch'] = req.user.branch;
+    let branchFilterId = null;
+
+    if (req.branchFilter && req.branchFilter['stockByBranch.branch']) {
+      branchFilterId = req.branchFilter['stockByBranch.branch'];
+    }
+
+    if (!branchFilterId && branch) {
+      if (!hasCrossBranchAccess(req.user.role)) {
+        branchFilterId = req.user.branch && (req.user.branch._id || req.user.branch);
+      } else {
+        if (!ValidationUtils.isValidObjectId(branch)) {
+          return ResponseUtils.error(res, 'Invalid branch identifier', 400);
+        }
+        branchFilterId = new mongoose.Types.ObjectId(branch);
+      }
+    }
+
+    if (!branchFilterId && !hasCrossBranchAccess(req.user.role) && req.user.branch) {
+      branchFilterId = req.user.branch._id || req.user.branch;
+    }
+
+    if (branchFilterId) {
+      filter['stockByBranch.branch'] = branchFilterId instanceof mongoose.Types.ObjectId
+        ? branchFilterId
+        : new mongoose.Types.ObjectId(branchFilterId);
     }
 
     const products = await Product.find(filter)
@@ -1239,11 +1300,32 @@ class ProductController {
 
     const filter = { isActive: true };
 
-    // Branch filter
-    if (branch) {
-      filter['stockByBranch.branch'] = branch;
-    } else if (req.user.role !== 'admin' && req.user.branch) {
-      filter['stockByBranch.branch'] = req.user.branch;
+    let branchFilterId = null;
+
+    if (req.branchFilter && req.branchFilter['stockByBranch.branch']) {
+      branchFilterId = req.branchFilter['stockByBranch.branch'];
+    }
+
+    if (!branchFilterId && branch) {
+      if (!hasCrossBranchAccess(req.user.role)) {
+        const userBranchId = req.user.branch && (req.user.branch._id || req.user.branch);
+        branchFilterId = userBranchId;
+      } else {
+        if (!ValidationUtils.isValidObjectId(branch)) {
+          return ResponseUtils.error(res, 'Invalid branch identifier', 400);
+        }
+        branchFilterId = new mongoose.Types.ObjectId(branch);
+      }
+    }
+
+    if (!branchFilterId && !hasCrossBranchAccess(req.user.role) && req.user.branch) {
+      branchFilterId = req.user.branch._id || req.user.branch;
+    }
+
+    if (branchFilterId) {
+      filter['stockByBranch.branch'] = branchFilterId instanceof mongoose.Types.ObjectId
+        ? branchFilterId
+        : new mongoose.Types.ObjectId(branchFilterId);
     }
 
     // Find products where any branch stock is at or below reorder level
@@ -1311,23 +1393,24 @@ class ProductController {
       return ResponseUtils.error(res, 'Product not found', 404);
     }
 
-    // Validate branch
-    const targetBranchId = branchId || req.user.branch;
-    const branch = await Branch.findById(targetBranchId);
+    const resolvedBranchId = branchId || (req.user.branch && (req.user.branch._id || req.user.branch));
+
+    if (!resolvedBranchId) {
+      return ResponseUtils.error(res, 'Branch is required to update stock', 400);
+    }
+
+    if (!assertBranchWriteAccess(resolvedBranchId, req.user)) {
+      return ResponseUtils.forbidden(res, 'Cannot update stock for other branches');
+    }
+
+    const branch = await Branch.findById(resolvedBranchId);
     if (!branch) {
       return ResponseUtils.error(res, 'Invalid branch', 400);
     }
 
-    // Check branch access for non-admin users
-    if (req.user.role !== 'admin' && req.user.branch) {
-      if (req.user.branch.toString() !== targetBranchId.toString()) {
-        return ResponseUtils.error(res, 'Access denied - Can only update stock for your assigned branch', 403);
-      }
-    }
-
     // Find or create branch stock
     const branchStockIndex = product.stockByBranch.findIndex(
-      stock => stock.branch.toString() === targetBranchId.toString()
+  stock => stock.branch.toString() === resolvedBranchId.toString()
     );
 
     let newQuantity;
@@ -1344,9 +1427,7 @@ class ProductController {
         newQuantity = quantity;
         break;
       default:
-        return res.status(400).json(
-          ResponseUtils.error('Invalid operation. Use: add, subtract, or set', 400)
-        );
+        return ResponseUtils.error(res, 'Invalid operation. Use: add, subtract, or set', 400);
     }
 
     // Start transaction
@@ -1357,7 +1438,7 @@ class ProductController {
       if (branchStockIndex >= 0) {
         // Update existing branch stock
         await Product.updateOne(
-          { _id: id, 'stockByBranch.branch': targetBranchId },
+          { _id: id, 'stockByBranch.branch': resolvedBranchId },
           { $set: { 'stockByBranch.$.quantity': newQuantity } },
           { session }
         );
@@ -1365,10 +1446,10 @@ class ProductController {
         // Add new branch stock
         await Product.updateOne(
           { _id: id },
-          { 
-            $push: { 
-              branchStocks: {
-                branch: targetBranchId,
+          {
+            $push: {
+              stockByBranch: {
+                branch: resolvedBranchId,
                 quantity: newQuantity,
                 reorderLevel: 10,
                 maxStockLevel: 1000
@@ -1398,7 +1479,7 @@ class ProductController {
         newValues: {
           productName: product.name,
           sku: product.sku,
-          branch: targetBranchId,
+          branch: resolvedBranchId,
           operation,
           newQuantity,
           quantityChange: quantity
@@ -1414,7 +1495,7 @@ class ProductController {
       ResponseUtils.success(res, {
         product: updatedProduct,
         stockUpdate: {
-          branch: targetBranchId,
+          branch: resolvedBranchId,
           operation,
           previousQuantity: currentQuantity,
           newQuantity,

@@ -62,7 +62,7 @@ const productSchema = new mongoose.Schema({
     trim: true,
     maxlength: [500, 'Description cannot exceed 500 characters']
   },
-  
+
   // Categorization
   category: {
     type: mongoose.Schema.Types.ObjectId,
@@ -85,7 +85,7 @@ const productSchema = new mongoose.Schema({
     ref: 'Supplier',
     index: true
   },
-  
+
   // Pricing (Indian Retail Model - GST Inclusive)
   // Note: In India, MRP is ALWAYS inclusive of all taxes including GST
   // Retailers can sell at MRP or below, but never above MRP
@@ -93,19 +93,19 @@ const productSchema = new mongoose.Schema({
     costPrice: {
       type: Number,
       required: [true, 'Cost price is required'],
-      min: [0.01, 'Cost price must be greater than 0'],
+      min: [0.01, 'Cost price must be greater than 0']
       // Cost price from supplier (may or may not include GST depending on supplier)
     },
     sellingPrice: {
       type: Number,
       required: [true, 'Selling price is required'],
-      min: [0.01, 'Selling price must be greater than 0'],
+      min: [0.01, 'Selling price must be greater than 0']
       // Actual selling price to customer (INCLUSIVE of GST)
       // This is what customer pays at checkout
     },
     mrp: {
       type: Number,
-      min: [0.01, 'MRP must be greater than 0'],
+      min: [0.01, 'MRP must be greater than 0']
       // Maximum Retail Price (INCLUSIVE of GST)
       // As per Indian law, this is the maximum price that can be charged
       // Printed on product packaging
@@ -127,10 +127,10 @@ const productSchema = new mongoose.Schema({
       // Price already includes this tax
     }
   },
-  
+
   // Multi-branch inventory
   stockByBranch: [stockSchema],
-  
+
   // Product details
   specifications: {
     weight: Number,
@@ -149,14 +149,14 @@ const productSchema = new mongoose.Schema({
       }
     }
   },
-  
+
   // Dates
   manufacturingDate: Date,
   expiryDate: {
     type: Date,
     index: true
   },
-  
+
   // Images and documents
   images: [{
     url: String,
@@ -171,7 +171,7 @@ const productSchema = new mongoose.Schema({
       enum: ['datasheet', 'manual', 'certificate', 'other']
     }
   }],
-  
+
   // Status and flags
   isActive: {
     type: Boolean,
@@ -186,7 +186,7 @@ const productSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  
+
   // SEO and tags
   tags: [{
     type: String,
@@ -198,7 +198,7 @@ const productSchema = new mongoose.Schema({
     unique: true,
     sparse: true
   },
-  
+
   // Tracking
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
@@ -290,7 +290,7 @@ productSchema.methods.getStockByBranch = function(branchId) {
 
 productSchema.methods.updateStock = function(branchId, quantity, operation = 'set') {
   const stockIndex = this.stockByBranch.findIndex(stock => stock.branch.toString() === branchId.toString());
-  
+
   if (stockIndex === -1) {
     // Create new stock entry for branch
     this.stockByBranch.push({
@@ -303,20 +303,20 @@ productSchema.methods.updateStock = function(branchId, quantity, operation = 'se
     // Update existing stock
     const currentStock = this.stockByBranch[stockIndex];
     switch (operation) {
-      case 'add':
-        currentStock.quantity += quantity;
-        break;
-      case 'subtract':
-        currentStock.quantity = Math.max(0, currentStock.quantity - quantity);
-        break;
-      case 'set':
-      default:
-        currentStock.quantity = quantity;
-        break;
+    case 'add':
+      currentStock.quantity += quantity;
+      break;
+    case 'subtract':
+      currentStock.quantity = Math.max(0, currentStock.quantity - quantity);
+      break;
+    case 'set':
+    default:
+      currentStock.quantity = quantity;
+      break;
     }
     currentStock.lastRestocked = new Date();
   }
-  
+
   return this.save();
 };
 
@@ -325,11 +325,11 @@ productSchema.methods.reserveStock = function(branchId, quantity) {
   if (!stock) {
     throw new Error('Stock not found for this branch');
   }
-  
+
   if (stock.quantity - (stock.reservedQuantity || 0) < quantity) {
     throw new Error('Insufficient stock available');
   }
-  
+
   stock.reservedQuantity = (stock.reservedQuantity || 0) + quantity;
   return this.save();
 };
@@ -339,7 +339,7 @@ productSchema.methods.releaseStock = function(branchId, quantity) {
   if (!stock) {
     throw new Error('Stock not found for this branch');
   }
-  
+
   stock.reservedQuantity = Math.max(0, (stock.reservedQuantity || 0) - quantity);
   return this.save();
 };
@@ -347,23 +347,23 @@ productSchema.methods.releaseStock = function(branchId, quantity) {
 // Static methods
 productSchema.statics.searchProducts = function(query, filters = {}) {
   const searchConditions = { isActive: true };
-  
+
   if (query) {
     searchConditions.$text = { $search: query };
   }
-  
+
   if (filters.category) {
     searchConditions.category = filters.category;
   }
-  
+
   if (filters.brand) {
     searchConditions.brand = filters.brand;
   }
-  
+
   if (filters.supplier) {
     searchConditions.supplier = filters.supplier;
   }
-  
+
   if (filters.priceMin || filters.priceMax) {
     searchConditions['pricing.sellingPrice'] = {};
     if (filters.priceMin) {
@@ -373,7 +373,7 @@ productSchema.statics.searchProducts = function(query, filters = {}) {
       searchConditions['pricing.sellingPrice'].$lte = filters.priceMax;
     }
   }
-  
+
   if (filters.lowStock) {
     searchConditions['stockByBranch'] = {
       $elemMatch: {
@@ -381,11 +381,11 @@ productSchema.statics.searchProducts = function(query, filters = {}) {
       }
     };
   }
-  
+
   if (filters.outOfStock) {
     searchConditions['stockByBranch.quantity'] = 0;
   }
-  
+
   if (filters.nearExpiry) {
     const thirtyDaysFromNow = new Date();
     thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
@@ -394,7 +394,7 @@ productSchema.statics.searchProducts = function(query, filters = {}) {
       $lte: thirtyDaysFromNow
     };
   }
-  
+
   return this.find(searchConditions)
     .populate('category', 'name code')
     .populate('brand', 'name code')
@@ -412,11 +412,11 @@ productSchema.statics.getLowStockProducts = function(branchId = null) {
       }
     }
   };
-  
+
   if (branchId) {
     matchConditions.stockByBranch.$elemMatch.branch = mongoose.Types.ObjectId(branchId);
   }
-  
+
   return this.find(matchConditions)
     .populate('category', 'name')
     .populate('brand', 'name')
@@ -426,7 +426,7 @@ productSchema.statics.getLowStockProducts = function(branchId = null) {
 productSchema.statics.getExpiringProducts = function(days = 30, branchId = null) {
   const futureDate = new Date();
   futureDate.setDate(futureDate.getDate() + days);
-  
+
   const matchConditions = {
     isActive: true,
     isPerishable: true,
@@ -435,11 +435,11 @@ productSchema.statics.getExpiringProducts = function(days = 30, branchId = null)
       $lte: futureDate
     }
   };
-  
+
   if (branchId) {
     matchConditions['stockByBranch.branch'] = mongoose.Types.ObjectId(branchId);
   }
-  
+
   return this.find(matchConditions)
     .populate('category', 'name')
     .populate('brand', 'name')

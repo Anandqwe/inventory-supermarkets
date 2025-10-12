@@ -96,19 +96,19 @@ const seedSteps = [
 function runSeedScript(scriptName) {
   return new Promise((resolve, reject) => {
     const scriptPath = path.join(__dirname, scriptName);
-    
+
     // Run with automatic "yes" responses for prompts
     const child = spawn('node', [scriptPath], {
       stdio: ['pipe', 'inherit', 'inherit'], // pipe stdin, inherit stdout/stderr
       cwd: path.join(__dirname, '..')
     });
-    
+
     // Auto-answer "yes" to any prompts
     if (child.stdin) {
       child.stdin.write('yes\n');
       child.stdin.end();
     }
-    
+
     child.on('close', (code) => {
       if (code === 0) {
         resolve();
@@ -116,7 +116,7 @@ function runSeedScript(scriptName) {
         reject(new Error(`Script exited with code ${code}`));
       }
     });
-    
+
     child.on('error', (error) => {
       reject(error);
     });
@@ -129,58 +129,58 @@ const executionResults = [];
 // Main orchestrator function
 async function runMasterSeed() {
   const startTime = Date.now();
-  
+
   logSection('🚀 MASTER SEED ORCHESTRATOR - Mumbai Supermarket System');
-  
+
   log('📋 Seed Plan:', colors.bright);
   seedSteps.forEach((step, index) => {
     console.log(`   ${index + 1}. ${step.name}: ${step.description}`);
   });
-  
+
   logInfo(`\n⏰ Started at: ${new Date().toLocaleString('en-IN')}`);
   logInfo(`🔗 Database: ${process.env.MONGODB_URI?.split('@')[1]?.split('/')[0] || 'MongoDB Atlas'}\n`);
-  
+
   let allSuccess = true;
   let completedSteps = 0;
-  
+
   for (let i = 0; i < seedSteps.length; i++) {
     const step = seedSteps[i];
     const stepNumber = i + 1;
-    
+
     logSection(`STEP ${stepNumber}/${seedSteps.length}: ${step.name}`);
     logInfo(step.description);
-    
+
     const stepStartTime = Date.now();
-    
+
     try {
       // Execute the seed script
       await runSeedScript(step.script);
-      
+
       const stepDuration = ((Date.now() - stepStartTime) / 1000).toFixed(2);
-      
+
       executionResults.push({
         step: step.name,
         status: 'SUCCESS',
         duration: stepDuration,
         error: null
       });
-      
+
       completedSteps++;
       logSuccess(`${step.name} completed in ${stepDuration}s`);
-      
+
     } catch (error) {
       const stepDuration = ((Date.now() - stepStartTime) / 1000).toFixed(2);
-      
+
       executionResults.push({
         step: step.name,
         status: 'FAILED',
         duration: stepDuration,
         error: error.message
       });
-      
+
       logError(`${step.name} failed after ${stepDuration}s`);
       logError(`Error: ${error.message}`);
-      
+
       if (step.critical) {
         logError(`\n💥 CRITICAL FAILURE: Cannot continue without ${step.name}`);
         allSuccess = false;
@@ -191,12 +191,12 @@ async function runMasterSeed() {
       }
     }
   }
-  
+
   // Final Summary
   const totalDuration = ((Date.now() - startTime) / 1000).toFixed(2);
-  
+
   logSection('📊 EXECUTION SUMMARY');
-  
+
   console.log('Step Results:');
   executionResults.forEach((result, index) => {
     const statusIcon = result.status === 'SUCCESS' ? '✅' : '❌';
@@ -206,19 +206,19 @@ async function runMasterSeed() {
       log(`      Error: ${result.error}`, colors.dim);
     }
   });
-  
+
   console.log('\n' + '-'.repeat(80));
   log(`\n   Total Steps: ${seedSteps.length}`, colors.bright);
   log(`   Completed: ${completedSteps}`, completedSteps === seedSteps.length ? colors.green : colors.yellow);
   log(`   Failed: ${seedSteps.length - completedSteps}`, colors.red);
   log(`   Total Duration: ${totalDuration}s`, colors.cyan);
   log(`   Finished at: ${new Date().toLocaleString('en-IN')}`, colors.cyan);
-  
+
   if (allSuccess && completedSteps === seedSteps.length) {
     console.log('\n' + '='.repeat(80));
     logSuccess('🎉 ALL SEED OPERATIONS COMPLETED SUCCESSFULLY!');
     console.log('='.repeat(80) + '\n');
-    
+
     // Print final statistics
     logSection('📈 SYSTEM STATISTICS');
     console.log('   🏢 Branches: 3 (Mumbai locations)');
@@ -229,22 +229,22 @@ async function runMasterSeed() {
     console.log('   💰 Sales Revenue: ₹2,31,10,440');
     console.log('   📈 Sales Transactions: 1,750');
     console.log('   💵 Profit Margin: ~20.1%\n');
-    
+
     logSuccess('✨ Your Mumbai Supermarket System is ready!');
     logInfo('🚀 Start the backend: npm run dev');
     logInfo('🌐 Start the frontend: cd ../frontend && npm run dev\n');
-    
+
     return true;
   } else {
     console.log('\n' + '='.repeat(80));
     logError('⚠️  SEED PROCESS COMPLETED WITH ERRORS');
     console.log('='.repeat(80) + '\n');
-    
+
     if (completedSteps > 0) {
       logWarning(`✅ ${completedSteps} steps completed successfully`);
       logWarning(`❌ ${seedSteps.length - completedSteps} steps failed\n`);
     }
-    
+
     logInfo('💡 Troubleshooting Tips:');
     console.log('   1. Check MongoDB Atlas connection');
     console.log('   2. Verify .env file configuration');
@@ -256,7 +256,7 @@ async function runMasterSeed() {
         console.log(`      npm run seed:${r.step.toLowerCase()}`);
       });
     console.log('   5. Clear database and try again: npm run db:clear\n');
-    
+
     return false;
   }
 }
@@ -264,12 +264,12 @@ async function runMasterSeed() {
 // Cleanup helper (optional - for rollback)
 async function clearAllData() {
   const mongoose = require('mongoose');
-  
+
   logSection('🗑️  DATABASE CLEANUP');
-  
+
   try {
     await mongoose.connect(process.env.MONGODB_URI);
-    
+
     const collections = [
       'branches',
       'users',
@@ -281,9 +281,9 @@ async function clearAllData() {
       'customers',
       'sales'
     ];
-    
+
     logInfo('Clearing existing data...\n');
-    
+
     for (const collection of collections) {
       try {
         const result = await mongoose.connection.db.collection(collection).deleteMany({});
@@ -292,10 +292,10 @@ async function clearAllData() {
         console.log(`   ⚠️  ${collection}: Collection not found or empty`);
       }
     }
-    
+
     await mongoose.connection.close();
     logSuccess('\n✅ Database cleanup completed\n');
-    
+
   } catch (error) {
     logError(`\n❌ Cleanup failed: ${error.message}\n`);
     throw error;
@@ -313,20 +313,20 @@ async function main() {
     // Show warning for clear operation
     if (shouldClear) {
       logWarning('\n⚠️  WARNING: This will DELETE ALL EXISTING DATA!\n');
-      
+
       if (!skipPrompt) {
         logInfo('To proceed, run: npm run seed:master -- --clear --yes\n');
         process.exit(0);
       }
-      
+
       await clearAllData();
     }
-    
+
     // Run the master seed
     const success = await runMasterSeed();
-    
+
     process.exit(success ? 0 : 1);
-    
+
   } catch (error) {
     console.error('\n' + '='.repeat(80));
     logError('💥 FATAL ERROR');

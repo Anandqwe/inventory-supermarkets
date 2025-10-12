@@ -25,12 +25,12 @@ const cacheMiddleware = (options = {}) => {
 
     try {
       // Generate cache key
-      const cacheKey = keyGenerator ? keyGenerator(req) : 
+      const cacheKey = keyGenerator ? keyGenerator(req) :
         generateCacheKey('default', req.originalUrl, JSON.stringify(req.query));
 
       // Try to get from cache
       const cachedData = await cache.get(cacheKey);
-      
+
       if (cachedData) {
         // Add cache headers
         res.set({
@@ -38,7 +38,7 @@ const cacheMiddleware = (options = {}) => {
           'X-Cache-Key': cacheKey,
           'Cache-Control': `public, max-age=${ttl}`
         });
-        
+
         return res.json(cachedData);
       }
 
@@ -95,7 +95,7 @@ const cacheInvalidationMiddleware = (patterns = []) => {
           if (typeof pattern === 'function') {
             pattern = pattern(req, data);
           }
-          
+
           cache.invalidatePattern(pattern).catch(err => {
             console.warn('Cache invalidation error:', err.message);
           });
@@ -270,7 +270,7 @@ const cacheOperations = {
  */
 const warmUpCache = async () => {
   console.log('🔥 Warming up cache...');
-  
+
   try {
     // Warm up common data that doesn't change often
     const warmUpTasks = [
@@ -294,7 +294,7 @@ const warmUpCache = async () => {
 
     const results = await cacheOperations.warmUp(warmUpTasks);
     const successful = results.filter(r => r.value?.success).length;
-    
+
     console.log(`✅ Cache warm-up completed: ${successful}/${results.length} successful`);
   } catch (error) {
     console.warn('⚠️ Cache warm-up failed:', error.message);
@@ -304,7 +304,7 @@ const warmUpCache = async () => {
 module.exports = {
   cacheMiddleware,
   cacheInvalidationMiddleware,
-  
+
   // Specific middleware
   cacheProductsList,
   cacheProduct,
@@ -314,13 +314,13 @@ module.exports = {
   cacheDashboard,
   cacheAnalytics,
   cacheReports,
-  
+
   // Invalidation middleware
   invalidateProductCaches,
   invalidateUserCaches,
   invalidateSalesCaches,
   invalidateMasterDataCaches,
-  
+
   // Operations
   cacheOperations,
   warmUpCache

@@ -35,13 +35,13 @@ describe('Application Health', () => {
         .expect(200);
 
       // Check for rate limit headers (either standard or legacy format)
-      const hasRateLimit = response.headers['ratelimit-limit'] || 
+      const hasRateLimit = response.headers['ratelimit-limit'] ||
                           response.headers['x-ratelimit-limit'] ||
                           response.headers['x-rate-limit-limit'];
-      const hasRemaining = response.headers['ratelimit-remaining'] || 
+      const hasRemaining = response.headers['ratelimit-remaining'] ||
                           response.headers['x-ratelimit-remaining'] ||
                           response.headers['x-rate-limit-remaining'];
-      
+
       // At least one rate limit header should be present
       expect(hasRateLimit || hasRemaining).toBeTruthy();
     });

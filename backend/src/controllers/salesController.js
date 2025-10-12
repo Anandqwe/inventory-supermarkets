@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Sale = require('../models/Sale');
 const Product = require('../models/Product');
 const Branch = require('../models/Branch');
@@ -5,14 +6,54 @@ const AuditLog = require('../models/AuditLog');
 const ResponseUtils = require('../utils/responseUtils');
 const ValidationUtils = require('../utils/validationUtils');
 const { asyncHandler } = require('../middleware/errorHandler');
-const mongoose = require('mongoose');
+const {
+  assertBranchWriteAccess,
+  assertBranchReadAccess,
+  getUserBranchId,
+} = require('../middleware/branchScope');
+const { hasCrossBranchAccess } = require('../../../shared/permissions');
+
+const shouldUseTransactions = () => process.env.NODE_ENV !== 'test';
+
+const normalizeQuantity = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+
+const resolveAccessibleBranchIds = (req, explicitBranchId) => {
+  const branchIds = [];
+
+  if (explicitBranchId && ValidationUtils.isValidObjectId(explicitBranchId)) {
+    branchIds.push(String(explicitBranchId));
+  }
+
+  const scopedIds = Array.isArray(req.resolvedBranchIds) ? req.resolvedBranchIds : [];
+  scopedIds.forEach((id) => {
+    if (ValidationUtils.isValidObjectId(id)) {
+      branchIds.push(String(id));
+    }
+  });
+
+  const crossBranch = hasCrossBranchAccess(req.user?.role);
+
+  if (!crossBranch) {
+    const userBranchId = getUserBranchId(req.user);
+    if (!userBranchId) {
+      return { branchIds: [], error: 'BRANCH_REQUIRED' };
+    }
+
+    branchIds.push(String(userBranchId));
+  }
+
+  return { branchIds: Array.from(new Set(branchIds)), crossBranch };
+};
 
 class SalesController {
   static createSale = asyncHandler(async (req, res) => {
-    const { 
-      items, 
-      customerName, 
-      customerPhone, 
+    const {
+      items,
+      customerName,
+      customerPhone,
       customerEmail,
       paymentMethod = 'cash',
       discountPercentage = 0,
@@ -25,34 +66,28 @@ class SalesController {
       return ResponseUtils.error(res, 'Items array is required and cannot be empty', 400);
     }
 
-    // Validate branch
-    let targetBranchId = branchId || req.user.branch;
-    
-    // If no branch specified and user doesn't have a branch, use first available branch
+    const targetBranchId = branchId || getUserBranchId(req.user);
+
     if (!targetBranchId) {
-      const firstBranch = await Branch.findOne({ isActive: true });
-      if (!firstBranch) {
-        return ResponseUtils.error(res, 'No active branch available', 400);
-      }
-      targetBranchId = firstBranch._id;
+      return ResponseUtils.forbidden(res, 'Branch is required to create a sale');
     }
-    
+
+    if (!ValidationUtils.isValidObjectId(targetBranchId)) {
+      return ResponseUtils.error(res, 'Invalid branch identifier', 400);
+    }
+
+    if (!assertBranchWriteAccess(targetBranchId, req.user)) {
+      return ResponseUtils.forbidden(res, 'Cannot create sales for other branches');
+    }
+
     const branch = await Branch.findById(targetBranchId);
-    if (!branch) {
-      return ResponseUtils.error(res, 'Invalid branch', 400);
+    if (!branch || !branch.isActive) {
+      return ResponseUtils.error(res, 'Branch not found or inactive', 400);
     }
 
-    // Check branch access for non-admin users
-    if (req.user.role !== 'admin' && req.user.branch) {
-      const userBranchId = req.user.branch._id || req.user.branch;
-      if (userBranchId.toString() !== targetBranchId.toString()) {
-        return ResponseUtils.error(res, 'Access denied - Can only create sales for your assigned branch', 403);
-      }
-    }
-
-    // Start transaction session (only if not in test environment)
-    const useTransactions = process.env.NODE_ENV !== 'test';
+    const useTransactions = shouldUseTransactions();
     const session = useTransactions ? await mongoose.startSession() : null;
+
     if (session) {
       session.startTransaction();
     }
@@ -62,119 +97,131 @@ class SalesController {
       const saleItems = [];
       const stockUpdates = [];
 
-      // Validate items and check stock availability
       for (const item of items) {
-        const product = session ? 
-          await Product.findById(item.productId).session(session) :
-          await Product.findById(item.productId);
-        if (!product) {
-          throw new Error(`Product not found: ${item.productId}`);
+        if (!ValidationUtils.isValidObjectId(item.productId)) {
+          return ResponseUtils.validationError(res, [{
+            path: 'items.productId',
+            message: 'Invalid product identifier',
+            value: item.productId,
+          }]);
         }
 
-        // Find branch stock
+        const quantity = normalizeQuantity(item.quantity);
+        if (!quantity) {
+          return ResponseUtils.validationError(res, [{
+            path: 'items.quantity',
+            message: 'Quantity must be a positive number',
+            value: item.quantity,
+          }]);
+        }
+
+        const productQuery = Product.findById(item.productId);
+        if (session) {
+          productQuery.session(session);
+        }
+
+        const product = await productQuery;
+        if (!product) {
+          return ResponseUtils.error(res, `Product not found: ${item.productId}`, 400);
+        }
+
         const branchStock = product.stockByBranch.find(
-          stock => stock.branch.toString() === targetBranchId.toString()
+          (stock) => stock.branch.toString() === String(targetBranchId),
         );
 
         if (!branchStock) {
-          throw new Error(`Product ${product.name} not available in this branch`);
+          return ResponseUtils.error(res, `Product ${product.name} not available in selected branch`, 400);
         }
 
-        // Check if sufficient stock is available
-        const availableStock = branchStock.quantity - branchStock.reservedQuantity;
-        if (availableStock < item.quantity) {
-          throw new Error(`Insufficient stock for ${product.name}. Available: ${availableStock}, Requested: ${item.quantity}`);
+        const availableStock = Number(branchStock.quantity || 0) - Number(branchStock.reservedQuantity || 0);
+        if (availableStock < quantity) {
+          return ResponseUtils.error(
+            res,
+            `Insufficient stock for ${product.name}. Available: ${availableStock}, Requested: ${quantity}`,
+            400,
+          );
         }
 
-        // Calculate pricing
-        const unitPrice = product.pricing.sellingPrice;
-        const itemTotal = item.quantity * unitPrice;
+        const sellingPrice = Number(product?.pricing?.sellingPrice || 0);
+        const costPrice = Number(product?.pricing?.costPrice || 0);
+        const itemTotal = sellingPrice * quantity;
+
         subtotal += itemTotal;
 
         saleItems.push({
-          product: item.productId,
+          product: product._id,
           productName: product.name,
           sku: product.sku,
-          quantity: item.quantity,
-          costPrice: product.pricing.costPrice,
-          sellingPrice: product.pricing.sellingPrice,
-          unitPrice: unitPrice,
+          quantity,
+          costPrice,
+          sellingPrice,
+          unitPrice: sellingPrice,
           total: itemTotal,
           discount: 0,
-          tax: 0
+          tax: 0,
         });
 
-        // Prepare stock update
         stockUpdates.push({
-          productId: item.productId,
-          branchId: targetBranchId,
-          quantity: item.quantity,
-          newQuantity: branchStock.quantity - item.quantity
+          productId: product._id,
+          newQuantity: Number(branchStock.quantity || 0) - quantity,
         });
       }
 
-      // Calculate totals
-      // Note: In Indian retail, MRP and selling prices are INCLUSIVE of GST
-      // We don't add tax on top, we extract it for reporting purposes
-      const discountAmount = (subtotal * discountPercentage) / 100;
-      const total = subtotal - discountAmount;  // Final amount (GST already included)
-      
-      // For tax reporting: Extract GST component from the total
-      // Formula: taxableAmount = total / (1 + taxRate/100)
-      // taxAmount = total - taxableAmount
-      const taxRate = taxPercentage || 18; // Default to 18% if not provided
-      const taxableAmount = total / (1 + (taxRate / 100));
+      const numericDiscount = Number(discountPercentage || 0);
+      const discountAmount = (subtotal * numericDiscount) / 100;
+      const total = subtotal - discountAmount;
+      const taxRate = Number(taxPercentage || 18);
+      const taxableAmount = taxRate > 0 ? total / (1 + taxRate / 100) : total;
       const taxAmount = total - taxableAmount;
 
-      // Generate sale number
-      const saleNumber = `SAL-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+      const saleNumber = `SAL-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 
-      // Create sale record
       const sale = new Sale({
         saleNumber,
         branch: targetBranchId,
         items: saleItems,
         subtotal,
-        discountPercentage,
+        discountPercentage: numericDiscount,
         discountAmount,
-        taxPercentage,
+        taxPercentage: taxRate,
         taxAmount,
         total,
         customerName,
         customerPhone,
         customerEmail,
-        paymentMethod: 'cash',
+        paymentMethod,
         status: 'completed',
         amountPaid: total,
         amountDue: 0,
         notes,
-        createdBy: req.user.id
+        createdBy: req.user.userId,
       });
 
-      await sale.save(session ? { session } : {});
+      await sale.save(session ? { session } : undefined);
 
-      // Update stock quantities
       for (const update of stockUpdates) {
         await Product.updateOne(
-          { 
+          {
             _id: update.productId,
-            'stockByBranch.branch': update.branchId
+            'stockByBranch.branch': targetBranchId,
           },
-          { 
-            $set: { 'stockByBranch.$.quantity': update.newQuantity }
+          {
+            $set: {
+              'stockByBranch.$.quantity': update.newQuantity,
+              'stockByBranch.$.lastUpdated': new Date(),
+            },
           },
-          session ? { session } : {}
+          session ? { session } : undefined,
         );
       }
 
-      // Create audit log
       await AuditLog.create([{
         action: 'sale_create',
         resourceType: 'sale',
         resourceId: sale._id.toString(),
         resourceName: sale.saleNumber,
         description: `Created sale: ${sale.saleNumber} (Total: ₹${sale.total})`,
-        userId: req.user.id,
+        userId: req.user.userId,
         userEmail: req.user.email,
         userRole: req.user.role,
         ipAddress: req.ip || '127.0.0.1',
@@ -184,31 +231,27 @@ class SalesController {
           saleNumber: sale.saleNumber,
           total: sale.total,
           itemCount: sale.items.length,
-          branch: targetBranchId
-        }
-      }], session ? { session } : {});
+          branch: targetBranchId,
+        },
+      }], session ? { session } : undefined);
 
-      // Commit transaction
       if (session) {
         await session.commitTransaction();
       }
 
-      // Populate the sale data for response
       const populatedSale = await Sale.findById(sale._id)
         .populate('branch', 'name code')
         .populate('createdBy', 'firstName lastName');
 
       return ResponseUtils.success(res, populatedSale, 'Sale created successfully', 201);
-
     } catch (error) {
-      // Abort transaction on error
       if (session) {
         await session.abortTransaction();
       }
-      
 
-      
-      return ResponseUtils.error(res, error.message, 400);
+      const statusCode = error.statusCode || 500;
+      const message = error.statusCode ? error.message : 'Failed to create sale';
+      return ResponseUtils.error(res, message, statusCode);
     } finally {
       if (session) {
         session.endSession();
@@ -231,95 +274,110 @@ class SalesController {
       sortOrder = 'desc'
     } = req.query;
 
-    const filter = {};
+    const filters = [];
 
-    // Branch filter
-    if (branchId) {
-      filter.branch = branchId;
-    } else if (req.user.role !== 'admin' && req.user.branch) {
-      filter.branch = req.user.branch;
+    const { branchIds, error } = resolveAccessibleBranchIds(req, branchId);
+    if (error === 'BRANCH_REQUIRED') {
+      return ResponseUtils.forbidden(res, 'Branch assignment required to view sales');
     }
 
-    // Date range filter
+    if (branchIds.length === 1) {
+      filters.push({ branch: branchIds[0] });
+    } else if (branchIds.length > 1) {
+      filters.push({ branch: { $in: branchIds } });
+    }
+
     if (startDate || endDate) {
-      filter.createdAt = {};
+      const range = {};
       if (startDate) {
-        filter.createdAt.$gte = new Date(startDate);
+        const parsed = new Date(startDate);
+        if (Number.isNaN(parsed.valueOf())) {
+          return ResponseUtils.error(res, 'Invalid start date', 400);
+        }
+        range.$gte = parsed;
       }
       if (endDate) {
-        filter.createdAt.$lte = new Date(endDate);
+        const parsed = new Date(endDate);
+        if (Number.isNaN(parsed.valueOf())) {
+          return ResponseUtils.error(res, 'Invalid end date', 400);
+        }
+        parsed.setHours(23, 59, 59, 999);
+        range.$lte = parsed;
       }
+
+      filters.push({ createdAt: range });
     }
 
-    // Payment method filter
     if (paymentMethod) {
-      filter.paymentMethod = paymentMethod;
+      filters.push({ paymentMethod });
     }
 
-    // Status filter
     if (status) {
-      filter.status = status;
+      filters.push({ status });
     }
 
-    // Customer name filter
     if (customerName) {
-      filter.customerName = { $regex: customerName, $options: 'i' };
+      filters.push({ customerName: { $regex: customerName, $options: 'i' } });
     }
 
-    // General search
     if (search) {
-      filter.$or = [
-        { saleNumber: { $regex: search, $options: 'i' } },
-        { customerName: { $regex: search, $options: 'i' } },
-        { customerPhone: { $regex: search, $options: 'i' } },
-        { customerEmail: { $regex: search, $options: 'i' } }
-      ];
+      filters.push({
+        $or: [
+          { saleNumber: { $regex: search, $options: 'i' } },
+          { customerName: { $regex: search, $options: 'i' } },
+          { customerPhone: { $regex: search, $options: 'i' } },
+          { customerEmail: { $regex: search, $options: 'i' } },
+        ],
+      });
     }
 
-    const pageNum = parseInt(page);
-    const limitNum = parseInt(limit);
-    const skip = (pageNum - 1) * limitNum;
+    const filter = filters.length > 0 ? { $and: filters } : {};
 
-    // Build sort object
-    const sortDirection = sortOrder === 'desc' ? -1 : 1;
-    const sort = { [sortBy]: sortDirection };
+    const { page: pageNumber, limit: pageSize } = ValidationUtils.validatePagination({ page, limit });
+    const skip = (pageNumber - 1) * pageSize;
 
-    const total = await Sale.countDocuments(filter);
-    const sales = await Sale.find(filter)
-      .populate('branch', 'name code address')
-      .populate('createdBy', 'firstName lastName email')
-      .populate('items.product', 'name sku')
-      .sort(sort)
-      .skip(skip)
-      .limit(limitNum);
+    const { sortObj } = ValidationUtils.validateSort(sortBy, sortOrder, [
+      'createdAt',
+      'total',
+      'saleNumber',
+      'customerName',
+    ]);
 
-    const pagination = {
-      currentPage: pageNum,
-      totalPages: Math.ceil(total / limitNum),
-      totalItems: total,
-      itemsPerPage: limitNum
-    };
+    const [sales, total] = await Promise.all([
+      Sale.find(filter)
+        .populate('branch', 'name code address')
+        .populate('createdBy', 'firstName lastName email')
+        .populate('items.product', 'name sku')
+        .sort(sortObj)
+        .skip(skip)
+        .limit(pageSize),
+      Sale.countDocuments(filter),
+    ]);
 
-    // Calculate summary statistics
-    const totalSalesAmount = sales.reduce((sum, sale) => sum + sale.total, 0);
+    const totalSalesAmount = sales.reduce((sum, sale) => sum + Number(sale.total || 0), 0);
     const avgSaleAmount = sales.length > 0 ? totalSalesAmount / sales.length : 0;
 
-    return ResponseUtils.success(res, {
-        sales,
-        pagination,
-        summary: {
-          totalSales: sales.length,
-          totalAmount: totalSalesAmount,
-          averageAmount: avgSaleAmount
-        }
-      }, 'Sales retrieved successfully');
+    const payload = {
+      sales,
+      summary: {
+        totalSales: sales.length,
+        totalAmount: totalSalesAmount,
+        averageAmount: avgSaleAmount,
+      },
+    };
+
+    return ResponseUtils.paginated(res, payload, {
+      page: pageNumber,
+      limit: pageSize,
+      total,
+    }, 'Sales retrieved successfully');
   });
 
   static getSaleById = asyncHandler(async (req, res) => {
     const { id } = req.params;
 
     if (!ValidationUtils.isValidObjectId(id)) {
-      return ResponseUtils.error(res, 'Invalid sale ID', 400);
+      return ResponseUtils.error(res, 'Invalid sale identifier', 400);
     }
 
     const sale = await Sale.findById(id)
@@ -335,14 +393,11 @@ class SalesController {
       });
 
     if (!sale) {
-      return ResponseUtils.error(res, 'Sale not found', 404);
+      return ResponseUtils.notFound(res, 'Sale not found');
     }
 
-    // Check branch access for non-admin users
-    if (req.user.role !== 'admin' && req.user.branch) {
-      if (sale.branch._id.toString() !== req.user.branch.toString()) {
-        return ResponseUtils.error(res, 'Access denied - Sale belongs to different branch', 403);
-      }
+    if (!assertBranchReadAccess(sale.branch, req.user)) {
+      return ResponseUtils.forbidden(res, 'Sale belongs to a different branch');
     }
 
     return ResponseUtils.success(res, sale, 'Sale retrieved successfully');
@@ -364,16 +419,11 @@ class SalesController {
       });
 
     if (!sale) {
-      return ResponseUtils.error(res, 'Receipt not found', 404);
+      return ResponseUtils.notFound(res, 'Receipt not found');
     }
 
-    // Check branch access for non-admin users
-    if (req.user.role !== 'admin' && req.user.branch) {
-      const userBranchId = req.user.branch._id || req.user.branch;
-      const saleBranchId = sale.branch?._id || sale.branch;
-      if (saleBranchId && saleBranchId.toString() !== userBranchId.toString()) {
-        return ResponseUtils.error(res, 'Access denied - Sale belongs to different branch', 403);
-      }
+    if (!assertBranchReadAccess(sale.branch, req.user)) {
+      return ResponseUtils.forbidden(res, 'Sale belongs to a different branch');
     }
 
     return ResponseUtils.success(res, sale, 'Receipt retrieved successfully');
@@ -384,12 +434,12 @@ class SalesController {
     const { status, notes, customerName, customerPhone, customerEmail } = req.body;
 
     if (!ValidationUtils.isValidObjectId(id)) {
-      return ResponseUtils.error(res, 'Invalid sale ID', 400);
+      return ResponseUtils.error(res, 'Invalid sale identifier', 400);
     }
 
     const sale = await Sale.findById(id);
     if (!sale) {
-      return ResponseUtils.error(res, 'Sale not found', 404);
+      return ResponseUtils.notFound(res, 'Sale not found');
     }
 
     // Check if sale can be modified
@@ -397,11 +447,8 @@ class SalesController {
       return ResponseUtils.error(res, 'Completed sales cannot be modified', 400);
     }
 
-    // Check branch access for non-admin users
-    if (req.user.role !== 'admin' && req.user.branch) {
-      if (sale.branch.toString() !== req.user.branch.toString()) {
-        return ResponseUtils.error(res, 'Access denied - Sale belongs to different branch', 403);
-      }
+    if (!assertBranchWriteAccess(sale.branch, req.user)) {
+      return ResponseUtils.forbidden(res, 'Sale belongs to a different branch');
     }
 
     const updateData = {
@@ -452,40 +499,31 @@ class SalesController {
     const { id } = req.params;
 
     if (!ValidationUtils.isValidObjectId(id)) {
-      return res.status(400).json(
-        ResponseUtils.error('Invalid sale ID', 400)
-      );
+      return ResponseUtils.error(res, 'Invalid sale identifier', 400);
     }
 
     const sale = await Sale.findById(id);
     if (!sale) {
-      return res.status(404).json(
-        ResponseUtils.error('Sale not found', 404)
-      );
+      return ResponseUtils.notFound(res, 'Sale not found');
     }
 
     // Check if sale can be deleted
     if (sale.status === 'completed') {
-      return res.status(400).json(
-        ResponseUtils.error('Completed sales cannot be deleted. Use refund instead.', 400)
-      );
+      return ResponseUtils.error(res, 'Completed sales cannot be deleted. Use refund instead.', 400);
     }
 
-    // Check branch access for non-admin users
-    if (req.user.role !== 'admin' && req.user.branch) {
-      if (sale.branch.toString() !== req.user.branch.toString()) {
-        return res.status(403).json(
-          ResponseUtils.error('Access denied - Sale belongs to different branch', 403)
-        );
-      }
+    if (!assertBranchWriteAccess(sale.branch, req.user)) {
+      return ResponseUtils.forbidden(res, 'Sale belongs to a different branch');
     }
 
-    // Start transaction to restore stock
-    const session = await mongoose.startSession();
-    session.startTransaction();
+    const useTransactions = shouldUseTransactions();
+    const session = useTransactions ? await mongoose.startSession() : null;
+
+    if (session) {
+      session.startTransaction();
+    }
 
     try {
-      // Restore stock quantities
       for (const item of sale.items) {
         await Product.updateOne(
           { 
@@ -493,13 +531,13 @@ class SalesController {
             'stockByBranch.branch': sale.branch
           },
           { 
-            $inc: { 'stockByBranch.$.quantity': item.quantity }
+            $inc: { 'stockByBranch.$.quantity': item.quantity },
+            $set: { 'stockByBranch.$.lastUpdated': new Date() }
           },
-          { session }
+          session ? { session } : undefined
         );
       }
 
-      // Soft delete the sale
       await Sale.findByIdAndUpdate(
         id,
         { 
@@ -507,10 +545,9 @@ class SalesController {
           deletedAt: new Date(),
           deletedBy: req.user.userId
         },
-        { session }
+        session ? { session } : undefined
       );
 
-      // Create audit log
       await AuditLog.create([{
         action: 'sale_delete',
         resourceType: 'sale',
@@ -531,19 +568,24 @@ class SalesController {
         newValues: {
           reason: 'Sale cancelled and stock restored'
         }
-      }], { session });
+      }], session ? { session } : undefined);
 
-      await session.commitTransaction();
+      if (session) {
+        await session.commitTransaction();
+      }
 
-      res.json(
-        ResponseUtils.success('Sale cancelled successfully and stock restored')
-      );
+      return ResponseUtils.success(res, null, 'Sale cancelled successfully and stock restored');
 
     } catch (error) {
-      await session.abortTransaction();
-      throw error;
+      if (session) {
+        await session.abortTransaction();
+      }
+
+      return ResponseUtils.error(res, 'Failed to cancel sale');
     } finally {
-      session.endSession();
+      if (session) {
+        session.endSession();
+      }
     }
   });
 
@@ -554,22 +596,37 @@ class SalesController {
       endDate = new Date()
     } = req.query;
 
-    const filter = {
-      createdAt: {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate)
-      }
-    };
+    const start = new Date(startDate);
+    const end = new Date(endDate);
 
-    // Branch filter
-    if (branchId) {
-      filter.branch = branchId;
-    } else if (req.user.role !== 'admin' && req.user.branch) {
-      filter.branch = req.user.branch;
+    if (Number.isNaN(start.valueOf()) || Number.isNaN(end.valueOf())) {
+      return ResponseUtils.error(res, 'Invalid date range', 400);
     }
 
+    end.setHours(23, 59, 59, 999);
+
+    const { branchIds, error } = resolveAccessibleBranchIds(req, branchId);
+    if (error === 'BRANCH_REQUIRED') {
+      return ResponseUtils.forbidden(res, 'Branch assignment required to view sales statistics');
+    }
+
+    const matchConditions = [{
+      createdAt: {
+        $gte: start,
+        $lte: end,
+      },
+    }];
+
+    if (branchIds.length === 1) {
+      matchConditions.push({ branch: mongoose.Types.ObjectId(branchIds[0]) });
+    } else if (branchIds.length > 1) {
+      matchConditions.push({ branch: { $in: branchIds.map((id) => mongoose.Types.ObjectId(id)) } });
+    }
+
+    const matchStage = matchConditions.length > 1 ? { $and: matchConditions } : matchConditions[0];
+
     const stats = await Sale.aggregate([
-      { $match: filter },
+      { $match: matchStage },
       {
         $group: {
           _id: null,
@@ -585,7 +642,7 @@ class SalesController {
 
     // Payment method breakdown
     const paymentStats = await Sale.aggregate([
-      { $match: filter },
+      { $match: matchStage },
       {
         $group: {
           _id: '$paymentMethod',
@@ -595,9 +652,8 @@ class SalesController {
       }
     ]);
 
-    // Daily sales trend
     const dailyTrend = await Sale.aggregate([
-      { $match: filter },
+      { $match: matchStage },
       {
         $group: {
           _id: {
@@ -619,19 +675,17 @@ class SalesController {
         totalDiscount: 0,
         totalTax: 0,
         averageOrderValue: 0,
-        totalItems: 0
+        totalItems: 0,
       },
       paymentMethods: paymentStats,
       dailyTrend,
       period: {
-        startDate: new Date(startDate),
-        endDate: new Date(endDate)
-      }
+        startDate: start,
+        endDate: end,
+      },
     };
 
-    res.json(
-      ResponseUtils.success('Sales statistics retrieved successfully', result)
-    );
+    return ResponseUtils.success(res, result, 'Sales statistics retrieved successfully');
   });
 
   static refundSale = asyncHandler(async (req, res) => {
@@ -641,100 +695,108 @@ class SalesController {
     const itemsToRefund = refundItems.length > 0 ? refundItems : items;
 
     if (!ValidationUtils.isValidObjectId(id)) {
-      return res.status(400).json(
-        ResponseUtils.error('Invalid sale ID', 400)
-      );
+      return ResponseUtils.error(res, 'Invalid sale identifier', 400);
     }
 
     const sale = await Sale.findById(id).populate('items.product');
     if (!sale) {
-      return res.status(404).json(
-        ResponseUtils.error('Sale not found', 404)
-      );
+      return ResponseUtils.notFound(res, 'Sale not found');
     }
 
     if (sale.status !== 'completed') {
-      return res.status(400).json(
-        ResponseUtils.error('Only completed sales can be refunded', 400)
-      );
+      return ResponseUtils.error(res, 'Only completed sales can be refunded', 400);
     }
 
-    // Check branch access
-    if (req.user.role !== 'admin' && req.user.branch) {
-      if (sale.branch.toString() !== req.user.branch.toString()) {
-        return res.status(403).json(
-          ResponseUtils.error('Access denied - Sale belongs to different branch', 403)
-        );
-      }
+    if (!assertBranchWriteAccess(sale.branch, req.user)) {
+      return ResponseUtils.forbidden(res, 'Sale belongs to a different branch');
     }
 
-    // Start transaction (only if not in test environment)
-    const useTransactions = process.env.NODE_ENV !== 'test';
+    const useTransactions = shouldUseTransactions();
     const session = useTransactions ? await mongoose.startSession() : null;
     if (session) {
       session.startTransaction();
     }
 
     try {
-      // If partial refund, restore stock for refunded items
+      const updateOptions = session ? { session } : undefined;
+
       if (itemsToRefund.length > 0) {
         for (const refundItem of itemsToRefund) {
-          const saleItem = sale.items.find(item => 
-            item.product._id.toString() === refundItem.productId
-          );
-          
-          if (saleItem && refundItem.quantity <= saleItem.quantity) {
-            // Restore stock
-            await Product.updateOne(
-              { 
-                _id: refundItem.productId,
-                'stockByBranch.branch': sale.branch
-              },
-              { 
-                $inc: { 'stockByBranch.$.quantity': refundItem.quantity }
-              },
-              ...(session ? [{ session }] : [])
-            );
+          if (!ValidationUtils.isValidObjectId(refundItem.productId)) {
+            return ResponseUtils.validationError(res, [{
+              path: 'refundItems.productId',
+              message: 'Invalid product identifier',
+              value: refundItem.productId,
+            }]);
           }
+
+          const quantity = normalizeQuantity(refundItem.quantity);
+          if (!quantity) {
+            return ResponseUtils.validationError(res, [{
+              path: 'refundItems.quantity',
+              message: 'Quantity must be a positive number',
+              value: refundItem.quantity,
+            }]);
+          }
+
+          const saleItem = sale.items.find(
+            (item) => item.product._id.toString() === String(refundItem.productId),
+          );
+
+          if (!saleItem || quantity > saleItem.quantity) {
+            return ResponseUtils.error(res, 'Invalid refund item quantity', 400);
+          }
+
+          await Product.updateOne(
+            {
+              _id: refundItem.productId,
+              'stockByBranch.branch': sale.branch,
+            },
+            {
+              $inc: { 'stockByBranch.$.quantity': quantity },
+              $set: { 'stockByBranch.$.lastUpdated': new Date() },
+            },
+            updateOptions,
+          );
         }
       } else {
-        // Full refund - restore all items
         for (const item of sale.items) {
           await Product.updateOne(
-            { 
+            {
               _id: item.product._id,
-              'stockByBranch.branch': sale.branch
+              'stockByBranch.branch': sale.branch,
             },
-            { 
-              $inc: { 'stockByBranch.$.quantity': item.quantity }
+            {
+              $inc: { 'stockByBranch.$.quantity': item.quantity },
+              $set: { 'stockByBranch.$.lastUpdated': new Date() },
             },
-            ...(session ? [{ session }] : [])
+            updateOptions,
           );
         }
       }
 
-      // Calculate refund amount for partial refunds if not provided
-      let finalRefundAmount = refundAmount;
+      let finalRefundAmount = Number(refundAmount || 0);
       if (!finalRefundAmount) {
         if (itemsToRefund.length > 0) {
-          // Partial refund - calculate based on refunded items
-          finalRefundAmount = 0;
-          for (const refundItem of itemsToRefund) {
-            const saleItem = sale.items.find(item => 
-              item.product._id.toString() === refundItem.productId
+          finalRefundAmount = itemsToRefund.reduce((sum, refundItem) => {
+            const saleItem = sale.items.find(
+              (item) => item.product._id.toString() === String(refundItem.productId),
             );
-            if (saleItem) {
-              const itemRefundAmount = (saleItem.unitPrice * refundItem.quantity);
-              finalRefundAmount += itemRefundAmount;
+            if (!saleItem) {
+              return sum;
             }
-          }
+            const quantity = Math.min(normalizeQuantity(refundItem.quantity) || 0, saleItem.quantity);
+            return sum + (Number(saleItem.unitPrice || 0) * quantity);
+          }, 0);
         } else {
-          // Full refund
-          finalRefundAmount = sale.total;
+          finalRefundAmount = Number(sale.total || 0);
         }
       }
 
-      // Update sale status
+      if (finalRefundAmount <= 0) {
+        return ResponseUtils.error(res, 'Refund amount must be greater than zero', 400);
+      }
+
       const updateData = {
         status: 'refunded',
         refundedAmount: finalRefundAmount,
@@ -746,10 +808,9 @@ class SalesController {
       const refundedSale = await Sale.findByIdAndUpdate(
         id,
         updateData,
-        { new: true, ...(session ? { session } : {}) }
+        { new: true, ...updateOptions }
       ).populate('items.product');
 
-      // Create audit log
       const auditData = [{
         action: 'sale_refund',
         resourceType: 'sale',
@@ -770,17 +831,12 @@ class SalesController {
         }
       }];
       
-      if (session) {
-        await AuditLog.create(auditData, { session });
-      } else {
-        await AuditLog.create(auditData);
-      }
+      await AuditLog.create(auditData, updateOptions);
 
       if (session) {
         await session.commitTransaction();
       }
 
-      // Create refund object for response to match test expectations
       const saleWithRefund = {
         ...refundedSale.toObject(),
         refund: {
@@ -798,7 +854,7 @@ class SalesController {
       if (session) {
         await session.abortTransaction();
       }
-      throw error;
+      return ResponseUtils.error(res, 'Failed to process sale refund');
     } finally {
       if (session) {
         session.endSession();
@@ -810,23 +866,37 @@ class SalesController {
     const { startDate, endDate, branchId } = req.query;
 
     if (!startDate || !endDate) {
-      return res.status(400).json(
-        ResponseUtils.error('Start date and end date are required', 400)
-      );
+      return ResponseUtils.error(res, 'Start date and end date are required', 400);
     }
 
-    const filter = {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    if (Number.isNaN(start.valueOf()) || Number.isNaN(end.valueOf())) {
+      return ResponseUtils.error(res, 'Invalid date range', 400);
+    }
+
+    end.setHours(23, 59, 59, 999);
+
+    const { branchIds, error } = resolveAccessibleBranchIds(req, branchId);
+    if (error === 'BRANCH_REQUIRED') {
+      return ResponseUtils.forbidden(res, 'Branch assignment required to view sales');
+    }
+
+    const filters = [{
       createdAt: {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate)
-      }
-    };
+        $gte: start,
+        $lte: end,
+      },
+    }];
 
-    if (branchId) {
-      filter.branch = branchId;
-    } else if (req.user.role !== 'admin') {
-      filter.branch = req.user.branchId;
+    if (branchIds.length === 1) {
+      filters.push({ branch: branchIds[0] });
+    } else if (branchIds.length > 1) {
+      filters.push({ branch: { $in: branchIds } });
     }
+
+    const filter = filters.length > 1 ? { $and: filters } : filters[0];
 
     const sales = await Sale.find(filter)
       .populate('branch')
@@ -836,17 +906,15 @@ class SalesController {
     const totalAmount = sales.reduce((sum, sale) => sum + sale.total, 0);
     const totalDiscount = sales.reduce((sum, sale) => sum + sale.discountAmount, 0);
 
-    res.json(
-      ResponseUtils.success('Sales retrieved successfully', {
-        sales,
-        summary: {
-          totalSales: sales.length,
-          totalAmount,
-          totalDiscount,
-          averageOrderValue: sales.length > 0 ? totalAmount / sales.length : 0
-        }
-      })
-    );
+    return ResponseUtils.success(res, {
+      sales,
+      summary: {
+        totalSales: sales.length,
+        totalAmount,
+        totalDiscount,
+        averageOrderValue: sales.length > 0 ? totalAmount / sales.length : 0,
+      },
+    }, 'Sales retrieved successfully');
   });
 }
 

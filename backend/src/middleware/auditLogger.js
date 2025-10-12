@@ -12,22 +12,22 @@ const geoip = require('geoip-lite'); // For IP geolocation
 const auditMiddleware = (options = {}) => {
   return async (req, res, next) => {
     const startTime = Date.now();
-    
+
     // Store original res.json to capture response
     const originalJson = res.json;
-    
+
     res.json = function(data) {
       // Calculate response time
       const responseTime = Date.now() - startTime;
-      
+
       // Log the action after response
       setImmediate(() => {
         logAction(req, res, data, responseTime, options);
       });
-      
+
       return originalJson.call(this, data);
     };
-    
+
     next();
   };
 };
@@ -41,45 +41,45 @@ async function logAction(req, res, responseData, responseTime, options) {
     if (shouldSkipLogging(req, options)) {
       return;
     }
-    
+
     const user = req.user;
     const ipAddress = getClientIP(req);
     const location = geoip.lookup(ipAddress);
-    
+
     // Determine action from route and method
     const action = determineAction(req);
     const resourceInfo = extractResourceInfo(req, responseData);
-    
+
     // Get old values for updates
     const oldValues = req.auditOldValues || null;
     const newValues = extractNewValues(req, responseData);
-    
+
     // Determine status
     const status = determineStatus(res.statusCode, responseData);
-    
+
     // Calculate risk level and flags
     const riskData = calculateRiskLevel(req, action, user);
-    
+
     const auditData = {
       // User information
       userId: user?._id || user?.userId || 'system',
       userEmail: user?.email || 'system@internal',
       userRole: user?.role || 'system',
-      
+
       // Branch information
       branchId: user?.branch?._id,
       branchName: user?.branch?.name,
-      
+
       // Action details
       action,
       resourceType: resourceInfo.type,
       resourceId: resourceInfo.id,
       resourceName: resourceInfo.name,
-      
+
       // Request information
       method: req.method,
       endpoint: req.originalUrl,
-      
+
       // IP and location
       ipAddress,
       userAgent: req.get('User-Agent'),
@@ -88,28 +88,28 @@ async function logAction(req, res, responseData, responseTime, options) {
         region: location.region,
         city: location.city
       } : null,
-      
+
       // Status and result
       status,
       statusCode: res.statusCode,
-      
+
       // Details
       description: generateDescription(action, resourceInfo, status),
       oldValues,
       newValues,
       errorMessage: responseData?.message && status === 'failure' ? responseData.message : null,
-      
+
       // Risk assessment
       riskLevel: riskData.level,
       flags: riskData.flags,
-      
+
       // Performance
       responseTime,
-      
+
       // Session
       sessionId: req.sessionID,
       correlationId: req.correlationId || req.get('X-Correlation-ID'),
-      
+
       // Metadata
       metadata: {
         queryParams: req.query,
@@ -118,9 +118,9 @@ async function logAction(req, res, responseData, responseTime, options) {
         ...options.metadata
       }
     };
-    
+
     await AuditLog.logUserAction(auditData);
-    
+
   } catch (error) {
     console.error('Audit logging error:', error);
     // Don't throw error to avoid breaking main operation
@@ -136,24 +136,24 @@ function shouldSkipLogging(req, options) {
     '/api/auth/refresh',  // Too frequent
     '/api/dashboard'      // Read-only, high frequency
   ];
-  
+
   const skipMethods = options.skipMethods || [];
-  
+
   // Skip health checks and frequent read operations
   if (skipRoutes.some(route => req.originalUrl.startsWith(route))) {
     return true;
   }
-  
+
   // Skip certain methods if configured
   if (skipMethods.includes(req.method)) {
     return true;
   }
-  
+
   // Skip if explicitly marked to skip
   if (req.skipAudit) {
     return true;
   }
-  
+
   return false;
 }
 
@@ -161,8 +161,8 @@ function shouldSkipLogging(req, options) {
  * Get client IP address
  */
 function getClientIP(req) {
-  return req.ip || 
-         req.connection.remoteAddress || 
+  return req.ip ||
+         req.connection.remoteAddress ||
          req.socket.remoteAddress ||
          (req.connection.socket ? req.connection.socket.remoteAddress : null) ||
          req.get('X-Forwarded-For')?.split(',')[0]?.trim() ||
@@ -176,28 +176,28 @@ function getClientIP(req) {
 function determineAction(req) {
   const { method, route } = req;
   const path = route?.path || req.originalUrl;
-  
+
   // Authentication actions
   if (path.includes('/auth/login')) return 'login';
   if (path.includes('/auth/logout')) return 'logout';
   if (path.includes('/auth/refresh')) return 'token_refresh';
   if (path.includes('/auth/change-password')) return 'password_change';
   if (path.includes('/auth/reset-password')) return 'password_reset_request';
-  
+
   // User management
   if (path.includes('/users')) {
     if (method === 'POST') return 'user_create';
     if (method === 'PUT' || method === 'PATCH') return 'user_update';
     if (method === 'DELETE') return 'user_delete';
   }
-  
+
   // Product management
   if (path.includes('/products')) {
     if (method === 'POST') return 'product_create';
     if (method === 'PUT' || method === 'PATCH') return 'product_update';
     if (method === 'DELETE') return 'product_delete';
   }
-  
+
   // Sales
   if (path.includes('/sales')) {
     if (method === 'POST') return 'sale_create';
@@ -205,14 +205,14 @@ function determineAction(req) {
     if (method === 'DELETE') return 'sale_delete';
     if (path.includes('/refund')) return 'sale_refund';
   }
-  
+
   // Inventory
   if (path.includes('/inventory')) {
     if (path.includes('/adjustments')) return 'stock_adjustment';
     if (path.includes('/transfers')) return 'stock_transfer';
     if (path.includes('/receive')) return 'stock_receive';
   }
-  
+
   // Purchases
   if (path.includes('/purchases')) {
     if (method === 'POST') return 'purchase_order_create';
@@ -222,7 +222,7 @@ function determineAction(req) {
     if (path.includes('/cancel')) return 'purchase_order_cancel';
     if (path.includes('/receive')) return 'purchase_receive';
   }
-  
+
   // Financial
   if (path.includes('/financial')) {
     if (path.includes('/invoices')) {
@@ -235,7 +235,7 @@ function determineAction(req) {
       if (path.includes('/void')) return 'payment_void';
     }
   }
-  
+
   // Master data
   if (path.includes('/master-data')) {
     if (path.includes('/categories')) {
@@ -264,7 +264,7 @@ function determineAction(req) {
       if (method === 'DELETE') return 'branch_delete';
     }
   }
-  
+
   // Default action
   return `${method.toLowerCase()}_${path.split('/')[2] || 'unknown'}`;
 }
@@ -275,12 +275,12 @@ function determineAction(req) {
 function extractResourceInfo(req, responseData) {
   const path = req.originalUrl;
   const pathParts = path.split('/');
-  
+
   // Extract resource type from path
   let type = 'unknown';
   let id = null;
   let name = null;
-  
+
   if (path.includes('/products')) {
     type = 'product';
     id = req.params.id;
@@ -310,11 +310,11 @@ function extractResourceInfo(req, responseData) {
     else if (path.includes('/units')) type = 'unit';
     else if (path.includes('/suppliers')) type = 'supplier';
     else if (path.includes('/branches')) type = 'branch';
-    
+
     id = req.params.id;
     name = responseData?.data?.name || req.body?.name;
   }
-  
+
   return { type, id, name };
 }
 
@@ -325,17 +325,17 @@ function extractNewValues(req, responseData) {
   if (req.method === 'GET' || req.method === 'DELETE') {
     return null;
   }
-  
+
   // Return sanitized request body (remove sensitive fields)
   const sensitiveFields = ['password', 'token', 'secret', 'key'];
   const newValues = { ...req.body };
-  
+
   sensitiveFields.forEach(field => {
     if (newValues[field]) {
       newValues[field] = '[REDACTED]';
     }
   });
-  
+
   return newValues;
 }
 
@@ -360,57 +360,57 @@ function determineStatus(statusCode, responseData) {
 function calculateRiskLevel(req, action, user) {
   const flags = [];
   let level = 'low';
-  
+
   // Check for sensitive data operations
   const sensitiveActions = [
     'user_delete', 'user_role_change', 'password_change',
     'financial_report_generate', 'data_export', 'config_change'
   ];
-  
+
   if (sensitiveActions.includes(action)) {
     flags.push('sensitive_data');
     level = 'medium';
   }
-  
+
   // Check for financial actions
   const financialActions = [
     'sale_create', 'sale_refund', 'invoice_create', 'payment_record',
     'purchase_order_create', 'purchase_order_approve'
   ];
-  
+
   if (financialActions.includes(action)) {
     flags.push('financial_action');
     level = level === 'low' ? 'medium' : level;
   }
-  
+
   // Check for admin actions
   if (user?.role === 'admin') {
     flags.push('admin_action');
     level = level === 'low' ? 'medium' : level;
   }
-  
+
   // Check for critical actions
   const criticalActions = [
     'user_delete', 'branch_delete', 'data_export', 'config_change'
   ];
-  
+
   if (criticalActions.includes(action)) {
     level = 'critical';
   }
-  
+
   // Check for after-hours activity
   const hour = new Date().getHours();
   if (hour < 6 || hour > 22) {
     flags.push('after_hours');
     level = level === 'low' ? 'medium' : level;
   }
-  
+
   // Check for bulk operations
   if (req.body && Array.isArray(req.body) && req.body.length > 10) {
     flags.push('bulk_operation');
     level = level === 'low' ? 'medium' : 'high';
   }
-  
+
   return { level, flags };
 }
 
@@ -431,19 +431,19 @@ function generateDescription(action, resourceInfo, status) {
     user_update: 'Updated user',
     user_delete: 'Deleted user'
   };
-  
+
   let description = actionMap[action] || `Performed ${action}`;
-  
+
   if (resourceInfo.name) {
     description += ` '${resourceInfo.name}'`;
   } else if (resourceInfo.id) {
     description += ` (ID: ${resourceInfo.id})`;
   }
-  
+
   if (status === 'failure') {
     description = `Failed to ${description.toLowerCase()}`;
   }
-  
+
   return description;
 }
 
@@ -475,7 +475,7 @@ const logSystemEvent = async (action, description, metadata = {}) => {
     if (process.env.NODE_ENV === 'test') {
       return;
     }
-    
+
     await AuditLog.logUserAction({
       action: 'system', // Always use 'system' action for system events
       resourceType: 'system',

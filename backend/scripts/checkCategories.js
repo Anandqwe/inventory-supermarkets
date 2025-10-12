@@ -19,13 +19,13 @@ async function checkCategories() {
 
     console.log('\n📋 Total Categories:', categories.length);
     console.log('\n📊 Category List:');
-    
+
     const categoryNames = {};
     categories.forEach((cat, index) => {
       const parent = cat.parentCategory ? ` (parent: ${cat.parentCategory.name})` : ' (top-level)';
       const active = cat.isActive ? '✅' : '❌';
       console.log(`${index + 1}. ${active} ${cat.name}${parent}`);
-      
+
       // Track duplicates
       if (categoryNames[cat.name]) {
         categoryNames[cat.name].push(cat._id);
@@ -37,7 +37,7 @@ async function checkCategories() {
     // Check for duplicates
     console.log('\n🔍 Checking for duplicates...');
     const duplicates = Object.entries(categoryNames).filter(([name, ids]) => ids.length > 1);
-    
+
     if (duplicates.length > 0) {
       console.log('\n⚠️  Found duplicate categories:');
       duplicates.forEach(([name, ids]) => {

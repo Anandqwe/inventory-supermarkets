@@ -3,7 +3,7 @@
  */
 const express = require('express');
 const AuthController = require('../controllers/authController');
-const { authenticateToken, requireAdmin, requireManager } = require('../middleware/auth');
+const { authenticateToken, requireAdmin, requireRole } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/errorHandler');
 
 const router = express.Router();
@@ -22,8 +22,8 @@ router.post('/logout', AuthController.logout);
 router.post('/refresh-token', AuthController.refreshToken);
 
 // Admin/Manager routes
-router.post('/register', requireManager, AuthController.register);
-router.get('/users', requireManager, AuthController.getAllUsers);
-router.patch('/users/:userId/toggle-status', requireAdmin, AuthController.toggleUserStatus);
+router.post('/register', requireRole(['Admin', 'Regional Manager', 'Store Manager']), AuthController.register);
+router.get('/users', requireRole(['Admin', 'Regional Manager', 'Store Manager']), AuthController.getAllUsers);
+router.patch('/users/:userId/toggle-status', requireRole(['Admin', 'Regional Manager', 'Store Manager']), AuthController.toggleUserStatus);
 
 module.exports = router;

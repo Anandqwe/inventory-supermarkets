@@ -14,7 +14,8 @@ class TokenUtils {
       id: user._id,
       email: user.email,
       role: user.role,
-      fullName: user.fullName
+      fullName: user.fullName,
+      branch: user.branch?._id || user.branch // Include branch ID if available
     };
 
     return jwt.sign(payload, process.env.JWT_SECRET, {
@@ -43,10 +44,10 @@ class TokenUtils {
    */
   static extractToken(authHeader) {
     if (!authHeader) return null;
-    
+
     const parts = authHeader.split(' ');
     if (parts.length !== 2 || parts[0] !== 'Bearer') return null;
-    
+
     return parts[1];
   }
 

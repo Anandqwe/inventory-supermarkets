@@ -4,6 +4,7 @@
  */
 const redis = require('redis');
 const NodeCache = require('node-cache');
+const { logger } = require('../utils/logger');
 
 // Cache TTL configurations (in seconds)
 const CACHE_TTL = {
@@ -41,7 +42,7 @@ class CacheManager {
       useClones: false
     });
     this.isRedisConnected = false;
-    
+
     this.initRedis();
   }
 
@@ -63,12 +64,12 @@ class CacheManager {
         });
 
         this.redisClient.on('error', (err) => {
-          console.warn('⚠️ Redis error:', err.message);
+          logger.warn('Redis error', { error: err.message });
           this.isRedisConnected = false;
         });
 
         this.redisClient.on('connect', () => {
-          console.log('✅ Redis cache connected');
+          logger.info('✅ Redis cache connected');
           this.isRedisConnected = true;
         });
 
@@ -78,10 +79,10 @@ class CacheManager {
 
         await this.redisClient.connect();
       } else {
-        console.log('ℹ️ No Redis URL configured, using Node Cache');
+        logger.info('ℹ️ No Redis URL configured, using Node Cache');
       }
     } catch (error) {
-      console.warn('⚠️ Redis connection failed, using Node Cache fallback:', error.message);
+      logger.warn('Redis connection failed, using Node Cache fallback', { error: error.message });
       this.isRedisConnected = false;
     }
   }
@@ -95,7 +96,7 @@ class CacheManager {
           return JSON.parse(value);
         }
       }
-      
+
       // Fallback to Node Cache
       return this.nodeCache.get(key);
     } catch (error) {
@@ -110,7 +111,7 @@ class CacheManager {
       if (this.isRedisConnected && this.redisClient) {
         await this.redisClient.setEx(key, ttl, JSON.stringify(value));
       }
-      
+
       // Always set in Node Cache as backup
       this.nodeCache.set(key, value, ttl);
       return true;
@@ -144,16 +145,16 @@ class CacheManager {
           await this.redisClient.del(keys);
         }
       }
-      
+
       // For Node Cache, manually check keys
       const allKeys = this.nodeCache.keys();
       const matchingKeys = allKeys.filter(key => {
         const regex = new RegExp(pattern.replace('*', '.*'));
         return regex.test(key);
       });
-      
+
       matchingKeys.forEach(key => this.nodeCache.del(key));
-      
+
       return true;
     } catch (error) {
       console.warn('Cache pattern invalidation error:', error.message);

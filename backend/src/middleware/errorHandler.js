@@ -13,10 +13,10 @@ const errorRateLimit = new Map();
 const errorHandler = (err, req, res, next) => {
   // Track error rates to detect potential attacks
   trackErrorRate(req);
-  
+
   // Log error for audit trail
   logErrorForAudit(err, req);
-  
+
   // Enhanced logging for debugging
   console.error('=== ERROR DETAILS ===');
   console.error('Message:', err.message);
@@ -103,10 +103,10 @@ const errorHandler = (err, req, res, next) => {
 
   // Default server error - show details in test/dev environment
   const isDevelopmentOrTest = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
-  const errorMessage = isDevelopmentOrTest ? 
-    `${err.name || 'Error'}: ${sanitizedError.message}` : 
+  const errorMessage = isDevelopmentOrTest ?
+    `${err.name || 'Error'}: ${sanitizedError.message}` :
     'An unexpected error occurred';
-    
+
   return ResponseUtils.error(res, errorMessage);
 };
 
@@ -117,19 +117,19 @@ function trackErrorRate(req) {
   const ip = req.ip;
   const now = Date.now();
   const windowMs = 5 * 60 * 1000; // 5 minutes
-  
+
   if (!errorRateLimit.has(ip)) {
     errorRateLimit.set(ip, []);
   }
-  
+
   const errors = errorRateLimit.get(ip);
-  
+
   // Remove old errors outside the window
   const recentErrors = errors.filter(time => now - time < windowMs);
   recentErrors.push(now);
-  
+
   errorRateLimit.set(ip, recentErrors);
-  
+
   // Alert if too many errors from same IP
   if (recentErrors.length > 20) {
     logSecurityEvent({
@@ -149,11 +149,11 @@ async function logErrorForAudit(err, req) {
   if (process.env.NODE_ENV === 'test') {
     return;
   }
-  
+
   try {
     const action = 'system_error';
     const description = `Error occurred: ${err.name || 'Unknown'} - ${err.message}`;
-    
+
     await logSystemEvent(action, description, {
       errorName: err.name,
       errorCode: err.code,
@@ -177,7 +177,7 @@ async function logSecurityEvent(error, req) {
   if (process.env.NODE_ENV === 'test') {
     return;
   }
-  
+
   try {
     await logSystemEvent('security_event', error.message || 'Security policy violation', {
       errorType: error.type || error.name,
@@ -199,7 +199,7 @@ async function logSecurityEvent(error, req) {
 function sanitizeErrorMessage(err, req) {
   const isDevelopment = process.env.NODE_ENV === 'development';
   const isAuthenticated = req.user && req.user.userId;
-  
+
   // In production, never expose sensitive error details to unauthenticated users
   if (!isDevelopment && !isAuthenticated) {
     return {
@@ -207,7 +207,7 @@ function sanitizeErrorMessage(err, req) {
       code: 'GENERIC_ERROR'
     };
   }
-  
+
   // Even in development, sanitize certain sensitive errors
   const sensitivePatterns = [
     /password/i,
@@ -217,16 +217,16 @@ function sanitizeErrorMessage(err, req) {
     /connection string/i,
     /mongodb/i
   ];
-  
+
   const message = err.message || 'Unknown error';
-  
+
   if (sensitivePatterns.some(pattern => pattern.test(message))) {
     return {
       message: 'Configuration error',
       code: 'CONFIG_ERROR'
     };
   }
-  
+
   return {
     message: sanitizeErrorText(message),
     code: err.code || 'UNKNOWN_ERROR'
@@ -240,20 +240,20 @@ function sanitizeErrorText(text) {
   if (!text || typeof text !== 'string') {
     return 'Unknown error';
   }
-  
+
   // Remove potential file paths
   text = text.replace(/[A-Za-z]:\\[\w\\]+/g, '[PATH]');
   text = text.replace(/\/[\w\/]+/g, '[PATH]');
-  
+
   // Remove potential database connection strings
   text = text.replace(/mongodb:\/\/[^"\s]+/g, '[CONNECTION]');
-  
+
   // Remove potential IP addresses
   text = text.replace(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g, '[IP]');
-  
+
   // Remove potential port numbers in URLs
   text = text.replace(/:\d{4,5}/g, ':[PORT]');
-  
+
   return text;
 }
 
@@ -263,7 +263,7 @@ function sanitizeErrorText(text) {
 const notFoundHandler = (req, res) => {
   // Track 404s for potential scanning attempts
   track404Rate(req);
-  
+
   ResponseUtils.notFound(res, 'Resource not found');
 };
 
@@ -275,17 +275,17 @@ function track404Rate(req) {
   const now = Date.now();
   const windowMs = 10 * 60 * 1000; // 10 minutes
   const key = `404_${ip}`;
-  
+
   if (!errorRateLimit.has(key)) {
     errorRateLimit.set(key, []);
   }
-  
+
   const attempts = errorRateLimit.get(key);
   const recentAttempts = attempts.filter(time => now - time < windowMs);
   recentAttempts.push(now);
-  
+
   errorRateLimit.set(key, recentAttempts);
-  
+
   // Alert if potential scanning detected
   if (recentAttempts.length > 50) {
     logSecurityEvent({
@@ -356,21 +356,21 @@ class ValidationError extends AppError {
 const handleValidationErrors = (req, res, next) => {
   const { validationResult } = require('express-validator');
   const errors = validationResult(req);
-  
+
   if (!errors.isEmpty()) {
     // Track validation failures for potential attack detection
     trackValidationFailures(req);
-    
+
     // Sanitize error messages
     const sanitizedErrors = errors.array().map(error => ({
       field: error.param,
       message: sanitizeErrorText(error.msg),
       value: process.env.NODE_ENV === 'development' ? error.value : undefined
     }));
-    
+
     return ResponseUtils.validationError(res, sanitizedErrors);
   }
-  
+
   next();
 };
 
@@ -382,17 +382,17 @@ function trackValidationFailures(req) {
   const now = Date.now();
   const windowMs = 15 * 60 * 1000; // 15 minutes
   const key = `validation_${ip}`;
-  
+
   if (!errorRateLimit.has(key)) {
     errorRateLimit.set(key, []);
   }
-  
+
   const failures = errorRateLimit.get(key);
   const recentFailures = failures.filter(time => now - time < windowMs);
   recentFailures.push(now);
-  
+
   errorRateLimit.set(key, recentFailures);
-  
+
   // Alert if too many validation failures
   if (recentFailures.length > 30) {
     logSecurityEvent({
@@ -409,7 +409,7 @@ function trackValidationFailures(req) {
  */
 const requestLogger = (req, res, next) => {
   const start = Date.now();
-  
+
   // Enhanced logging with security context
   const logData = {
     method: req.method,
@@ -420,7 +420,7 @@ const requestLogger = (req, res, next) => {
     userId: req.user?.userId,
     sessionId: req.sessionID
   };
-  
+
   // Log suspicious patterns
   const suspiciousPatterns = [
     /\.\.\//, // Directory traversal
@@ -429,31 +429,31 @@ const requestLogger = (req, res, next) => {
     /exec\(/i, // Code execution
     /eval\(/i // Code evaluation
   ];
-  
-  const isSuspicious = suspiciousPatterns.some(pattern => 
+
+  const isSuspicious = suspiciousPatterns.some(pattern =>
     pattern.test(req.url) || pattern.test(JSON.stringify(req.body))
   );
-  
+
   if (isSuspicious) {
     logData.suspicious = true;
     logSecurityEvent({
       type: 'suspicious_request',
-      message: `Suspicious request pattern detected`,
+      message: 'Suspicious request pattern detected',
       url: req.url,
       body: req.body
     }, req);
   }
-  
+
   console.log(`${req.method} ${req.url} - ${req.ip} - ${new Date().toISOString()}`);
-  
+
   // Override res.json to log response
   const originalJson = res.json;
   res.json = function(data) {
     const duration = Date.now() - start;
-    
+
     // Enhanced response logging
     console.log(`${req.method} ${req.url} - ${res.statusCode} - ${duration}ms`);
-    
+
     // Log slow requests
     if (duration > 5000) {
       logSecurityEvent({
@@ -462,10 +462,10 @@ const requestLogger = (req, res, next) => {
         duration
       }, req);
     }
-    
+
     return originalJson.call(this, data);
   };
-  
+
   next();
 };
 
@@ -475,36 +475,36 @@ const requestLogger = (req, res, next) => {
 const securityHeaders = (req, res, next) => {
   // Remove X-Powered-By header
   res.removeHeader('X-Powered-By');
-  
+
   // Set comprehensive security headers
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  
+
   // Strict Transport Security (HTTPS only)
   if (req.secure) {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
   }
-  
+
   // Content Security Policy
-  res.setHeader('Content-Security-Policy', 
-    "default-src 'self'; " +
-    "script-src 'self' 'unsafe-inline'; " +
-    "style-src 'self' 'unsafe-inline'; " +
-    "img-src 'self' data: https:; " +
-    "connect-src 'self'; " +
-    "font-src 'self'; " +
-    "object-src 'none'; " +
-    "media-src 'self'; " +
-    "frame-src 'none';"
+  res.setHeader('Content-Security-Policy',
+    'default-src \'self\'; ' +
+    'script-src \'self\' \'unsafe-inline\'; ' +
+    'style-src \'self\' \'unsafe-inline\'; ' +
+    'img-src \'self\' data: https:; ' +
+    'connect-src \'self\'; ' +
+    'font-src \'self\'; ' +
+    'object-src \'none\'; ' +
+    'media-src \'self\'; ' +
+    'frame-src \'none\';'
   );
-  
+
   // Permissions Policy
-  res.setHeader('Permissions-Policy', 
+  res.setHeader('Permissions-Policy',
     'camera=(), microphone=(), geolocation=(), browsing-topics=()'
   );
-  
+
   next();
 };
 
@@ -522,7 +522,7 @@ const corsOptions = {
         return callback(null, true);
       }
     }
-    
+
     // Combine configured origins with demo origins
     const allowedOrigins = [
       'http://localhost:3000',
@@ -535,7 +535,7 @@ const corsOptions = {
       process.env.FRONTEND_URL,
       ...(DEMO_CONFIG.frontend?.corsOrigins || [])
     ].filter(Boolean); // Remove undefined values
-    
+
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
@@ -543,12 +543,12 @@ const corsOptions = {
       if ((DEMO_CONFIG.demoMode || process.env.NODE_ENV === 'test') && origin && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
         return callback(null, true);
       }
-      
+
       // In test mode, allow all origins
       if (process.env.NODE_ENV === 'test') {
         return callback(null, true);
       }
-      
+
       // Log unauthorized CORS attempts (but not during tests)
       if (process.env.NODE_ENV !== 'test') {
         console.warn(`CORS blocked request from origin: ${origin}`);
@@ -559,8 +559,8 @@ const corsOptions = {
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: [
-    'Content-Type', 
-    'Authorization', 
+    'Content-Type',
+    'Authorization',
     'X-Requested-With',
     'X-Correlation-ID',
     'Accept',

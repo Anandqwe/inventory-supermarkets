@@ -3,7 +3,8 @@
  */
 const express = require('express');
 const ProductController = require('../controllers/productController');
-const { authenticateToken, requireManager, requirePermission } = require('../middleware/auth');
+const { authenticateToken, requirePermission } = require('../middleware/auth');
+const { applyBranchScope } = require('../middleware/branchScope');
 
 const router = express.Router();
 
@@ -12,14 +13,14 @@ router.use(authenticateToken);
 
 // Product CRUD routes
 router.post('/', requirePermission('products.create'), ProductController.createProduct);
-router.get('/', requirePermission('products.read'), ProductController.getAllProducts);
-router.get('/search/:query', requirePermission('products.read'), ProductController.searchProduct);
+router.get('/', applyBranchScope('stockByBranch.branch'), requirePermission('products.read'), ProductController.getAllProducts);
+router.get('/search/:query', applyBranchScope('stockByBranch.branch'), requirePermission('products.read'), ProductController.searchProduct);
 router.get('/categories', requirePermission('products.read'), ProductController.getCategories);
 router.get('/categories/:category/subcategories', requirePermission('products.read'), ProductController.getSubcategories);
-router.get('/low-stock', requirePermission('products.read'), ProductController.getLowStockProducts);
+router.get('/low-stock', applyBranchScope('stockByBranch.branch'), requirePermission('products.read'), ProductController.getLowStockProducts);
 
 // CSV Import/Export routes
-router.get('/export', requirePermission('products.export'), ProductController.exportProducts);
+router.get('/export', applyBranchScope('stockByBranch.branch'), requirePermission('products.export'), ProductController.exportProducts);
 router.post('/import', requirePermission('products.create'), ProductController.importProducts);
 
 // Bulk operations

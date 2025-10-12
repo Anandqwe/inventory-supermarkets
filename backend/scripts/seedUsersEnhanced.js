@@ -22,7 +22,7 @@ const enhancedUsers = [
     branch: null,
     phone: '+91 98200 11111',
     isActive: true,
-    permissions: ['*'], // All permissions
+    permissions: [], // Will be set by setDefaultPermissions in User model
     metadata: {
       employeeId: 'EMP001',
       joinDate: new Date('2023-01-15'),
@@ -43,15 +43,7 @@ const enhancedUsers = [
     branch: null, // Access to all branches
     phone: '+91 98200 22222',
     isActive: true,
-    permissions: [
-      'view_all_branches',
-      'view_all_reports',
-      'manage_inventory_all',
-      'manage_transfers',
-      'view_financial_reports',
-      'make_sales',
-      'manage_products_all'
-    ]
+    permissions: [] // Will be set by setDefaultPermissions in User model
   },
 
   // 3. Store Managers (3 users - one per branch)
@@ -63,18 +55,7 @@ const enhancedUsers = [
     branchCode: 'AW001', // Andheri West - will be resolved to branch ID
     phone: '+91 98200 33331',
     isActive: true,
-    permissions: [
-      'view_products',
-      'manage_products',
-      'make_sales',
-      'view_sales',
-      'manage_inventory',
-      'manage_staff',
-      'view_reports',
-      'view_financial_reports',
-      'manage_purchase_orders',
-      'approve_transfers'
-    ]
+    permissions: [] // Will be set by setDefaultPermissions in User model
   },
   {
     firstName: 'Sneha', lastName: 'Desai',
@@ -84,18 +65,7 @@ const enhancedUsers = [
     branchCode: 'VP002', // Vile Parle East
     phone: '+91 98200 33332',
     isActive: true,
-    permissions: [
-      'view_products',
-      'manage_products',
-      'make_sales',
-      'view_sales',
-      'manage_inventory',
-      'manage_staff',
-      'view_reports',
-      'view_financial_reports',
-      'manage_purchase_orders',
-      'approve_transfers'
-    ]
+    permissions: [] // Will be set by setDefaultPermissions in User model
   },
   {
     firstName: 'Vikram', lastName: 'Singh',
@@ -105,18 +75,7 @@ const enhancedUsers = [
     branchCode: 'BW003', // Bandra West
     phone: '+91 98200 33333',
     isActive: true,
-    permissions: [
-      'view_products',
-      'manage_products',
-      'make_sales',
-      'view_sales',
-      'manage_inventory',
-      'manage_staff',
-      'view_reports',
-      'view_financial_reports',
-      'manage_purchase_orders',
-      'approve_transfers'
-    ]
+    permissions: [] // Will be set by setDefaultPermissions in User model
   },
 
   // 4. Inventory Managers (3 users - one per branch)
@@ -128,15 +87,7 @@ const enhancedUsers = [
     branchCode: 'AW001',
     phone: '+91 98200 44441',
     isActive: true,
-    permissions: [
-      'view_products',
-      'manage_inventory',
-      'manage_stock_adjustments',
-      'manage_purchase_orders',
-      'request_transfers',
-      'view_reports',
-      'manage_reorder_points'
-    ]
+    permissions: [] // Will be set by setDefaultPermissions in User model
   },
   {
     firstName: 'Pooja', lastName: 'Joshi',
@@ -146,15 +97,7 @@ const enhancedUsers = [
     branchCode: 'VP002',
     phone: '+91 98200 44442',
     isActive: true,
-    permissions: [
-      'view_products',
-      'manage_inventory',
-      'manage_stock_adjustments',
-      'manage_purchase_orders',
-      'request_transfers',
-      'view_reports',
-      'manage_reorder_points'
-    ]
+    permissions: [] // Will be set by setDefaultPermissions in User model
   },
   {
     firstName: 'Arjun', lastName: 'Nair',
@@ -164,15 +107,7 @@ const enhancedUsers = [
     branchCode: 'BW003',
     phone: '+91 98200 44443',
     isActive: true,
-    permissions: [
-      'view_products',
-      'manage_inventory',
-      'manage_stock_adjustments',
-      'manage_purchase_orders',
-      'request_transfers',
-      'view_reports',
-      'manage_reorder_points'
-    ]
+    permissions: [] // Will be set by setDefaultPermissions in User model
   },
 
   // 5. Cashiers/Sales Associates (9 users - 3 per branch)
@@ -185,7 +120,7 @@ const enhancedUsers = [
     branchCode: 'AW001',
     phone: '+91 98200 55541',
     isActive: true,
-    permissions: ['make_sales', 'view_products', 'view_own_sales']
+    permissions: [] // Will be set by setDefaultPermissions in User model
   },
   {
     firstName: 'Deepak', lastName: 'Gupta',
@@ -195,7 +130,7 @@ const enhancedUsers = [
     branchCode: 'AW001',
     phone: '+91 98200 55542',
     isActive: true,
-    permissions: ['make_sales', 'view_products', 'view_own_sales']
+    permissions: [] // Will be set by setDefaultPermissions in User model
   },
   {
     firstName: 'Kavita', lastName: 'Reddy',
@@ -205,7 +140,7 @@ const enhancedUsers = [
     branchCode: 'AW001',
     phone: '+91 98200 55543',
     isActive: true,
-    permissions: ['make_sales', 'view_products', 'view_own_sales']
+    permissions: [] // Will be set by setDefaultPermissions in User model
   },
 
   // Vile Parle East Cashiers
@@ -217,7 +152,7 @@ const enhancedUsers = [
     branchCode: 'VP002',
     phone: '+91 98200 55551',
     isActive: true,
-    permissions: ['make_sales', 'view_products', 'view_own_sales']
+    permissions: [] // Will be set by setDefaultPermissions in User model
   },
   {
     firstName: 'Meena', lastName: 'Shah',
@@ -227,7 +162,7 @@ const enhancedUsers = [
     branchCode: 'VP002',
     phone: '+91 98200 55552',
     isActive: true,
-    permissions: ['make_sales', 'view_products', 'view_own_sales']
+    permissions: [] // Will be set by setDefaultPermissions in User model
   },
   {
     firstName: 'Ravi', lastName: 'Iyer',
@@ -237,7 +172,7 @@ const enhancedUsers = [
     branchCode: 'VP002',
     phone: '+91 98200 55553',
     isActive: true,
-    permissions: ['make_sales', 'view_products', 'view_own_sales']
+    permissions: [] // Will be set by setDefaultPermissions in User model
   },
 
   // Bandra West Cashiers
@@ -249,7 +184,7 @@ const enhancedUsers = [
     branchCode: 'BW003',
     phone: '+91 98200 55561',
     isActive: true,
-    permissions: ['make_sales', 'view_products', 'view_own_sales']
+    permissions: [] // Will be set by setDefaultPermissions in User model
   },
   {
     firstName: 'Sanjay', lastName: 'Malhotra',
@@ -259,7 +194,7 @@ const enhancedUsers = [
     branchCode: 'BW003',
     phone: '+91 98200 55562',
     isActive: true,
-    permissions: ['make_sales', 'view_products', 'view_own_sales']
+    permissions: [] // Will be set by setDefaultPermissions in User model
   },
   {
     firstName: 'Divya', lastName: 'Rao',
@@ -269,10 +204,10 @@ const enhancedUsers = [
     branchCode: 'BW003',
     phone: '+91 98200 55563',
     isActive: true,
-    permissions: ['make_sales', 'view_products', 'view_own_sales']
+    permissions: [] // Will be set by setDefaultPermissions in User model
   },
 
-  // 6. Viewer/Auditor (1 user)
+  // 6. Viewers/Auditors (2 users)
   {
     firstName: 'Anita', lastName: 'Verma',
     email: 'auditor@mumbaisupermart.com',
@@ -281,15 +216,17 @@ const enhancedUsers = [
     branch: null,
     phone: '+91 98200 66666',
     isActive: true,
-    permissions: [
-      'view_all_branches',
-      'view_products',
-      'view_sales',
-      'view_inventory',
-      'view_reports',
-      'view_financial_reports',
-      'view_audit_logs'
-    ]
+    permissions: [] // Will be set by setDefaultPermissions in User model
+  },
+  {
+    firstName: 'Rajesh', lastName: 'Kapoor',
+    email: 'viewer@mumbaisupermart.com',
+    password: defaultPassword,
+    role: 'Viewer',
+    branch: null,
+    phone: '+91 98200 66667',
+    isActive: true,
+    permissions: [] // Will be set by setDefaultPermissions in User model
   }
 ];
 
@@ -302,7 +239,7 @@ const seedEnhancedUsers = async () => {
     if (existingUsers.length > 1) { // More than default admin
       console.log('⚠️  Warning: Users already exist in database');
       console.log(`📊 Found ${existingUsers.length} existing users`);
-      
+
       const readline = require('readline').createInterface({
         input: process.stdin,
         output: process.stdout
@@ -311,7 +248,7 @@ const seedEnhancedUsers = async () => {
       const answer = await new Promise(resolve => {
         readline.question('\n❓ Do you want to DELETE all existing users (except system admin) and create new ones? (yes/no): ', resolve);
       });
-      
+
       readline.close();
 
       if (answer.toLowerCase() !== 'yes') {
@@ -328,7 +265,7 @@ const seedEnhancedUsers = async () => {
     // Fetch all branches to map branch codes
     const branches = await Branch.find();
     console.log(`📍 Found ${branches.length} branches in database`);
-    
+
     if (branches.length === 0) {
       console.log('❌ Error: No branches found! Please run seedBranchesMumbai.js first');
       process.exit(1);
@@ -343,7 +280,7 @@ const seedEnhancedUsers = async () => {
 
     // Create users (password will be hashed by User model's pre-save hook)
     console.log('📝 Creating 18 enhanced users...\n');
-    
+
     const createdUsers = [];
     const roleCount = {
       'Admin': 0,
@@ -370,11 +307,11 @@ const seedEnhancedUsers = async () => {
       const user = await User.create(userData);
       createdUsers.push(user);
       roleCount[user.role]++;
-      
-      const branchInfo = user.branch ? 
-        `Branch: ${branches.find(b => b._id.equals(user.branch))?.code || 'Unknown'}` : 
+
+      const branchInfo = user.branch ?
+        `Branch: ${branches.find(b => b._id.equals(user.branch))?.code || 'Unknown'}` :
         'Branch: All/None';
-      
+
       console.log(`✅ ${user.role.padEnd(18)} - ${`${user.firstName} ${user.lastName}`.padEnd(20)} - ${user.email}`);
       console.log(`   ${branchInfo}`);
     }
@@ -400,6 +337,7 @@ const seedEnhancedUsers = async () => {
     console.log('   Store Manager (Andheri): manager.andheri@mumbaisupermart.com');
     console.log('   Inventory Manager (Bandra): inventory.bandra@mumbaisupermart.com');
     console.log('   Cashier (Vile Parle): cashier1.vileparle@mumbaisupermart.com');
+    console.log('   Viewer: viewer@mumbaisupermart.com');
     console.log('   Auditor: auditor@mumbaisupermart.com');
     console.log('');
     console.log('💡 Next Steps:');
@@ -418,7 +356,7 @@ const seedEnhancedUsers = async () => {
 // Run if called directly
 if (require.main === module) {
   const database = require('../src/config/database');
-  
+
   database.connect()
     .then(async () => {
       await seedEnhancedUsers();

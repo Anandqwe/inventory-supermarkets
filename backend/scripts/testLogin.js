@@ -14,7 +14,7 @@ async function testAdminLogin() {
 
     // Find admin user
     const admin = await User.findOne({ email: 'admin@mumbaisupermart.com' }).select('+password');
-    
+
     if (!admin) {
       console.log('❌ Admin user not found!');
       process.exit(1);
@@ -29,7 +29,7 @@ async function testAdminLogin() {
     // Test password
     const testPassword = 'Mumbai@123456';
     console.log('\n🧪 Testing password:', testPassword);
-    
+
     // Method 1: Using bcrypt directly
     const isValidBcrypt = await bcrypt.compare(testPassword, admin.password);
     console.log('   bcrypt.compare result:', isValidBcrypt);

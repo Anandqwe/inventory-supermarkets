@@ -50,10 +50,10 @@ const createIndexes = async () => {
     await Product.collection.createIndex({ stockQuantity: 1 });
     await Product.collection.createIndex({ price: 1 });
     await Product.collection.createIndex({ createdAt: -1 });
-    await Product.collection.createIndex({ 
-      categoryId: 1, 
-      brandId: 1, 
-      isActive: 1 
+    await Product.collection.createIndex({
+      categoryId: 1,
+      brandId: 1,
+      isActive: 1
     }); // Compound index for filtering
 
     // Sale indexes
@@ -64,9 +64,9 @@ const createIndexes = async () => {
     await Sale.collection.createIndex({ saleDate: -1 });
     await Sale.collection.createIndex({ status: 1 });
     await Sale.collection.createIndex({ paymentMethod: 1 });
-    await Sale.collection.createIndex({ 
-      branchId: 1, 
-      saleDate: -1 
+    await Sale.collection.createIndex({
+      branchId: 1,
+      saleDate: -1
     }); // Compound index for branch sales queries
     await Sale.collection.createIndex({
       saleDate: -1,
@@ -238,7 +238,7 @@ const performanceMonitor = {
       mongoose.set('debug', (collectionName, method, query, doc) => {
         const start = Date.now();
         console.log(`🔍 Query: ${collectionName}.${method}`, query);
-        
+
         // Log execution time (simplified for demo)
         setTimeout(() => {
           const duration = Date.now() - start;
@@ -257,7 +257,7 @@ const performanceMonitor = {
     try {
       const db = mongoose.connection.db;
       const stats = await db.stats();
-      
+
       return {
         collections: stats.collections,
         dataSize: stats.dataSize,

@@ -48,40 +48,40 @@ const adjustmentSchema = new mongoose.Schema({
     required: true
   },
   items: [adjustmentItemSchema],
-  
+
   type: {
     type: String,
     enum: ['increase', 'decrease', 'correction'],
     required: true
   },
-  
+
   reason: {
     type: String,
     enum: ['damage', 'theft', 'expiry', 'found', 'count_error', 'other'],
     required: true
   },
-  
+
   notes: {
     type: String,
     maxlength: [500, 'Notes cannot exceed 500 characters']
   },
-  
+
   adjustmentDate: {
     type: Date,
     default: Date.now
   },
-  
+
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
   },
-  
+
   approvedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   },
-  
+
   status: {
     type: String,
     enum: ['pending', 'approved', 'rejected'],
@@ -127,17 +127,17 @@ adjustmentSchema.statics.generateAdjustmentNumber = async function() {
   const year = today.getFullYear();
   const month = String(today.getMonth() + 1).padStart(2, '0');
   const prefix = `ADJ${year}${month}`;
-  
+
   const lastAdjustment = await this.findOne({
     adjustmentNumber: { $regex: `^${prefix}` }
   }).sort({ adjustmentNumber: -1 });
-  
+
   let nextNumber = 1;
   if (lastAdjustment) {
     const lastNumber = parseInt(lastAdjustment.adjustmentNumber.substring(prefix.length));
     nextNumber = lastNumber + 1;
   }
-  
+
   return `${prefix}${String(nextNumber).padStart(4, '0')}`;
 };
 

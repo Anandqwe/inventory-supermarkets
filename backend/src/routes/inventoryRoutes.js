@@ -4,8 +4,16 @@ const router = express.Router();
 // Controllers
 const InventoryController = require('../controllers/inventoryController');
 
-// Middleware
-const { authenticateToken, requireManager } = require('../middleware/auth');
+// Middleware & Permissions
+const {
+  authenticateToken,
+  requirePermission,
+  requireAnyPermission
+} = require('../middleware/auth');
+const { applyBranchScope } = require('../middleware/branchScope');
+const { PERMISSIONS } = require('../../../shared/permissions');
+
+router.use(authenticateToken);
 
 /**
  * @route   POST /api/inventory/adjustments
@@ -13,8 +21,11 @@ const { authenticateToken, requireManager } = require('../middleware/auth');
  * @access  Private (Manager+ only)
  */
 router.post('/adjustments',
-  authenticateToken,
-  requireManager,
+  requireAnyPermission([
+    PERMISSIONS.INVENTORY.ADJUST,
+    PERMISSIONS.INVENTORY.UPDATE,
+    PERMISSIONS.INVENTORY.CREATE
+  ]),
   InventoryController.createAdjustment
 );
 
@@ -24,8 +35,8 @@ router.post('/adjustments',
  * @access  Private (Manager+ only)
  */
 router.get('/adjustments',
-  authenticateToken,
-  requireManager,
+  applyBranchScope({ field: 'branch', param: 'branch', allowMultiple: true }),
+  requirePermission(PERMISSIONS.INVENTORY.READ),
   InventoryController.getAdjustments
 );
 
@@ -35,8 +46,7 @@ router.get('/adjustments',
  * @access  Private (Manager+ only)
  */
 router.post('/transfers',
-  authenticateToken,
-  requireManager,
+  requirePermission(PERMISSIONS.INVENTORY.TRANSFER),
   InventoryController.createTransfer
 );
 
@@ -46,8 +56,8 @@ router.post('/transfers',
  * @access  Private (Manager+ only)
  */
 router.get('/transfers',
-  authenticateToken,
-  requireManager,
+  applyBranchScope({ param: 'branch', allowMultiple: true, attachProperty: null, enforceForScopedRoles: false }),
+  requirePermission(PERMISSIONS.INVENTORY.READ),
   InventoryController.getTransfers
 );
 
@@ -57,8 +67,10 @@ router.get('/transfers',
  * @access  Private (Manager+ only)
  */
 router.put('/transfers/:id/status',
-  authenticateToken,
-  requireManager,
+  requireAnyPermission([
+    PERMISSIONS.INVENTORY.TRANSFER,
+    PERMISSIONS.INVENTORY.UPDATE
+  ]),
   InventoryController.updateTransferStatus
 );
 
@@ -68,8 +80,8 @@ router.put('/transfers/:id/status',
  * @access  Private (Manager+ only)
  */
 router.get('/summary',
-  authenticateToken,
-  requireManager,
+  applyBranchScope({ field: 'branch', param: 'branch', allowMultiple: true }),
+  requirePermission(PERMISSIONS.INVENTORY.READ),
   InventoryController.getInventorySummary
 );
 
@@ -79,8 +91,8 @@ router.get('/summary',
  * @access  Private (Manager+ only)
  */
 router.get('/low-stock',
-  authenticateToken,
-  requireManager,
+  applyBranchScope({ field: 'branch', param: 'branch', allowMultiple: true }),
+  requirePermission(PERMISSIONS.INVENTORY.READ),
   InventoryController.getLowStockItems
 );
 
