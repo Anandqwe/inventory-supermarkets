@@ -17,6 +17,7 @@
     "seed:master": "node scripts/seedMasterData.js",
     "seed": "npm run seed:master",
     "validate:data": "node scripts/validateData.js",
+    "clean:categories": "node scripts/removeDuplicateCategories.js",
     "migrate:permissions": "node scripts/migrateUserPermissions.js",
     "test:rbac": "node scripts/testRBAC.js",
     "test": "jest --detectOpenHandles",

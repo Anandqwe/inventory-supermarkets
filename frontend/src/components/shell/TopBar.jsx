@@ -46,8 +46,8 @@ const TopBar = ({ user, onMenuClick, onLogout }) => {
           {/* Logo and title - Responsive text */}
           <div className="flex items-center min-w-0">
             <h1 className="text-base sm:text-lg md:text-xl font-semibold text-slate-900 dark:text-amoled-primary truncate">
-              <span className="lg:hidden">Inventory</span>
-              <span className="hidden lg:inline">Supermarket Inventory System</span>
+              <span className="lg:hidden">Mumbai Supermart</span>
+              <span className="hidden lg:inline">Mumbai Supermart - Inventory System</span>
             </h1>
           </div>
         </div>

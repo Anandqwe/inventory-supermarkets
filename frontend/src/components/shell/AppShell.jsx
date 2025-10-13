@@ -52,7 +52,7 @@ const AppShell = ({ children, className }) => {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex flex-col sm:flex-row justify-between items-center text-sm text-slate-500 dark:text-amoled-muted">
               <div className="flex items-center space-x-4">
-                <span>© 2024 Supermarket Inventory System</span>
+                <span>© 2024 Mumbai Supermart</span>
                 <span>•</span>
                 <span>Version 1.0.0</span>
               </div>

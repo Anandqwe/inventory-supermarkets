@@ -228,7 +228,7 @@ function Dashboard() {
   const kpiStats = [
     {
       title: 'Revenue',
-      value: `₹${(data.kpis.totalRevenue || 0).toLocaleString('en-IN')}`,
+      value: `₹${(data.kpis.totalRevenue || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`,
       icon: CurrencyRupeeIcon,
       trend: `${data.kpis.totalSales || 0} sales`,
       trendType: 'increase',
@@ -548,58 +548,155 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* Enhanced KPI Grid - Fully Responsive */}
-      <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
-        {kpiStats.map((stat, index) => (
-          <Card
-            key={index}
-            className={cn(
-              "p-4 cursor-pointer transition-all hover:shadow-lg hover:scale-105",
-              "border-l-4 flex flex-col",
-              stat.color === 'emerald' && "border-l-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/50",
-              stat.color === 'blue' && "border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/50",
-              stat.color === 'purple' && "border-l-purple-500 bg-purple-50/50 dark:bg-purple-950/50",
-              stat.color === 'amber' && "border-l-amber-500 bg-amber-50/50 dark:bg-amber-950/50",
-              stat.color === 'cyan' && "border-l-cyan-500 bg-cyan-50/50 dark:bg-cyan-950/50",
-              stat.color === 'red' && "border-l-red-500 bg-red-50/50 dark:bg-red-950/50",
-              stat.color === 'green' && "border-l-green-500 bg-green-50/50 dark:bg-green-950/50"
-            )}
-            onClick={stat.onClick}
-          >
-            {/* Header with Icon and Title - Fixed Height */}
-            <div className="flex items-start gap-2 h-10 mb-2">
-              <stat.icon className="h-4 w-4 text-surface-600 dark:text-surface-400 flex-shrink-0 mt-0.5" />
-              <span className="text-sm font-semibold text-surface-900 dark:text-surface-100 line-clamp-2 leading-tight">
-                {stat.title}
-              </span>
-            </div>
-            
-            {/* Main Value - Fixed Position */}
-            <div className="text-2xl font-bold text-surface-900 dark:text-surface-100 leading-tight mb-3">
-              {stat.value}
-            </div>
-            
-            {/* Bottom Section with Badge and Comparison - Fixed Height */}
-            <div className="space-y-1 mt-auto">
-              <Badge
-                variant={
-                  stat.trendType === 'increase' ? 'success' :
-                  stat.trendType === 'decrease' ? 'destructive' :
-                  stat.trendType === 'warning' ? 'warning' : 'secondary'
-                }
-                className="text-xs inline-flex items-center"
-              >
-                {stat.trendType === 'increase' && <ArrowUpIcon className="h-2.5 w-2.5 mr-1" />}
-                {stat.trendType === 'decrease' && <ArrowDownIcon className="h-2.5 w-2.5 mr-1" />}
-                <span className="truncate">{stat.trend}</span>
-              </Badge>
-              
-              <div className="text-xs text-surface-500 dark:text-surface-400 truncate h-4 leading-4">
-                {stat.comparison}
+      {/* Modern Professional KPI Grid */}
+      <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        {kpiStats.map((stat, index) => {
+          // Define color classes for each stat
+          const colorClasses = {
+            emerald: {
+              gradient: 'from-emerald-500 to-emerald-600',
+              icon: 'text-emerald-600',
+              bg: 'bg-emerald-50 dark:bg-emerald-950/30',
+              ring: 'ring-emerald-200 dark:ring-emerald-800'
+            },
+            blue: {
+              gradient: 'from-blue-500 to-blue-600',
+              icon: 'text-blue-600',
+              bg: 'bg-blue-50 dark:bg-blue-950/30',
+              ring: 'ring-blue-200 dark:ring-blue-800'
+            },
+            purple: {
+              gradient: 'from-purple-500 to-purple-600',
+              icon: 'text-purple-600',
+              bg: 'bg-purple-50 dark:bg-purple-950/30',
+              ring: 'ring-purple-200 dark:ring-purple-800'
+            },
+            amber: {
+              gradient: 'from-amber-500 to-amber-600',
+              icon: 'text-amber-600',
+              bg: 'bg-amber-50 dark:bg-amber-950/30',
+              ring: 'ring-amber-200 dark:ring-amber-800'
+            },
+            cyan: {
+              gradient: 'from-cyan-500 to-cyan-600',
+              icon: 'text-cyan-600',
+              bg: 'bg-cyan-50 dark:bg-cyan-950/30',
+              ring: 'ring-cyan-200 dark:ring-cyan-800'
+            },
+            red: {
+              gradient: 'from-red-500 to-red-600',
+              icon: 'text-red-600',
+              bg: 'bg-red-50 dark:bg-red-950/30',
+              ring: 'ring-red-200 dark:ring-red-800'
+            },
+            green: {
+              gradient: 'from-green-500 to-green-600',
+              icon: 'text-green-600',
+              bg: 'bg-green-50 dark:bg-green-950/30',
+              ring: 'ring-green-200 dark:ring-green-800'
+            }
+          };
+
+          const colors = colorClasses[stat.color] || colorClasses.blue;
+
+          return (
+            <div
+              key={index}
+              onClick={stat.onClick}
+              className={cn(
+                "group relative overflow-hidden rounded-xl",
+                "bg-white dark:bg-surface-800",
+                "border border-surface-200 dark:border-surface-700",
+                "p-5 cursor-pointer",
+                "transition-all duration-300",
+                "hover:shadow-2xl hover:-translate-y-1",
+                "hover:border-surface-300 dark:hover:border-surface-600"
+              )}
+            >
+              {/* Gradient Bar at Top */}
+              <div className={cn(
+                "absolute top-0 left-0 right-0 h-1",
+                "bg-gradient-to-r", colors.gradient
+              )} />
+
+              {/* Content */}
+              <div className="flex flex-col space-y-3">
+                {/* Icon and Title */}
+                <div className="flex items-center justify-between">
+                  <div className={cn(
+                    "p-2 rounded-lg",
+                    colors.bg
+                  )}>
+                    <stat.icon className={cn("h-5 w-5", colors.icon)} />
+                  </div>
+                  <ArrowRightIcon className="h-4 w-4 text-surface-300 dark:text-surface-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+
+                {/* Title */}
+                <div>
+                  <p className="text-sm font-medium text-surface-600 dark:text-surface-400">
+                    {stat.title}
+                  </p>
+                </div>
+
+                {/* Value */}
+                <div className="min-h-[2.5rem]">
+                  <p className="text-xl lg:text-2xl font-bold text-surface-900 dark:text-surface-100 break-words leading-tight">
+                    {stat.value}
+                  </p>
+                </div>
+
+                {/* Trend Info */}
+                <div className="flex items-center justify-between pt-2 border-t border-surface-100 dark:border-surface-700">
+                  <div className="flex items-center gap-1.5">
+                    {stat.trendType === 'increase' && (
+                      <>
+                        <div className="p-0.5 rounded bg-green-100 dark:bg-green-900/30">
+                          <ArrowUpIcon className="h-3 w-3 text-green-600 dark:text-green-400" />
+                        </div>
+                        <span className="text-xs font-medium text-green-600 dark:text-green-400">
+                          {stat.trend}
+                        </span>
+                      </>
+                    )}
+                    {stat.trendType === 'decrease' && (
+                      <>
+                        <div className="p-0.5 rounded bg-red-100 dark:bg-red-900/30">
+                          <ArrowDownIcon className="h-3 w-3 text-red-600 dark:text-red-400" />
+                        </div>
+                        <span className="text-xs font-medium text-red-600 dark:text-red-400">
+                          {stat.trend}
+                        </span>
+                      </>
+                    )}
+                    {stat.trendType === 'warning' && (
+                      <>
+                        <div className="p-0.5 rounded bg-amber-100 dark:bg-amber-900/30">
+                          <ExclamationTriangleIcon className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                        </div>
+                        <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                          {stat.trend}
+                        </span>
+                      </>
+                    )}
+                    {stat.trendType === 'neutral' && (
+                      <span className="text-xs font-medium text-surface-500 dark:text-surface-400">
+                        {stat.trend}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Comparison Text */}
+                <div>
+                  <p className="text-xs text-surface-500 dark:text-surface-400">
+                    {stat.comparison}
+                  </p>
+                </div>
               </div>
             </div>
-          </Card>
-        ))}
+          );
+        })}
       </div>
 
       {/* Charts Grid - Responsive */}

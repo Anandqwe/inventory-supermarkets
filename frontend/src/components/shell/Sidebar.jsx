@@ -97,7 +97,7 @@ const Sidebar = ({ isOpen, onClose, lowStockCount = 0, onLogout }) => {
               </div>
               <div className="ml-3">
                 <h1 className="text-lg font-semibold text-surface-900 dark:text-amoled-primary">
-                  Inventory
+                  Mumbai Supermart
                 </h1>
                 <p className="text-xs text-surface-500 dark:text-amoled-muted">
                   Management System
@@ -219,7 +219,7 @@ const Sidebar = ({ isOpen, onClose, lowStockCount = 0, onLogout }) => {
               </div>
               <div className="ml-3 min-w-0 flex-1">
                 <h1 className="text-lg font-semibold text-surface-900 dark:text-amoled-primary truncate">
-                  Inventory
+                  Mumbai Supermart
                 </h1>
                 <p className="text-xs text-surface-500 dark:text-amoled-muted truncate">
                   Management System

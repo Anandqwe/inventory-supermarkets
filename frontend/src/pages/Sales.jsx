@@ -217,7 +217,13 @@ function Sales() {
   // Data Processing
   const products = productsData?.data?.products || [];
   const totalProducts = productsData?.data?.pagination?.totalItems || 0;
-  const categories = categoriesData?.data || [];
+  
+  // Filter unique active categories (remove duplicates by name)
+  const allCategories = categoriesData?.data || [];
+  const categories = allCategories.filter((category, index, self) => 
+    category.isActive !== false && 
+    index === self.findIndex(c => c.name === category.name)
+  ).sort((a, b) => a.name.localeCompare(b.name));
   
   // Extract branches from the response
   const branches = branchesData?.branches || [];

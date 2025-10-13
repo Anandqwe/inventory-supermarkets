@@ -74,18 +74,6 @@ const Login = () => {
     }
   };
 
-  const demoCredentials = [
-    { role: 'Admin', email: 'admin@mumbaisupermart.com', password: 'Mumbai@123456' },
-    { role: 'Regional Manager', email: 'regional.manager@mumbaisupermart.com', password: 'Mumbai@123456' },
-    { role: 'Store Manager', email: 'manager.andheri@mumbaisupermart.com', password: 'Mumbai@123456' },
-    { role: 'Inventory Manager', email: 'inventory.andheri@mumbaisupermart.com', password: 'Mumbai@123456' },
-    { role: 'Cashier', email: 'cashier1.andheri@mumbaisupermart.com', password: 'Mumbai@123456' }
-  ];
-
-  const fillDemo = (email, password) => {
-    setFormData({ email, password });
-  };
-
   return (
     <div className="min-h-screen bg-surface-50 dark:bg-black flex flex-col">
       {/* Header with theme toggle */}
@@ -96,8 +84,11 @@ const Login = () => {
           </div>
           <div className="ml-3">
             <h1 className="text-lg font-semibold text-surface-900 dark:text-surface-100">
-              Inventory System
+              Mumbai Supermart
             </h1>
+            <p className="text-xs text-surface-500 dark:text-surface-400">
+              Management System
+            </p>
           </div>
         </div>
         <ThemeToggle />
@@ -115,7 +106,7 @@ const Login = () => {
               Welcome back
             </h2>
             <p className="mt-2 text-center text-sm text-surface-600 dark:text-surface-400">
-              Sign in to your supermarket inventory account
+              Sign in to Mumbai Supermart account
             </p>
           </div>
 
@@ -182,45 +173,10 @@ const Login = () => {
             </form>
           </Card>
 
-          {/* Demo credentials */}
-          <Card className="p-6">
-            <h3 className="text-sm font-medium text-surface-900 dark:text-surface-100 mb-4 text-center">
-              Demo Credentials
-            </h3>
-            <p className="text-xs text-surface-600 dark:text-surface-400 mb-4 text-center">
-              Click any credential below to automatically fill the form:
-            </p>
-            <div className="space-y-2">
-              {demoCredentials.map((cred, index) => (
-                <button
-                  key={index}
-                  type="button"
-                  onClick={() => fillDemo(cred.email, cred.password)}
-                  disabled={loading}
-                  className="w-full text-left px-4 py-3 text-sm bg-surface-50 dark:bg-surface-800 hover:bg-surface-100 dark:hover:bg-surface-700 rounded-lg transition-colors border border-surface-200 dark:border-surface-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <span className="font-medium text-primary-600 dark:text-primary-400">
-                        {cred.role}
-                      </span>
-                      <div className="text-xs text-surface-600 dark:text-surface-400 mt-1">
-                        {cred.email}
-                      </div>
-                    </div>
-                    <div className="text-xs text-surface-500 dark:text-surface-500">
-                      Click to fill
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </Card>
-
           {/* Footer */}
           <div className="text-center">
             <p className="text-xs text-surface-500 dark:text-surface-400">
-              Supermarket Inventory & Sales Management System
+              Mumbai Supermart - Inventory & Sales Management System
             </p>
           </div>
         </div>

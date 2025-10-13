@@ -254,7 +254,13 @@ function Products() {
   // Data processing
   const products = productsData?.data?.products || [];
   const totalProducts = productsData?.data?.pagination?.totalItems || 0;
-  const categories = categoriesData?.data || [];
+  
+  // Filter unique active categories (remove duplicates by name)
+  const allCategories = categoriesData?.data || [];
+  const categories = allCategories.filter((category, index, self) => 
+    category.isActive !== false && 
+    index === self.findIndex(c => c.name === category.name)
+  ).sort((a, b) => a.name.localeCompare(b.name));
 
   // DataTable columns configuration
   const columns = useMemo(() => [
