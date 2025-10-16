@@ -192,25 +192,7 @@ VITE_APP_NAME=Inventory Management
 VITE_APP_VERSION=1.0.0
 ```
 
-## 📱 Application Screenshots
-
-### Dashboard
-![Dashboard](docs/screenshots/dashboard.png)
-*Real-time business metrics and analytics*
-
-### Product Management
-![Products](docs/screenshots/products.png)
-*Comprehensive product catalog with search and filters*
-
-### Sales Interface
-![Sales](docs/screenshots/sales.png)
-*Intuitive point-of-sale transaction processing*
-
-### Reports
-![Reports](docs/screenshots/reports.png)
-*Professional PDF reports with charts and analytics*
-
-## 🏗️ System Architecture
+## System Architecture
 
 ```mermaid
 graph TB
@@ -278,7 +260,7 @@ graph TB
 - `GET /api/reports/inventory` - Inventory reports
 - `POST /api/reports/email` - Email report delivery
 
-For complete API documentation, visit: [API Docs](backend/docs/API.md)
+For complete API documentation, visit the Swagger UI at: http://localhost:5000/api-docs
 
 ## 👥 User Roles & Permissions
 
@@ -403,7 +385,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Support & Contact
 
 - **Email**: support@inventory.com
-- **Documentation**: [Setup Guide](docs/SETUP.md) | [Architecture](docs/ARCHITECTURE.md)
 - **Issues**: [GitHub Issues](https://github.com/Anandqwe/inventory-supermarkets/issues)
 
 ## 🙏 Acknowledgments

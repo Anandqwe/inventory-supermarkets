@@ -234,7 +234,7 @@ const GlobalSearch = () => {
       <form onSubmit={handleSubmit}>
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-2 sm:pl-3 flex items-center pointer-events-none">
-            <MagnifyingGlassIcon className="h-4 w-4 sm:h-5 sm:w-5 text-slate-400 dark:text-amoled-muted" />
+            <MagnifyingGlassIcon className="h-4 w-4 sm:h-5 sm:w-5 text-slate-400 dark:text-zinc-600" />
           </div>
           
           <input
@@ -244,14 +244,14 @@ const GlobalSearch = () => {
             onChange={handleSearchChange}
             onFocus={() => setIsOpen(true)}
             placeholder="Search products, sales..."
-            className="block w-full pl-8 sm:pl-10 pr-8 sm:pr-10 py-1.5 sm:py-2 border border-slate-300 dark:border-amoled-border rounded-lg bg-white dark:bg-amoled-card text-slate-900 dark:text-amoled-primary placeholder-slate-500 dark:placeholder-amoled-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-xs sm:text-sm transition-all duration-200"
+            className="block w-full pl-8 sm:pl-10 pr-8 sm:pr-10 py-1.5 sm:py-2 border border-slate-300 dark:border-zinc-900 rounded-lg bg-white dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 placeholder-slate-500 dark:placeholder-zinc-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-xs sm:text-sm transition-all duration-200"
           />
           
           {query && (
             <button
               type="button"
               onClick={handleClear}
-              className="absolute inset-y-0 right-0 pr-2 sm:pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:text-amoled-muted dark:hover:text-amoled-secondary"
+              className="absolute inset-y-0 right-0 pr-2 sm:pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:text-zinc-600 dark:hover:text-zinc-400"
             >
               <XMarkIcon className="h-4 w-4 sm:h-5 sm:w-5" />
             </button>
@@ -261,18 +261,18 @@ const GlobalSearch = () => {
 
       {/* Search Results Dropdown */}
       {isOpen && (
-        <div className="absolute mt-2 w-full sm:w-[calc(100vw-2rem)] md:w-full left-0 sm:left-auto bg-white dark:bg-amoled-card rounded-lg shadow-xl border border-slate-200 dark:border-amoled-border max-h-[70vh] sm:max-h-[32rem] overflow-y-auto z-50">
+        <div className="absolute mt-2 w-full sm:w-[calc(100vw-2rem)] md:w-full left-0 sm:left-auto bg-white dark:bg-zinc-950 rounded-lg shadow-xl border border-slate-200 dark:border-zinc-900 max-h-[70vh] sm:max-h-[32rem] overflow-y-auto z-50">
           {isSearching && (
             <div className="p-6 sm:p-8 flex items-center justify-center">
               <ArrowPathIcon className="h-4 w-4 sm:h-5 sm:w-5 animate-spin text-primary-600 dark:text-primary-400" />
-              <span className="ml-2 text-xs sm:text-sm text-slate-500 dark:text-amoled-muted">Searching...</span>
+              <span className="ml-2 text-xs sm:text-sm text-slate-500 dark:text-zinc-600">Searching...</span>
             </div>
           )}
 
           {!isSearching && showRecent && (
             <div className="p-3 sm:p-4">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-slate-500 dark:text-amoled-muted uppercase">Recent Searches</span>
+                <span className="text-xs font-medium text-slate-500 dark:text-zinc-600 uppercase">Recent Searches</span>
                 <button
                   onClick={() => {
                     setRecentSearches([]);
@@ -288,15 +288,15 @@ const GlobalSearch = () => {
                   <button
                     key={idx}
                     onClick={() => handleRecentClick(recent)}
-                    className="w-full text-left px-2 sm:px-3 py-1.5 sm:py-2 rounded-md text-xs sm:text-sm text-slate-700 dark:text-amoled-secondary hover:bg-slate-100 dark:hover:bg-amoled-hover flex items-center gap-2"
+                    className="w-full text-left px-2 sm:px-3 py-1.5 sm:py-2 rounded-md text-xs sm:text-sm text-slate-700 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-900 flex items-center gap-2"
                   >
-                    <ClockIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-400 dark:text-amoled-muted flex-shrink-0" />
+                    <ClockIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-400 dark:text-zinc-600 flex-shrink-0" />
                     <span className="truncate">{recent}</span>
                   </button>
                 ))}
               </div>
-              <div className="mt-3 pt-3 border-t border-slate-200 dark:border-amoled-border">
-                <p className="text-xs text-slate-500 dark:text-amoled-muted">
+              <div className="mt-3 pt-3 border-t border-slate-200 dark:border-zinc-900">
+                <p className="text-xs text-slate-500 dark:text-zinc-600">
                   💡 Try: <span className="font-mono text-primary-600 dark:text-primary-400">Amul</span>, <span className="font-mono text-primary-600 dark:text-primary-400">Tata</span>, <span className="font-mono text-primary-600 dark:text-primary-400">Milk</span>
                 </p>
               </div>
@@ -305,9 +305,9 @@ const GlobalSearch = () => {
 
           {!isSearching && query && !hasResults && (
             <div className="p-6 sm:p-8 text-center">
-              <MagnifyingGlassIcon className="h-10 w-10 sm:h-12 sm:w-12 text-slate-300 dark:text-amoled-muted mx-auto mb-3" />
-              <p className="text-xs sm:text-sm font-medium text-slate-900 dark:text-amoled-primary">No results found</p>
-              <p className="text-xs text-slate-500 dark:text-amoled-muted mt-1">
+              <MagnifyingGlassIcon className="h-10 w-10 sm:h-12 sm:w-12 text-slate-300 dark:text-zinc-600 mx-auto mb-3" />
+              <p className="text-xs sm:text-sm font-medium text-slate-900 dark:text-zinc-100">No results found</p>
+              <p className="text-xs text-slate-500 dark:text-zinc-600 mt-1">
                 Try different keywords
               </p>
               <div className="mt-3 sm:mt-4 p-2 sm:p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
@@ -319,13 +319,13 @@ const GlobalSearch = () => {
           )}
 
           {!isSearching && hasResults && (
-            <div className="divide-y divide-slate-200 dark:divide-amoled-border">
+            <div className="divide-y divide-slate-200 dark:divide-zinc-900">
               {/* Products Section */}
               {results.products.length > 0 && (
                 <div className="p-3 sm:p-4">
                   <div className="flex items-center gap-2 mb-2 sm:mb-3">
-                    <CubeIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-400 dark:text-amoled-muted" />
-                    <span className="text-xs font-medium text-slate-500 dark:text-amoled-muted uppercase">
+                    <CubeIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-400 dark:text-zinc-600" />
+                    <span className="text-xs font-medium text-slate-500 dark:text-zinc-600 uppercase">
                       Products ({results.products.length})
                     </span>
                   </div>
@@ -334,14 +334,14 @@ const GlobalSearch = () => {
                       <button
                         key={product._id}
                         onClick={() => handleResultClick('product', product)}
-                        className="w-full text-left px-2 sm:px-3 py-1.5 sm:py-2 rounded-md hover:bg-slate-100 dark:hover:bg-amoled-hover transition-colors"
+                        className="w-full text-left px-2 sm:px-3 py-1.5 sm:py-2 rounded-md hover:bg-slate-100 dark:hover:bg-zinc-900 transition-colors"
                       >
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs sm:text-sm font-medium text-slate-900 dark:text-amoled-primary truncate">
+                            <p className="text-xs sm:text-sm font-medium text-slate-900 dark:text-zinc-100 truncate">
                               {product.name}
                             </p>
-                            <p className="text-xs text-slate-500 dark:text-amoled-muted truncate">
+                            <p className="text-xs text-slate-500 dark:text-zinc-600 truncate">
                               SKU: {product.sku} • Stock: {product.stock}
                             </p>
                           </div>
@@ -359,8 +359,8 @@ const GlobalSearch = () => {
               {results.sales.length > 0 && (
                 <div className="p-3 sm:p-4">
                   <div className="flex items-center gap-2 mb-2 sm:mb-3">
-                    <ShoppingCartIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-400 dark:text-amoled-muted" />
-                    <span className="text-xs font-medium text-slate-500 dark:text-amoled-muted uppercase">
+                    <ShoppingCartIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-400 dark:text-zinc-600" />
+                    <span className="text-xs font-medium text-slate-500 dark:text-zinc-600 uppercase">
                       Sales ({results.sales.length})
                     </span>
                   </div>
@@ -369,14 +369,14 @@ const GlobalSearch = () => {
                       <button
                         key={sale._id}
                         onClick={() => handleResultClick('sale', sale)}
-                        className="w-full text-left px-2 sm:px-3 py-1.5 sm:py-2 rounded-md hover:bg-slate-100 dark:hover:bg-amoled-hover transition-colors"
+                        className="w-full text-left px-2 sm:px-3 py-1.5 sm:py-2 rounded-md hover:bg-slate-100 dark:hover:bg-zinc-900 transition-colors"
                       >
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs sm:text-sm font-medium text-slate-900 dark:text-amoled-primary truncate">
+                            <p className="text-xs sm:text-sm font-medium text-slate-900 dark:text-zinc-100 truncate">
                               Sale #{sale.saleNumber || sale._id?.slice(-6)}
                             </p>
-                            <p className="text-xs text-slate-500 dark:text-amoled-muted truncate">
+                            <p className="text-xs text-slate-500 dark:text-zinc-600 truncate">
                               {new Date(sale.createdAt).toLocaleDateString()} • {sale.customer?.name || 'Walk-in'}
                             </p>
                           </div>
@@ -394,8 +394,8 @@ const GlobalSearch = () => {
               {results.customers.length > 0 && (
                 <div className="p-3 sm:p-4">
                   <div className="flex items-center gap-2 mb-2 sm:mb-3">
-                    <UserIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-400 dark:text-amoled-muted" />
-                    <span className="text-xs font-medium text-slate-500 dark:text-amoled-muted uppercase">
+                    <UserIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-400 dark:text-zinc-600" />
+                    <span className="text-xs font-medium text-slate-500 dark:text-zinc-600 uppercase">
                       Suppliers/Customers ({results.customers.length})
                     </span>
                   </div>
@@ -404,13 +404,13 @@ const GlobalSearch = () => {
                       <button
                         key={customer._id}
                         onClick={() => handleResultClick('customer', customer)}
-                        className="w-full text-left px-2 sm:px-3 py-1.5 sm:py-2 rounded-md hover:bg-slate-100 dark:hover:bg-amoled-hover transition-colors"
+                        className="w-full text-left px-2 sm:px-3 py-1.5 sm:py-2 rounded-md hover:bg-slate-100 dark:hover:bg-zinc-900 transition-colors"
                       >
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs sm:text-sm font-medium text-slate-900 dark:text-amoled-primary truncate">
+                          <p className="text-xs sm:text-sm font-medium text-slate-900 dark:text-zinc-100 truncate">
                             {customer.name}
                           </p>
-                          <p className="text-xs text-slate-500 dark:text-amoled-muted truncate">
+                          <p className="text-xs text-slate-500 dark:text-zinc-600 truncate">
                             {customer.email || customer.phone || 'No contact info'}
                           </p>
                         </div>
@@ -421,7 +421,7 @@ const GlobalSearch = () => {
               )}
 
               {/* View All Results */}
-              <div className="p-2 sm:p-3 bg-slate-50 dark:bg-amoled-hover">
+              <div className="p-2 sm:p-3 bg-slate-50 dark:bg-zinc-900">
                 <button
                   onClick={() => {
                     navigate(`/products?search=${encodeURIComponent(query)}`);

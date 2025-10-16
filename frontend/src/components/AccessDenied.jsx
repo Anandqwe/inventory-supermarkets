@@ -25,7 +25,7 @@ const AccessDenied = ({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-amoled-black dark:via-slate-900 dark:to-amoled-black flex items-center justify-center px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-black dark:via-slate-900 dark:to-black flex items-center justify-center px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8 text-center">
         {/* Icon */}
         <div className="mx-auto flex items-center justify-center h-24 w-24 rounded-full bg-red-100 dark:bg-red-900/20">
@@ -34,25 +34,25 @@ const AccessDenied = ({
 
         {/* Content */}
         <div className="space-y-3">
-          <h1 className="text-3xl font-bold text-surface-900 dark:text-amoled-primary">
+          <h1 className="text-3xl font-bold text-surface-900 dark:text-zinc-100">
             Access Denied
           </h1>
-          <p className="text-base text-surface-600 dark:text-amoled-secondary">
+          <p className="text-base text-surface-600 dark:text-zinc-400">
             {message}
           </p>
           
           {/* User info */}
           {user && (
-            <div className="mt-4 p-4 bg-surface-50 dark:bg-amoled-hover rounded-lg border border-surface-200 dark:border-amoled-border">
-              <p className="text-sm text-surface-700 dark:text-amoled-secondary">
+            <div className="mt-4 p-4 bg-surface-50 dark:bg-zinc-900 rounded-lg border border-surface-200 dark:border-zinc-900">
+              <p className="text-sm text-surface-700 dark:text-zinc-400">
                 <span className="font-medium">Current Role:</span>{' '}
-                <span className="text-surface-900 dark:text-amoled-primary font-semibold">
+                <span className="text-surface-900 dark:text-zinc-100 font-semibold">
                   {user.role}
                 </span>
               </p>
               {requiredPermission && (
-                <p className="text-xs text-surface-500 dark:text-amoled-muted mt-2">
-                  Required permission: <code className="bg-surface-100 dark:bg-amoled-black px-1.5 py-0.5 rounded text-surface-700 dark:text-amoled-secondary">{requiredPermission}</code>
+                <p className="text-xs text-surface-500 dark:text-zinc-600 mt-2">
+                  Required permission: <code className="bg-surface-100 dark:bg-black px-1.5 py-0.5 rounded text-surface-700 dark:text-zinc-400">{requiredPermission}</code>
                 </p>
               )}
             </div>
@@ -82,7 +82,7 @@ const AccessDenied = ({
         </div>
 
         {/* Additional help */}
-        <div className="mt-8 text-sm text-surface-500 dark:text-amoled-muted">
+        <div className="mt-8 text-sm text-surface-500 dark:text-zinc-600">
           <p>
             If you believe this is an error, please contact your administrator.
           </p>

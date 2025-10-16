@@ -3,7 +3,7 @@ import { cva } from 'class-variance-authority';
 import { cn } from '../../utils/cn';
 
 const inputVariants = cva(
-  "flex w-full rounded-md border border-surface-300 bg-white px-3 py-2 text-sm placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 dark:border-amoled-border dark:bg-amoled-card dark:text-amoled-primary dark:placeholder:text-amoled-muted",
+  "flex w-full rounded-md border border-surface-300 bg-white px-3 py-2 text-sm placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder:text-zinc-700",
   {
     variants: {
       size: {
@@ -44,7 +44,7 @@ const Input = React.forwardRef(({
       {label && (
         <label 
           htmlFor={inputId}
-          className="block text-sm font-medium text-surface-700 dark:text-amoled-secondary mb-1"
+          className="block text-sm font-medium text-surface-700 dark:text-zinc-300 mb-1"
         >
           {label}
           {required && <span className="text-danger-500 ml-1">*</span>}
@@ -70,7 +70,7 @@ const Input = React.forwardRef(({
         </p>
       )}
       {helperText && !error && (
-        <p id={helperTextId} className="mt-1 text-sm text-surface-500 dark:text-surface-400">
+        <p id={helperTextId} className="mt-1 text-sm text-surface-500 dark:text-zinc-600">
           {helperText}
         </p>
       )}
@@ -85,7 +85,7 @@ const PriceInput = React.forwardRef(({ currency = "₹", ...props }, ref) => {
   return (
     <div className="relative">
       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-        <span className="text-surface-500 dark:text-surface-400 text-sm">{currency}</span>
+        <span className="text-surface-500 dark:text-zinc-600 text-sm">{currency}</span>
       </div>
       <Input
         {...props}

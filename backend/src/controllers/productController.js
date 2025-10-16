@@ -358,14 +358,36 @@ class ProductController {
         if (!ValidationUtils.isValidObjectId(branch)) {
           return ResponseUtils.error(res, 'Invalid branch identifier', 400);
         }
-        branchFilterId = new mongoose.Types.ObjectId(branch);
+        branchFilterId = branch; // Keep as string, will normalize below
       }
     }
 
+    // Normalize branchFilterId for use in aggregation stages
+    // Handle both ObjectId instances and string IDs
+    let normalizedBranchId = null;
     if (branchFilterId) {
-      const normalizedBranchId = branchFilterId instanceof mongoose.Types.ObjectId
-        ? branchFilterId
-        : new mongoose.Types.ObjectId(branchFilterId);
+      try {
+        if (branchFilterId instanceof mongoose.Types.ObjectId) {
+          normalizedBranchId = branchFilterId;
+        } else if (typeof branchFilterId === 'string') {
+          normalizedBranchId = new mongoose.Types.ObjectId(branchFilterId);
+        } else if (branchFilterId._id) {
+          normalizedBranchId = new mongoose.Types.ObjectId(branchFilterId._id);
+        } else {
+          normalizedBranchId = new mongoose.Types.ObjectId(branchFilterId.toString());
+        }
+      } catch (error) {
+        logger.error('Error converting branchFilterId to ObjectId', { branchFilterId, error: error.message });
+        return ResponseUtils.error(res, 'Invalid branch identifier format', 400);
+      }
+    }
+
+    // Add branch filter to initial match ONLY when:
+    // 1. A specific branch is selected AND
+    // 2. No stock filter is active (stock filters handle branch filtering in aggregation)
+    // This prevents excluding products with 0 quantity when filtering for out-of-stock
+    const hasStockFilter = stock && stock !== 'all';
+    if (normalizedBranchId && !hasStockFilter) {
       filter['stockByBranch.branch'] = normalizedBranchId;
     }
 
@@ -383,60 +405,129 @@ class ProductController {
       { $match: filter }
     ];
 
+    // Track if low-stock filter is active for later use
+    const isLowStockFilter = stock === 'low-stock' || lowStock === 'true';
+
     // Stock filter - handle multiple stock states
     if (stock || lowStock === 'true') {
       if (stock === 'low-stock' || lowStock === 'true') {
-        // Low stock: total quantity across all branches <= total reorder level
-        // This ensures only products that are genuinely low in stock appear
-        pipeline.push({
-          $match: {
-            $expr: {
-              $let: {
-                vars: {
-                  totalStock: { $sum: "$stockByBranch.quantity" },
-                  totalReorderLevel: { $sum: "$stockByBranch.reorderLevel" }
-                },
-                in: {
-                  $and: [
-                    { $gt: ["$$totalStock", 0] }, // Has some stock (not out of stock)
-                    { $lte: ["$$totalStock", "$$totalReorderLevel"] } // Total stock <= total reorder level
-                  ]
-                }
-              }
-            }
-          }
-        });
-      } else if (stock === 'out-of-stock') {
-        // Out of stock: total quantity = 0
-        pipeline.push({
-          $match: {
-            $expr: {
-              $eq: [
-                { $sum: "$stockByBranch.quantity" },
-                0
-              ]
-            }
-          }
-        });
-      } else if (stock === 'in-stock') {
-        // In stock: total quantity > 0
+        // Low stock: has at least one branch where quantity <= reorderLevel
+        // When branch filter exists, check that specific branch
         pipeline.push({
           $match: {
             $expr: {
               $gt: [
-                { $sum: "$stockByBranch.quantity" },
+                {
+                  $size: {
+                    $filter: {
+                      input: "$stockByBranch",
+                      cond: {
+                        $and: [
+                          { $lte: ["$$this.quantity", "$$this.reorderLevel"] },
+                          normalizedBranchId ? { $eq: ["$$this.branch", normalizedBranchId] } : {}
+                        ]
+                      }
+                    }
+                  }
+                },
                 0
               ]
             }
           }
         });
+      } else if (stock === 'out-of-stock') {
+        // Out of stock: Check if product has 0 total quantity across all branches
+        // OR if branch filter exists, check that specific branch has 0 quantity
+        if (normalizedBranchId) {
+          // When branch filter exists, check that specific branch for 0 quantity
+          pipeline.push({
+            $match: {
+              $expr: {
+                $eq: [
+                  {
+                    $sum: {
+                      $map: {
+                        input: "$stockByBranch",
+                        as: "stock",
+                        in: {
+                          $cond: [
+                            { $eq: ["$$stock.branch", normalizedBranchId] },
+                            "$$stock.quantity",
+                            0
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  0
+                ]
+              }
+            }
+          });
+        } else {
+          // No branch filter - check total quantity across all branches = 0
+          pipeline.push({
+            $match: {
+              $expr: {
+                $eq: [
+                  { $sum: "$stockByBranch.quantity" },
+                  0
+                ]
+              }
+            }
+          });
+        }
+      } else if (stock === 'in-stock') {
+        // In stock: Check if product has > 0 quantity
+        // When branch filter exists, check that specific branch
+        if (normalizedBranchId) {
+          // When branch filter exists, check that specific branch for > 0 quantity
+          pipeline.push({
+            $match: {
+              $expr: {
+                $gt: [
+                  {
+                    $sum: {
+                      $map: {
+                        input: "$stockByBranch",
+                        as: "stock",
+                        in: {
+                          $cond: [
+                            { $eq: ["$$stock.branch", normalizedBranchId] },
+                            "$$stock.quantity",
+                            0
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  0
+                ]
+              }
+            }
+          });
+        } else {
+          // No branch filter - check total quantity > 0
+          pipeline.push({
+            $match: {
+              $expr: {
+                $gt: [
+                  { $sum: "$stockByBranch.quantity" },
+                  0
+                ]
+              }
+            }
+          });
+        }
       }
     }
 
-    if (filter['stockByBranch.branch']) {
+    // When stock filter is active AND a specific branch is selected,
+    // add a filter to ensure products have stock entries for that branch
+    if (hasStockFilter && normalizedBranchId) {
       pipeline.push({
         $match: {
-          'stockByBranch.branch': filter['stockByBranch.branch']
+          'stockByBranch.branch': normalizedBranchId
         }
       });
     }
@@ -501,13 +592,34 @@ class ProductController {
         costPrice: '$pricing.costPrice',
         mrp: '$pricing.mrp',
         
-        // Calculate total stock across branches
+        // Extract low-stock branches for display purposes
+        lowStockBranches: {
+          $filter: {
+            input: '$stockByBranch',
+            cond: {
+              $lte: ['$$this.quantity', '$$this.reorderLevel']
+            }
+          }
+        }
+      }
+    });
+
+    // Add stock field that shows per-branch value when low-stock exists
+    pipeline.push({
+      $addFields: {
+        // Show the low-stock branch quantity if it exists, otherwise show total
         stock: {
-          $sum: {
-            $map: {
-              input: '$stockByBranch',
-              as: 'branchStock',
-              in: '$$branchStock.quantity'
+          $cond: {
+            if: { $gt: [{ $size: '$lowStockBranches' }, 0] },
+            then: { $arrayElemAt: ['$lowStockBranches.quantity', 0] },
+            else: {
+              $sum: {
+                $map: {
+                  input: '$stockByBranch',
+                  as: 'branchStock',
+                  in: '$$branchStock.quantity'
+                }
+              }
             }
           }
         },
@@ -730,6 +842,12 @@ class ProductController {
   // CSV Export functionality
   static exportProducts = asyncHandler(async (req, res) => {
     try {
+      logger.info('Export request received', { 
+        query: req.query,
+        user: req.user?.email,
+        branch: req.user?.branch 
+      });
+      
       const { branch, category, format = 'csv', search, stock, minPrice, maxPrice } = req.query;
       const filter = { isActive: true };
 
@@ -907,8 +1025,11 @@ class ProductController {
 
         res.download(csvFilePath, `products_${new Date().toISOString().split('T')[0]}.csv`, (err) => {
           if (!err) {
+            logger.info('File download successful', { file: csvFilePath });
             // Clean up file after download
             fs.unlink(csvFilePath, () => {});
+          } else {
+            logger.error('File download error', { error: err.message });
           }
         });
       } else {

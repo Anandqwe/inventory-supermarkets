@@ -215,12 +215,12 @@ const MobileSearchModal = ({ isOpen, onClose }) => {
       />
 
       {/* Modal Content */}
-      <div className="relative h-full bg-white dark:bg-amoled-black flex flex-col">
+      <div className="relative h-full bg-white dark:bg-black flex flex-col">
         {/* Header */}
-        <div className="flex items-center gap-3 p-4 border-b border-slate-200 dark:border-amoled-border">
+        <div className="flex items-center gap-3 p-4 border-b border-slate-200 dark:border-zinc-900">
           <button
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-600 dark:text-amoled-muted dark:hover:text-amoled-secondary rounded-lg"
+            className="p-2 text-slate-400 hover:text-slate-600 dark:text-zinc-600 dark:hover:text-zinc-400 rounded-lg"
           >
             <XMarkIcon className="h-6 w-6" />
           </button>
@@ -228,7 +228,7 @@ const MobileSearchModal = ({ isOpen, onClose }) => {
           <form onSubmit={handleSubmit} className="flex-1">
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <MagnifyingGlassIcon className="h-5 w-5 text-slate-400 dark:text-amoled-muted" />
+                <MagnifyingGlassIcon className="h-5 w-5 text-slate-400 dark:text-zinc-600" />
               </div>
               
               <input
@@ -237,14 +237,14 @@ const MobileSearchModal = ({ isOpen, onClose }) => {
                 value={query}
                 onChange={handleSearchChange}
                 placeholder="Search products, sales, customers..."
-                className="block w-full pl-10 pr-10 py-2.5 border border-slate-300 dark:border-amoled-border rounded-lg bg-white dark:bg-amoled-card text-slate-900 dark:text-amoled-primary placeholder-slate-500 dark:placeholder-amoled-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-base"
+                className="block w-full pl-10 pr-10 py-2.5 border border-slate-300 dark:border-zinc-900 rounded-lg bg-white dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 placeholder-slate-500 dark:placeholder-zinc-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-base"
               />
               
               {query && (
                 <button
                   type="button"
                   onClick={handleClear}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:text-amoled-muted dark:hover:text-amoled-secondary"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:text-zinc-600 dark:hover:text-zinc-400"
                 >
                   <XMarkIcon className="h-5 w-5" />
                 </button>
@@ -258,14 +258,14 @@ const MobileSearchModal = ({ isOpen, onClose }) => {
           {isSearching && (
             <div className="p-8 flex items-center justify-center">
               <ArrowPathIcon className="h-6 w-6 animate-spin text-primary-600 dark:text-primary-400" />
-              <span className="ml-2 text-sm text-slate-500 dark:text-amoled-muted">Searching...</span>
+              <span className="ml-2 text-sm text-slate-500 dark:text-zinc-600">Searching...</span>
             </div>
           )}
 
           {!isSearching && showRecent && (
             <div className="p-4">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-medium text-slate-500 dark:text-amoled-muted uppercase">Recent Searches</span>
+                <span className="text-xs font-medium text-slate-500 dark:text-zinc-600 uppercase">Recent Searches</span>
                 <button
                   onClick={() => {
                     setRecentSearches([]);
@@ -281,9 +281,9 @@ const MobileSearchModal = ({ isOpen, onClose }) => {
                   <button
                     key={idx}
                     onClick={() => handleRecentClick(recent)}
-                    className="w-full text-left px-4 py-3 rounded-lg text-base text-slate-700 dark:text-amoled-secondary hover:bg-slate-100 dark:hover:bg-amoled-hover flex items-center gap-3"
+                    className="w-full text-left px-4 py-3 rounded-lg text-base text-slate-700 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-900 flex items-center gap-3"
                   >
-                    <ClockIcon className="h-5 w-5 text-slate-400 dark:text-amoled-muted flex-shrink-0" />
+                    <ClockIcon className="h-5 w-5 text-slate-400 dark:text-zinc-600 flex-shrink-0" />
                     <span className="truncate">{recent}</span>
                   </button>
                 ))}
@@ -298,22 +298,22 @@ const MobileSearchModal = ({ isOpen, onClose }) => {
 
           {!isSearching && query && !hasResults && (
             <div className="p-8 text-center">
-              <MagnifyingGlassIcon className="h-16 w-16 text-slate-300 dark:text-amoled-muted mx-auto mb-4" />
-              <p className="text-base font-medium text-slate-900 dark:text-amoled-primary">No results found</p>
-              <p className="text-sm text-slate-500 dark:text-amoled-muted mt-2">
+              <MagnifyingGlassIcon className="h-16 w-16 text-slate-300 dark:text-zinc-600 mx-auto mb-4" />
+              <p className="text-base font-medium text-slate-900 dark:text-zinc-100">No results found</p>
+              <p className="text-sm text-slate-500 dark:text-zinc-600 mt-2">
                 Try different keywords
               </p>
             </div>
           )}
 
           {!isSearching && hasResults && (
-            <div className="divide-y divide-slate-200 dark:divide-amoled-border">
+            <div className="divide-y divide-slate-200 dark:divide-zinc-900">
               {/* Products Section */}
               {results.products.length > 0 && (
                 <div className="p-4">
                   <div className="flex items-center gap-2 mb-3">
-                    <CubeIcon className="h-5 w-5 text-slate-400 dark:text-amoled-muted" />
-                    <span className="text-sm font-medium text-slate-500 dark:text-amoled-muted uppercase">
+                    <CubeIcon className="h-5 w-5 text-slate-400 dark:text-zinc-600" />
+                    <span className="text-sm font-medium text-slate-500 dark:text-zinc-600 uppercase">
                       Products ({results.products.length})
                     </span>
                   </div>
@@ -322,14 +322,14 @@ const MobileSearchModal = ({ isOpen, onClose }) => {
                       <button
                         key={product._id}
                         onClick={() => handleResultClick('product', product)}
-                        className="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-100 dark:hover:bg-amoled-hover transition-colors"
+                        className="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-900 transition-colors"
                       >
                         <div className="flex items-center justify-between gap-3">
                           <div className="flex-1 min-w-0">
-                            <p className="text-base font-medium text-slate-900 dark:text-amoled-primary truncate">
+                            <p className="text-base font-medium text-slate-900 dark:text-zinc-100 truncate">
                               {product.name}
                             </p>
-                            <p className="text-sm text-slate-500 dark:text-amoled-muted truncate">
+                            <p className="text-sm text-slate-500 dark:text-zinc-600 truncate">
                               SKU: {product.sku} • Stock: {product.stock}
                             </p>
                           </div>
@@ -347,8 +347,8 @@ const MobileSearchModal = ({ isOpen, onClose }) => {
               {results.sales.length > 0 && (
                 <div className="p-4">
                   <div className="flex items-center gap-2 mb-3">
-                    <ShoppingCartIcon className="h-5 w-5 text-slate-400 dark:text-amoled-muted" />
-                    <span className="text-sm font-medium text-slate-500 dark:text-amoled-muted uppercase">
+                    <ShoppingCartIcon className="h-5 w-5 text-slate-400 dark:text-zinc-600" />
+                    <span className="text-sm font-medium text-slate-500 dark:text-zinc-600 uppercase">
                       Sales ({results.sales.length})
                     </span>
                   </div>
@@ -357,14 +357,14 @@ const MobileSearchModal = ({ isOpen, onClose }) => {
                       <button
                         key={sale._id}
                         onClick={() => handleResultClick('sale', sale)}
-                        className="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-100 dark:hover:bg-amoled-hover transition-colors"
+                        className="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-900 transition-colors"
                       >
                         <div className="flex items-center justify-between gap-3">
                           <div className="flex-1 min-w-0">
-                            <p className="text-base font-medium text-slate-900 dark:text-amoled-primary truncate">
+                            <p className="text-base font-medium text-slate-900 dark:text-zinc-100 truncate">
                               Sale #{sale.saleNumber || sale._id?.slice(-6)}
                             </p>
-                            <p className="text-sm text-slate-500 dark:text-amoled-muted truncate">
+                            <p className="text-sm text-slate-500 dark:text-zinc-600 truncate">
                               {new Date(sale.createdAt).toLocaleDateString()} • {sale.customer?.name || 'Walk-in'}
                             </p>
                           </div>
@@ -382,8 +382,8 @@ const MobileSearchModal = ({ isOpen, onClose }) => {
               {results.customers.length > 0 && (
                 <div className="p-4">
                   <div className="flex items-center gap-2 mb-3">
-                    <UserIcon className="h-5 w-5 text-slate-400 dark:text-amoled-muted" />
-                    <span className="text-sm font-medium text-slate-500 dark:text-amoled-muted uppercase">
+                    <UserIcon className="h-5 w-5 text-slate-400 dark:text-zinc-600" />
+                    <span className="text-sm font-medium text-slate-500 dark:text-zinc-600 uppercase">
                       Suppliers/Customers ({results.customers.length})
                     </span>
                   </div>
@@ -392,13 +392,13 @@ const MobileSearchModal = ({ isOpen, onClose }) => {
                       <button
                         key={customer._id}
                         onClick={() => handleResultClick('customer', customer)}
-                        className="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-100 dark:hover:bg-amoled-hover transition-colors"
+                        className="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-900 transition-colors"
                       >
                         <div className="flex-1 min-w-0">
-                          <p className="text-base font-medium text-slate-900 dark:text-amoled-primary truncate">
+                          <p className="text-base font-medium text-slate-900 dark:text-zinc-100 truncate">
                             {customer.name}
                           </p>
-                          <p className="text-sm text-slate-500 dark:text-amoled-muted truncate">
+                          <p className="text-sm text-slate-500 dark:text-zinc-600 truncate">
                             {customer.email || customer.phone || 'No contact info'}
                           </p>
                         </div>

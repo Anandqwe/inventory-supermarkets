@@ -477,7 +477,7 @@ const logSystemEvent = async (action, description, metadata = {}) => {
     }
 
     await AuditLog.logUserAction({
-      action: 'system', // Always use 'system' action for system events
+      action: 'system_error', // Use valid enum value for system events
       resourceType: 'system',
       description: `${action}: ${description}`,
       status: 'success',

@@ -20,6 +20,7 @@ const Sales = React.lazy(() => import('./pages/Sales'));
 const Inventory = React.lazy(() => import('./pages/Inventory'));
 const Reports = React.lazy(() => import('./pages/Reports'));
 const Settings = React.lazy(() => import('./pages/Settings'));
+const HelpSupport = React.lazy(() => import('./pages/HelpSupport'));
 
 // Create a client for React Query
 const queryClient = new QueryClient({
@@ -232,6 +233,17 @@ function App() {
                     <ProtectedRoute permission={PERMISSIONS.PROFILE.READ}>
                       <SuspenseWrapper fallback={<PageLoader message="Loading settings..." />}>
                         <Settings />
+                      </SuspenseWrapper>
+                    </ProtectedRoute>
+                  } 
+                />
+                
+                <Route 
+                  path="/help-support" 
+                  element={
+                    <ProtectedRoute>
+                      <SuspenseWrapper fallback={<PageLoader message="Loading help..." />}>
+                        <HelpSupport />
                       </SuspenseWrapper>
                     </ProtectedRoute>
                   } 

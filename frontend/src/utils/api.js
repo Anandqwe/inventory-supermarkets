@@ -45,8 +45,13 @@ export const authAPI = {
     return response; // Return the full axios response
   },
 
+  register: async (userData) => {
+    const response = await api.post('/auth/register', userData);
+    return response.data;
+  },
+
   getAllUsers: async () => {
-    const response = await api.get('/auth/users');
+    const response = await api.get('/auth/users', { params: { limit: 1000 } });
     return response.data;
   },
 
@@ -384,6 +389,16 @@ export const settingsAPI = {
   
   changePassword: async (data) => {
     const response = await api.post('/auth/change-password', data);
+    return response.data;
+  },
+  
+  getSystemSettings: async () => {
+    const response = await api.get('/system-settings');
+    return response.data;
+  },
+  
+  updateSystemSettings: async (data) => {
+    const response = await api.put('/system-settings', data);
     return response.data;
   }
 };

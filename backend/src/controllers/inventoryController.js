@@ -278,7 +278,8 @@ class InventoryController {
         toBranch: toBranchId,
         items,
         notes,
-        expectedDeliveryDate
+        expectedDeliveryDate,
+        reason
       } = req.body;
 
       if (!ValidationUtils.isValidObjectId(fromBranchId) || !ValidationUtils.isValidObjectId(toBranchId)) {
@@ -345,18 +346,33 @@ class InventoryController {
       // Generate transfer number
       const transferNumber = await generateTransferNumber(fromBranch.code, toBranch.code);
 
+      // Validate reason
+      const validReasons = ['restock', 'demand', 'expiry', 'other'];
+      const transferReason = reason || 'restock';
+      if (!validReasons.includes(transferReason)) {
+        return ResponseUtils.error(res, `Invalid reason. Must be one of: ${validReasons.join(', ')}`, 400);
+      }
+
+      // Format items for Transfer model
+      const transferItems = processedItems.map(item => ({
+        product: item.product,
+        productName: item.name,
+        sku: item.sku,
+        quantity: item.quantity,
+        unit: item.unit || 'pcs'
+      }));
+
       // Create transfer
       const transfer = new Transfer({
         transferNumber,
         fromBranch: fromBranch._id,
         toBranch: toBranch._id,
-        items: processedItems,
-        totalItems: processedItems.reduce((sum, item) => sum + item.quantity, 0),
-        totalValue: processedItems.reduce((sum, item) => sum + (item.quantity * item.unitCost), 0),
+        items: transferItems,
         status: 'pending',
-        notes,
-        expectedDeliveryDate: expectedDeliveryDate ? new Date(expectedDeliveryDate) : undefined,
-        initiatedBy: req.user.userId
+        reason: transferReason,
+        notes: notes || '',
+        transferDate: expectedDeliveryDate ? new Date(expectedDeliveryDate) : new Date(),
+        createdBy: req.user.userId
       });
 
       await transfer.save();

@@ -17,20 +17,15 @@
     "seed:master": "node scripts/seedMasterData.js",
     "seed": "npm run seed:master",
     "validate:data": "node scripts/validateData.js",
-    "clean:categories": "node scripts/removeDuplicateCategories.js",
-    "migrate:permissions": "node scripts/migrateUserPermissions.js",
-    "test:rbac": "node scripts/testRBAC.js",
+    "cleanup:inventory": "node scripts/cleanupAdjustmentsAndTransfers.js",
+    "db:indexes": "node scripts/createIndexes.js",
     "test": "jest --detectOpenHandles",
     "test:watch": "jest --watch --detectOpenHandles",
     "test:coverage": "jest --coverage --detectOpenHandles",
-    "test:ci": "jest --ci --coverage --watchAll=false",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "validate": "npm run test",
-    "build": "npm run validate",
-    "db:indexes": "node scripts/createIndexes.js"
+    "format:check": "prettier --check ."
   },
   "keywords": [
     "inventory",

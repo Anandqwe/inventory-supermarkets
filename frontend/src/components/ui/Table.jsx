@@ -13,7 +13,7 @@ const tableVariants = cva(
       },
       variant: {
         default: "",
-        striped: "[&_tbody_tr:nth-child(odd)]:bg-surface-50 dark:[&_tbody_tr:nth-child(odd)]:bg-surface-800",
+        striped: "[&_tbody_tr:nth-child(odd)]:bg-surface-50 dark:[&_tbody_tr:nth-child(odd)]:bg-zinc-950",
         bordered: "border border-border",
       },
     },
@@ -38,7 +38,7 @@ Table.displayName = "Table";
 const TableHeader = React.forwardRef(({ className, ...props }, ref) => (
   <thead 
     ref={ref} 
-    className={cn("bg-surface-50 dark:bg-surface-800", className)} 
+    className={cn("bg-surface-50 dark:bg-zinc-950", className)} 
     {...props} 
   />
 ));
@@ -56,7 +56,7 @@ TableBody.displayName = "TableBody";
 const TableFooter = React.forwardRef(({ className, ...props }, ref) => (
   <tfoot
     ref={ref}
-    className={cn("bg-surface-50 dark:bg-surface-800 font-medium", className)}
+    className={cn("bg-surface-50 dark:bg-zinc-950 font-medium", className)}
     {...props}
   />
 ));
@@ -66,7 +66,7 @@ const TableRow = React.forwardRef(({ className, ...props }, ref) => (
   <tr
     ref={ref}
     className={cn(
-      "border-b border-surface-200 dark:border-surface-700 transition-colors hover:bg-surface-50 dark:hover:bg-surface-800/50 data-[state=selected]:bg-surface-100 dark:data-[state=selected]:bg-surface-800",
+      "border-b border-surface-200 dark:border-zinc-900 transition-colors hover:bg-surface-50 dark:hover:bg-zinc-900/50 data-[state=selected]:bg-surface-100 dark:data-[state=selected]:bg-zinc-900",
       className
     )}
     {...props}
@@ -78,7 +78,7 @@ const TableHead = React.forwardRef(({ className, ...props }, ref) => (
   <th
     ref={ref}
     className={cn(
-      "h-12 px-4 text-left align-middle font-medium text-surface-500 dark:text-surface-400 [&:has([role=checkbox])]:pr-0",
+      "h-12 px-4 text-left align-middle font-medium text-surface-500 dark:text-zinc-400 [&:has([role=checkbox])]:pr-0",
       className
     )}
     {...props}
@@ -98,7 +98,7 @@ TableCell.displayName = "TableCell";
 const TableCaption = React.forwardRef(({ className, ...props }, ref) => (
   <caption
     ref={ref}
-    className={cn("mt-4 text-sm text-surface-500 dark:text-surface-400", className)}
+    className={cn("mt-4 text-sm text-surface-500 dark:text-zinc-600", className)}
     {...props}
   />
 ));
@@ -135,18 +135,18 @@ const DataTable = ({
   const getSortIcon = (field) => {
     if (sortConfig.field !== field) {
       return (
-        <svg className="w-4 h-4 ml-1 text-surface-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-4 h-4 ml-1 text-zinc-600 dark:text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
         </svg>
       );
     }
     
     return sortConfig.direction === 'asc' ? (
-      <svg className="w-4 h-4 ml-1 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-4 h-4 ml-1 text-purple-500 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
       </svg>
     ) : (
-      <svg className="w-4 h-4 ml-1 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-4 h-4 ml-1 text-purple-500 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
       </svg>
     );
@@ -154,13 +154,13 @@ const DataTable = ({
 
   if (loading) {
     return (
-      <div className="bg-white dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700">
+      <div className="bg-white dark:bg-zinc-950 rounded-lg border border-surface-200 dark:border-zinc-900">
         <Table className={className}>
           <TableHeader className={stickyHeader ? 'sticky top-0 z-10' : ''}>
             <TableRow>
               {columns.map((column, index) => (
                 <TableHead key={index}>
-                  <div className="animate-pulse bg-surface-200 dark:bg-surface-700 h-4 rounded w-24"></div>
+                  <div className="animate-pulse bg-zinc-800 dark:bg-zinc-900 h-4 rounded w-24"></div>
                 </TableHead>
               ))}
             </TableRow>
@@ -170,7 +170,7 @@ const DataTable = ({
               <TableRow key={index}>
                 {columns.map((_, colIndex) => (
                   <TableCell key={colIndex}>
-                    <div className="animate-pulse bg-surface-200 dark:bg-surface-700 h-4 rounded w-full"></div>
+                    <div className="animate-pulse bg-zinc-800 dark:bg-zinc-900 h-4 rounded w-full"></div>
                   </TableCell>
                 ))}
               </TableRow>
@@ -183,8 +183,8 @@ const DataTable = ({
 
   if (data.length === 0) {
     return (
-      <div className="bg-white dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700 p-8 text-center">
-        <div className="text-surface-500 dark:text-surface-400">
+      <div className="bg-white dark:bg-zinc-950 rounded-lg border border-surface-200 dark:border-zinc-900 p-8 text-center">
+        <div className="text-surface-500 dark:text-zinc-600">
           <svg className="mx-auto h-12 w-12 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
           </svg>
@@ -195,7 +195,7 @@ const DataTable = ({
   }
 
   return (
-    <div className="bg-white dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700 overflow-hidden">
+    <div className="bg-white dark:bg-zinc-950 rounded-lg border border-surface-200 dark:border-zinc-900 overflow-hidden">
       <Table className={className}>
         <TableHeader className={stickyHeader ? 'sticky top-0 z-10' : ''}>
           <TableRow>
@@ -203,7 +203,7 @@ const DataTable = ({
               <TableHead 
                 key={index}
                 className={cn(
-                  column.sortable && sortable ? 'cursor-pointer select-none hover:bg-surface-100 dark:hover:bg-surface-700' : '',
+                  column.sortable && sortable ? 'cursor-pointer select-none hover:bg-surface-100 dark:hover:bg-zinc-900' : '',
                   column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : 'text-left'
                 )}
                 onClick={() => column.sortable && handleSort(column.field)}
@@ -221,8 +221,8 @@ const DataTable = ({
             <TableRow 
               key={row.id || rowIndex}
               className={cn(
-                striped && rowIndex % 2 === 1 ? 'bg-surface-50 dark:bg-surface-900/50' : '',
-                hoverable ? 'hover:bg-surface-50 dark:hover:bg-surface-800/50' : ''
+                striped && rowIndex % 2 === 1 ? 'bg-surface-50 dark:bg-zinc-950/50' : '',
+                hoverable ? 'hover:bg-surface-50 dark:hover:bg-zinc-900/50' : ''
               )}
             >
               {columns.map((column, colIndex) => (

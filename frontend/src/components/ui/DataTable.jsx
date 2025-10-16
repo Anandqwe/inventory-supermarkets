@@ -70,18 +70,18 @@ const DataTable = ({
   return (
     <div className={cn("space-y-4", className)} {...domProps}>
       {/* Table */}
-      <div className="rounded-md border border-surface-200 dark:border-surface-700 overflow-hidden">
+      <div className="rounded-md border border-surface-200 dark:border-zinc-900 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-surface-50 dark:bg-surface-800">
+            <thead className="bg-surface-50 dark:bg-zinc-950">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
                     <th
                       key={header.id}
                       className={cn(
-                        "px-4 py-3 text-left text-xs font-medium text-surface-500 dark:text-surface-400 uppercase tracking-wider",
-                        header.column.getCanSort() && "cursor-pointer select-none hover:bg-surface-100 dark:hover:bg-surface-700"
+                        "px-4 py-3 text-left text-xs font-medium text-surface-500 dark:text-zinc-500 uppercase tracking-wider",
+                        header.column.getCanSort() && "cursor-pointer select-none hover:bg-surface-100 dark:hover:bg-zinc-900"
                       )}
                       onClick={header.column.getToggleSortingHandler()}
                     >
@@ -98,16 +98,16 @@ const DataTable = ({
                               className={cn(
                                 "h-3 w-3",
                                 header.column.getIsSorted() === 'asc' 
-                                  ? "text-blue-600" 
-                                  : "text-surface-300 dark:text-surface-600"
+                                  ? "text-blue-600 dark:text-purple-500" 
+                                  : "text-surface-300 dark:text-zinc-800"
                               )} 
                             />
                             <ChevronDownIcon 
                               className={cn(
                                 "h-3 w-3 -mt-1",
                                 header.column.getIsSorted() === 'desc' 
-                                  ? "text-blue-600" 
-                                  : "text-surface-300 dark:text-surface-600"
+                                  ? "text-blue-600 dark:text-purple-500" 
+                                  : "text-surface-300 dark:text-zinc-800"
                               )} 
                             />
                           </div>
@@ -118,20 +118,20 @@ const DataTable = ({
                 </tr>
               ))}
             </thead>
-            <tbody className="bg-white dark:bg-surface-900 divide-y divide-surface-200 dark:divide-surface-700">
+            <tbody className="bg-white dark:bg-black divide-y divide-surface-200 dark:divide-zinc-900">
               {table.getRowModel().rows?.length ? (
                 table.getRowModel().rows.map((row) => (
                   <tr
                     key={row.id}
                     className={cn(
-                      "hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors",
-                      row.getIsSelected() && "bg-blue-50 dark:bg-blue-950"
+                      "hover:bg-surface-50 dark:hover:bg-zinc-950 transition-colors",
+                      row.getIsSelected() && "bg-blue-50 dark:bg-purple-950/30 dark:border-l-2 dark:border-l-purple-500"
                     )}
                   >
                     {row.getVisibleCells().map((cell) => (
                       <td
                         key={cell.id}
-                        className="px-4 py-3 whitespace-nowrap text-sm text-surface-900 dark:text-surface-100"
+                        className="px-4 py-3 whitespace-nowrap text-sm text-surface-900 dark:text-zinc-100"
                       >
                         {flexRender(
                           cell.column.columnDef.cell,
@@ -145,7 +145,7 @@ const DataTable = ({
                 <tr>
                   <td
                     colSpan={columns.length}
-                    className="px-4 py-8 text-center text-surface-500 dark:text-surface-400"
+                    className="px-4 py-8 text-center text-surface-500 dark:text-zinc-600"
                   >
                     {loading ? "Loading..." : "No results found."}
                   </td>
@@ -158,14 +158,14 @@ const DataTable = ({
 
       {/* Pagination */}
       <div className="flex items-center justify-between px-2">
-        <div className="flex items-center gap-2 text-sm text-surface-500 dark:text-surface-400">
+        <div className="flex items-center gap-2 text-sm text-surface-500 dark:text-zinc-500">
           <span>
             Showing {pagination.pageIndex * pagination.pageSize + 1} to{' '}
             {Math.min((pagination.pageIndex + 1) * pagination.pageSize, totalRows || 0)} of{' '}
             {totalRows || 0} results
           </span>
           {table.getFilteredSelectedRowModel().rows.length > 0 && (
-            <span className="text-blue-600 dark:text-blue-400">
+            <span className="text-blue-600 dark:text-purple-400">
               ({table.getFilteredSelectedRowModel().rows.length} selected)
             </span>
           )}
@@ -193,7 +193,7 @@ const DataTable = ({
             </Button>
             
             <div className="flex items-center gap-1 mx-2">
-              <span className="text-sm text-surface-600 dark:text-surface-400">Page</span>
+              <span className="text-sm text-surface-600 dark:text-zinc-500">Page</span>
               <input
                 type="number"
                 value={pagination.pageIndex + 1}
@@ -201,9 +201,9 @@ const DataTable = ({
                   const page = e.target.value ? Number(e.target.value) - 1 : 0;
                   table.setPageIndex(page);
                 }}
-                className="w-12 px-2 py-1 text-sm border border-surface-300 dark:border-surface-700 rounded bg-white dark:bg-surface-800"
+                className="w-12 px-2 py-1 text-sm border border-surface-300 dark:border-zinc-900 rounded bg-white dark:bg-zinc-950 dark:text-zinc-100"
               />
-              <span className="text-sm text-surface-600 dark:text-surface-400">
+              <span className="text-sm text-surface-600 dark:text-zinc-500">
                 of {table.getPageCount()}
               </span>
             </div>
@@ -233,7 +233,7 @@ const DataTable = ({
             onChange={(e) => {
               table.setPageSize(Number(e.target.value));
             }}
-            className="px-3 py-1 text-sm border border-surface-300 dark:border-surface-700 rounded bg-white dark:bg-surface-800"
+            className="px-3 py-1 text-sm border border-surface-300 dark:border-zinc-900 rounded bg-white dark:bg-zinc-950 dark:text-zinc-100"
           >
             {[10, 25, 50, 100].map((pageSize) => (
               <option key={pageSize} value={pageSize}>

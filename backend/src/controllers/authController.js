@@ -229,10 +229,25 @@ class AuthController {
       updates.address = ValidationUtils.sanitizeString(address);
     }
 
-    // Note: Email updates are typically not allowed or require verification
-    // Keeping email read-only for security reasons
+    // Email updates: Only admins can change their own email
     if (email && email !== req.user.email) {
-      return ResponseUtils.error(res, 'Email address cannot be changed. Please contact an administrator.', 400);
+      // Check if user is admin
+      if (req.user.role !== 'Admin') {
+        return ResponseUtils.error(res, 'Email address cannot be changed. Please contact an administrator.', 400);
+      }
+      
+      // Validate email format
+      if (!ValidationUtils.isValidEmail(email)) {
+        return ResponseUtils.error(res, 'Invalid email format', 400);
+      }
+      
+      // Check if email is already in use by another user
+      const existingUser = await User.findOne({ email: email.toLowerCase() });
+      if (existingUser && existingUser._id.toString() !== req.user.id) {
+        return ResponseUtils.error(res, 'Email address is already in use', 400);
+      }
+      
+      updates.email = email.toLowerCase();
     }
 
     const user = await User.findByIdAndUpdate(

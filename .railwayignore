@@ -1,0 +1,36 @@
+# Railway Ignore File
+# Files and directories to exclude from Railway deployment
+
+# Frontend directory (not needed for backend deployment)
+frontend/
+
+# Documentation files
+docs/
+*.md
+!README.md
+
+# Development files
+.vscode/
+.idea/
+.git/
+.github/
+
+# Test files
+tests/
+*.test.js
+*.spec.js
+
+# Environment examples
+*.example
+
+# Scripts (seed scripts are in backend, so they'll be included)
+# Only exclude root-level scripts if any
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+tmp/
+temp/
+.cache/

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { TopBar } from './TopBar';
 import { Sidebar } from './Sidebar';
 import { SkipLink } from '../ui';
@@ -8,9 +9,10 @@ import { cn } from '../../utils/cn';
 const AppShell = ({ children, className }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-white dark:bg-amoled-black">
+    <div className="min-h-screen bg-white dark:bg-black">
       {/* Skip Links for accessibility */}
       <SkipLink href="#main-content" />
       <SkipLink href="#sidebar-navigation" className="focus:top-16">
@@ -48,28 +50,28 @@ const AppShell = ({ children, className }) => {
         </main>
         
         {/* Footer */}
-        <footer className="bg-white dark:bg-amoled-dark border-t border-surface-200 dark:border-amoled-border mt-auto">
+        <footer className="bg-white dark:bg-black border-t border-surface-200 dark:border-zinc-900 mt-auto">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="flex flex-col sm:flex-row justify-between items-center text-sm text-slate-500 dark:text-amoled-muted">
+            <div className="flex flex-col sm:flex-row justify-between items-center text-sm text-slate-500 dark:text-zinc-600">
               <div className="flex items-center space-x-4">
-                <span>© 2024 Mumbai Supermart</span>
+                <span>© 2025 Mumbai Supermart</span>
                 <span>•</span>
                 <span>Version 1.0.0</span>
               </div>
               <div className="flex items-center space-x-4 mt-2 sm:mt-0">
-                <a 
-                  href="#" 
-                  className="hover:text-slate-700 dark:hover:text-amoled-secondary transition-colors"
+                <button 
+                  onClick={() => navigate('/help-support')}
+                  className="hover:text-slate-700 dark:hover:text-zinc-400 transition-colors cursor-pointer"
                 >
                   Help
-                </a>
+                </button>
                 <span>•</span>
-                <a 
-                  href="#" 
-                  className="hover:text-slate-700 dark:hover:text-amoled-secondary transition-colors"
+                <button 
+                  onClick={() => navigate('/help-support')}
+                  className="hover:text-slate-700 dark:hover:text-zinc-400 transition-colors cursor-pointer"
                 >
                   Support
-                </a>
+                </button>
               </div>
             </div>
           </div>

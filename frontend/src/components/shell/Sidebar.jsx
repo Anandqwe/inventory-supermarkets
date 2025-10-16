@@ -89,17 +89,17 @@ const Sidebar = ({ isOpen, onClose, lowStockCount = 0, onLogout }) => {
 
       {/* Desktop sidebar - Fixed positioned */}
       <div className="hidden lg:block lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:w-64">
-        <div className="flex h-full flex-col bg-white dark:bg-amoled-black border-r border-surface-200 dark:border-amoled-border overflow-y-auto">{/* Header */}
+                <div className="flex h-full flex-col bg-white dark:bg-black border-r border-surface-200 dark:border-zinc-900 overflow-y-auto">{/* Header */}
           <div className="flex items-center flex-shrink-0 px-4 py-5">
             <div className="flex items-center">
               <div className="flex-shrink-0 h-8 w-8 bg-primary-600 rounded-lg flex items-center justify-center" aria-hidden="true">
                 <CubeIcon className="h-5 w-5 text-white" />
               </div>
               <div className="ml-3">
-                <h1 className="text-lg font-semibold text-surface-900 dark:text-amoled-primary">
+                <h1 className="text-lg font-semibold text-surface-900 dark:text-zinc-100">
                   Mumbai Supermart
                 </h1>
-                <p className="text-xs text-surface-500 dark:text-amoled-muted">
+                <p className="text-xs text-surface-500 dark:text-zinc-600">
                   Management System
                 </p>
               </div>
@@ -125,7 +125,7 @@ const Sidebar = ({ isOpen, onClose, lowStockCount = 0, onLogout }) => {
                       "group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-all duration-200",
                       isActive
                         ? "bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 border-r-2 border-primary-600"
-                        : "text-surface-600 dark:text-amoled-secondary hover:bg-surface-50 dark:hover:bg-amoled-hover hover:text-surface-900 dark:hover:text-amoled-primary"
+                        : "text-surface-600 dark:text-zinc-400 hover:bg-surface-50 dark:hover:bg-zinc-900 hover:text-surface-900 dark:hover:text-zinc-100"
                     )
                   }
                   aria-label={`Navigate to ${item.name}: ${item.description}`}
@@ -137,13 +137,13 @@ const Sidebar = ({ isOpen, onClose, lowStockCount = 0, onLogout }) => {
                           "mr-3 flex-shrink-0 h-5 w-5",
                           isActive 
                             ? "text-primary-600 dark:text-primary-400" 
-                            : "text-surface-400 dark:text-amoled-muted group-hover:text-surface-500 dark:group-hover:text-amoled-secondary"
+                            : "text-surface-400 dark:text-zinc-600 group-hover:text-surface-500 dark:group-hover:text-zinc-400"
                         )}
                         aria-hidden="true"
                       />
                       <div className="flex-1">
                         <div>{item.name}</div>
-                        <div className="text-xs text-surface-500 dark:text-amoled-muted mt-0.5">
+                        <div className="text-xs text-surface-500 dark:text-zinc-600 mt-0.5">
                           {item.description}
                         </div>
                       </div>
@@ -166,17 +166,17 @@ const Sidebar = ({ isOpen, onClose, lowStockCount = 0, onLogout }) => {
           {/* Low Stock Alert */}
           {lowStockCount > 0 && (
             <div 
-              className="mx-2 mb-4 p-3 bg-warning-50 dark:bg-amoled-card border border-warning-200 dark:border-amoled-border rounded-lg"
+              className="mx-2 mb-4 p-3 bg-warning-50 dark:bg-zinc-950 border border-warning-200 dark:border-zinc-900 rounded-lg"
               role="alert"
               aria-live="polite"
             >
               <div className="flex items-start">
                 <ExclamationTriangleIcon className="h-5 w-5 text-warning-600 dark:text-warning-400 mt-0.5 mr-2 flex-shrink-0" aria-hidden="true" />
                 <div>
-                  <p className="text-sm font-medium text-warning-800 dark:text-amoled-primary">
+                  <p className="text-sm font-medium text-warning-800 dark:text-zinc-100">
                     Low Stock Alert
                   </p>
-                  <p className="text-xs text-warning-700 dark:text-amoled-secondary mt-1">
+                  <p className="text-xs text-warning-700 dark:text-zinc-400 mt-1">
                     {lowStockCount} item{lowStockCount > 1 ? 's' : ''} need{lowStockCount === 1 ? 's' : ''} restocking
                   </p>
                 </div>
@@ -189,13 +189,13 @@ const Sidebar = ({ isOpen, onClose, lowStockCount = 0, onLogout }) => {
             <div className="mx-2 mb-4">
               <button
                 onClick={onLogout}
-                className="w-full flex items-center px-2 py-2 text-sm font-medium rounded-md text-surface-600 dark:text-amoled-secondary hover:bg-surface-50 dark:hover:bg-amoled-hover hover:text-surface-900 dark:hover:text-amoled-primary transition-all duration-200"
+                className="w-full flex items-center px-2 py-2 text-sm font-medium rounded-md text-surface-600 dark:text-zinc-400 hover:bg-surface-50 dark:hover:bg-zinc-900 hover:text-surface-900 dark:hover:text-zinc-100 transition-all duration-200"
                 aria-label="Sign out of your account"
               >
                 <ArrowRightOnRectangleIcon className="mr-3 flex-shrink-0 h-5 w-5" aria-hidden="true" />
                 <div className="flex-1 text-left">
                   <div>Sign Out</div>
-                  <div className="text-xs text-surface-500 dark:text-amoled-muted mt-0.5">
+                  <div className="text-xs text-surface-500 dark:text-zinc-600 mt-0.5">
                     Log out of your account
                   </div>
                 </div>
@@ -207,21 +207,21 @@ const Sidebar = ({ isOpen, onClose, lowStockCount = 0, onLogout }) => {
 
       {/* Mobile sidebar - Improved animation and touch */}
       <div className={cn(
-        "fixed inset-y-0 left-0 z-50 w-72 sm:w-80 max-w-[85vw] bg-white dark:bg-amoled-black shadow-2xl transform transition-transform duration-300 ease-in-out lg:hidden overflow-y-auto",
+        "fixed inset-y-0 left-0 z-50 w-72 sm:w-80 max-w-[85vw] bg-white dark:bg-black shadow-2xl transform transition-transform duration-300 ease-in-out lg:hidden overflow-y-auto",
         isOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex flex-col h-full">
           {/* Header - Sticky */}
-          <div className="sticky top-0 z-10 flex items-center justify-between p-4 border-b border-surface-200 dark:border-amoled-border bg-white dark:bg-amoled-black">
+          <div className="sticky top-0 z-10 flex items-center justify-between p-4 border-b border-surface-200 dark:border-zinc-900 bg-white dark:bg-black">
             <div className="flex items-center min-w-0 flex-1">
               <div className="flex-shrink-0 h-8 w-8 bg-primary-600 rounded-lg flex items-center justify-center">
                 <CubeIcon className="h-5 w-5 text-white" />
               </div>
               <div className="ml-3 min-w-0 flex-1">
-                <h1 className="text-lg font-semibold text-surface-900 dark:text-amoled-primary truncate">
+                <h1 className="text-lg font-semibold text-surface-900 dark:text-zinc-100 truncate">
                   Mumbai Supermart
                 </h1>
-                <p className="text-xs text-surface-500 dark:text-amoled-muted truncate">
+                <p className="text-xs text-surface-500 dark:text-zinc-600 truncate">
                   Management System
                 </p>
               </div>

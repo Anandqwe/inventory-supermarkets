@@ -285,35 +285,35 @@ function ProductModal({ product, onSave, onClose }) {
   ];
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] overflow-hidden">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] overflow-hidden">
       <div className="h-full w-full overflow-y-auto overflow-x-hidden">
         <div className="min-h-full sm:min-h-0 flex items-start sm:items-center justify-center p-0 sm:p-4">
-          <div className="relative w-full sm:max-w-5xl bg-white dark:bg-surface-900 sm:rounded-xl shadow-2xl border-0 sm:border border-surface-200 dark:border-surface-800 min-h-screen sm:min-h-0 sm:max-h-[90vh] flex flex-col overflow-hidden">
+          <div className="relative w-full sm:max-w-5xl bg-white dark:bg-black sm:rounded-xl shadow-2xl border-0 sm:border border-surface-200 dark:border-zinc-900 min-h-screen sm:min-h-0 sm:max-h-[90vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-surface-200 dark:border-surface-800 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-surface-800 dark:to-surface-800">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-surface-200 dark:border-zinc-900 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-zinc-950 dark:to-black">
           <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
-            <div className="p-1.5 sm:p-2 bg-blue-600 rounded-lg shrink-0">
+            <div className="p-1.5 sm:p-2 bg-blue-600 dark:bg-purple-600 rounded-lg shrink-0 shadow-lg dark:shadow-purple-950/50">
               <CubeIcon className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className="text-lg sm:text-xl font-semibold text-surface-900 dark:text-surface-100 truncate">
+              <h3 className="text-lg sm:text-xl font-semibold text-surface-900 dark:text-zinc-100 truncate">
                 {product ? 'Edit Product' : 'Add New Product'}
               </h3>
-              <p className="text-xs sm:text-sm text-surface-600 dark:text-surface-400 hidden sm:block">
+              <p className="text-xs sm:text-sm text-surface-600 dark:text-zinc-500 hidden sm:block">
                 {product ? 'Update product information' : 'Create a new product in your inventory'}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 sm:p-2 text-surface-400 hover:text-surface-600 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 rounded-lg transition-colors shrink-0"
+            className="p-1.5 sm:p-2 text-surface-400 hover:text-surface-600 dark:text-zinc-500 dark:hover:text-zinc-100 hover:bg-surface-100 dark:hover:bg-zinc-900 rounded-lg transition-colors shrink-0"
           >
             <XMarkIcon className="h-5 w-5 sm:h-6 sm:w-6" />
           </button>
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 overflow-x-auto scrollbar-hide">
+        <div className="border-b border-surface-200 dark:border-zinc-900 bg-white dark:bg-zinc-950 overflow-x-auto scrollbar-hide">
           <nav className="flex space-x-0 sm:space-x-1 px-3 sm:px-6 w-full sm:w-auto" aria-label="Tabs">
             {tabs.map((tab) => (
               <button
@@ -322,8 +322,8 @@ function ProductModal({ product, onSave, onClose }) {
                 className={`
                   flex items-center justify-center space-x-1 sm:space-x-2 px-2 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-medium border-b-2 transition-all whitespace-nowrap flex-1 sm:flex-initial
                   ${activeTab === tab.id
-                    ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                    : 'border-transparent text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-200 hover:border-surface-300'
+                    ? 'border-blue-600 text-blue-600 dark:border-purple-500 dark:text-purple-400'
+                    : 'border-transparent text-surface-600 dark:text-zinc-500 hover:text-surface-900 dark:hover:text-zinc-100 hover:border-surface-300 dark:hover:border-zinc-800'
                   }
                 `}
               >
@@ -336,14 +336,14 @@ function ProductModal({ product, onSave, onClose }) {
 
         {/* Form Content */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto overflow-x-hidden">
-          <div className="p-4 sm:p-6 max-w-full">
+          <div className="p-4 sm:p-6 max-w-full dark:bg-black">
             {/* Basic Info Tab */}
             {activeTab === 'basic' && (
               <div className="space-y-4 sm:space-y-6 max-w-full">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 w-full">
                   {/* Product Name */}
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+                    <label className="block text-sm font-medium text-surface-700 dark:text-zinc-300 mb-2">
                       Product Name <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -353,10 +353,10 @@ function ProductModal({ product, onSave, onClose }) {
                       onChange={handleInputChange}
                       placeholder="e.g., Amul Milk 1L"
                       className={`
-                        w-full px-4 py-2.5 rounded-lg border bg-white dark:bg-surface-800 
-                        text-surface-900 dark:text-surface-100 placeholder-surface-400
-                        focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all
-                        ${errors.name ? 'border-red-500' : 'border-surface-300 dark:border-surface-700'}
+                        w-full px-4 py-2.5 rounded-lg border bg-white dark:bg-zinc-950 
+                        text-surface-900 dark:text-zinc-100 placeholder-surface-400 dark:placeholder-zinc-700
+                        focus:ring-2 focus:ring-blue-500 dark:focus:ring-purple-500 dark:focus:ring-purple-500 focus:border-transparent transition-all
+                        ${errors.name ? 'border-red-500' : 'border-surface-300 dark:border-zinc-900'}
                       `}
                     />
                     {errors.name && (
@@ -369,7 +369,7 @@ function ProductModal({ product, onSave, onClose }) {
 
                   {/* Category */}
                   <div>
-                    <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+                    <label className="block text-sm font-medium text-surface-700 dark:text-zinc-300 mb-2">
                       Category <span className="text-red-500">*</span>
                     </label>
                     <select
@@ -377,10 +377,10 @@ function ProductModal({ product, onSave, onClose }) {
                       value={formData.category}
                       onChange={handleInputChange}
                       className={`
-                        w-full px-4 py-2.5 rounded-lg border bg-white dark:bg-surface-800 
-                        text-surface-900 dark:text-surface-100
-                        focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all
-                        ${errors.category ? 'border-red-500' : 'border-surface-300 dark:border-surface-700'}
+                        w-full px-4 py-2.5 rounded-lg border bg-white dark:bg-zinc-950 
+                        text-surface-900 dark:text-zinc-100
+                        focus:ring-2 focus:ring-blue-500 dark:focus:ring-purple-500 focus:border-transparent transition-all
+                        ${errors.category ? 'border-red-500' : 'border-surface-300 dark:border-zinc-900'}
                       `}
                     >
                       <option value="">Select Category</option>
@@ -395,14 +395,14 @@ function ProductModal({ product, onSave, onClose }) {
 
                   {/* Brand */}
                   <div>
-                    <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+                    <label className="block text-sm font-medium text-surface-700 dark:text-zinc-300 mb-2">
                       Brand
                     </label>
                     <select
                       name="brand"
                       value={formData.brand}
                       onChange={handleInputChange}
-                      className="w-full px-4 py-2.5 rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-4 py-2.5 rounded-lg border border-surface-300 dark:border-zinc-900 bg-white dark:bg-zinc-950 text-surface-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-purple-500 focus:border-transparent"
                     >
                       <option value="">Select Brand (Optional)</option>
                       {brands.map(brand => (
@@ -413,7 +413,7 @@ function ProductModal({ product, onSave, onClose }) {
 
                   {/* SKU */}
                   <div>
-                    <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+                    <label className="block text-sm font-medium text-surface-700 dark:text-zinc-300 mb-2">
                       SKU <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -423,10 +423,10 @@ function ProductModal({ product, onSave, onClose }) {
                       onChange={handleInputChange}
                       placeholder="e.g., AMUL-MILK-1L"
                       className={`
-                        w-full px-4 py-2.5 rounded-lg border bg-white dark:bg-surface-800 
-                        text-surface-900 dark:text-surface-100 placeholder-surface-400
-                        focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all
-                        ${errors.sku ? 'border-red-500' : 'border-surface-300 dark:border-surface-700'}
+                        w-full px-4 py-2.5 rounded-lg border bg-white dark:bg-zinc-950 
+                        text-surface-900 dark:text-zinc-100 placeholder-surface-400
+                        focus:ring-2 focus:ring-blue-500 dark:focus:ring-purple-500 focus:border-transparent transition-all
+                        ${errors.sku ? 'border-red-500' : 'border-surface-300 dark:border-zinc-900'}
                       `}
                     />
                     {errors.sku && (
@@ -436,7 +436,7 @@ function ProductModal({ product, onSave, onClose }) {
 
                   {/* Unit */}
                   <div>
-                    <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+                    <label className="block text-sm font-medium text-surface-700 dark:text-zinc-300 mb-2">
                       Unit <span className="text-red-500">*</span>
                     </label>
                     <select
@@ -444,10 +444,10 @@ function ProductModal({ product, onSave, onClose }) {
                       value={formData.unit}
                       onChange={handleInputChange}
                       className={`
-                        w-full px-4 py-2.5 rounded-lg border bg-white dark:bg-surface-800 
-                        text-surface-900 dark:text-surface-100
-                        focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all
-                        ${errors.unit ? 'border-red-500' : 'border-surface-300 dark:border-surface-700'}
+                        w-full px-4 py-2.5 rounded-lg border bg-white dark:bg-zinc-950 
+                        text-surface-900 dark:text-zinc-100
+                        focus:ring-2 focus:ring-blue-500 dark:focus:ring-purple-500 focus:border-transparent transition-all
+                        ${errors.unit ? 'border-red-500' : 'border-surface-300 dark:border-zinc-900'}
                       `}
                     >
                       <option value="">Select Unit</option>
@@ -462,14 +462,14 @@ function ProductModal({ product, onSave, onClose }) {
 
                   {/* Supplier */}
                   <div>
-                    <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+                    <label className="block text-sm font-medium text-surface-700 dark:text-zinc-300 mb-2">
                       Supplier
                     </label>
                     <select
                       name="supplier"
                       value={formData.supplier}
                       onChange={handleInputChange}
-                      className="w-full px-4 py-2.5 rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-4 py-2.5 rounded-lg border border-surface-300 dark:border-zinc-900 bg-white dark:bg-zinc-950 text-surface-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-purple-500 focus:border-transparent"
                     >
                       <option value="">Select Supplier (Optional)</option>
                       {suppliers.map(supplier => (
@@ -480,7 +480,7 @@ function ProductModal({ product, onSave, onClose }) {
 
                   {/* Description */}
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+                    <label className="block text-sm font-medium text-surface-700 dark:text-zinc-300 mb-2">
                       Description
                     </label>
                     <textarea
@@ -489,7 +489,7 @@ function ProductModal({ product, onSave, onClose }) {
                       onChange={handleInputChange}
                       rows={3}
                       placeholder="Enter product description..."
-                      className="w-full px-4 py-2.5 rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 placeholder-surface-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-4 py-2.5 rounded-lg border border-surface-300 dark:border-zinc-900 bg-white dark:bg-zinc-950 text-surface-900 dark:text-zinc-100 placeholder-surface-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-purple-500 focus:border-transparent"
                     />
                   </div>
 
@@ -501,9 +501,9 @@ function ProductModal({ product, onSave, onClose }) {
                         name="isActive"
                         checked={formData.isActive}
                         onChange={handleInputChange}
-                        className="w-5 h-5 rounded border-surface-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                        className="w-5 h-5 rounded border-surface-300 text-blue-600 focus:ring-2 focus:ring-blue-500 dark:focus:ring-purple-500"
                       />
-                      <span className="text-sm font-medium text-surface-700 dark:text-surface-300 group-hover:text-surface-900 dark:group-hover:text-surface-100">
+                      <span className="text-sm font-medium text-surface-700 dark:text-zinc-300 group-hover:text-surface-900 dark:group-hover:text-surface-100">
                         Product is active and available for sale
                       </span>
                     </label>
@@ -528,7 +528,7 @@ function ProductModal({ product, onSave, onClose }) {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                   {/* Cost Price */}
                   <div>
-                    <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+                    <label className="block text-sm font-medium text-surface-700 dark:text-zinc-300 mb-2">
                       Cost Price (₹)
                       <span className="text-xs font-normal text-surface-500 ml-2">(From Supplier)</span>
                     </label>
@@ -543,10 +543,10 @@ function ProductModal({ product, onSave, onClose }) {
                         min="0"
                         placeholder="0.00"
                         className={`
-                          w-full pl-10 pr-4 py-2.5 rounded-lg border bg-white dark:bg-surface-800 
-                          text-surface-900 dark:text-surface-100 placeholder-surface-400
-                          focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all
-                          ${errors.costPrice ? 'border-red-500' : 'border-surface-300 dark:border-surface-700'}
+                          w-full pl-10 pr-4 py-2.5 rounded-lg border bg-white dark:bg-zinc-950 
+                          text-surface-900 dark:text-zinc-100 placeholder-surface-400
+                          focus:ring-2 focus:ring-blue-500 dark:focus:ring-purple-500 focus:border-transparent transition-all
+                          ${errors.costPrice ? 'border-red-500' : 'border-surface-300 dark:border-zinc-900'}
                         `}
                       />
                     </div>
@@ -557,7 +557,7 @@ function ProductModal({ product, onSave, onClose }) {
 
                   {/* Selling Price */}
                   <div>
-                    <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+                    <label className="block text-sm font-medium text-surface-700 dark:text-zinc-300 mb-2">
                       Selling Price (₹) <span className="text-red-500">*</span>
                       <span className="text-xs font-normal text-surface-500 ml-2">(Incl. GST)</span>
                     </label>
@@ -572,10 +572,10 @@ function ProductModal({ product, onSave, onClose }) {
                         min="0"
                         placeholder="0.00"
                         className={`
-                          w-full pl-10 pr-4 py-2.5 rounded-lg border bg-white dark:bg-surface-800 
-                          text-surface-900 dark:text-surface-100 placeholder-surface-400
-                          focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all
-                          ${errors.sellingPrice ? 'border-red-500' : 'border-surface-300 dark:border-surface-700'}
+                          w-full pl-10 pr-4 py-2.5 rounded-lg border bg-white dark:bg-zinc-950 
+                          text-surface-900 dark:text-zinc-100 placeholder-surface-400
+                          focus:ring-2 focus:ring-blue-500 dark:focus:ring-purple-500 focus:border-transparent transition-all
+                          ${errors.sellingPrice ? 'border-red-500' : 'border-surface-300 dark:border-zinc-900'}
                         `}
                       />
                     </div>
@@ -586,7 +586,7 @@ function ProductModal({ product, onSave, onClose }) {
 
                   {/* MRP */}
                   <div>
-                    <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+                    <label className="block text-sm font-medium text-surface-700 dark:text-zinc-300 mb-2">
                       MRP (₹)
                       <span className="text-xs font-normal text-surface-500 ml-2">(Max Retail Price - Incl. GST)</span>
                     </label>
@@ -601,10 +601,10 @@ function ProductModal({ product, onSave, onClose }) {
                         min="0"
                         placeholder="0.00"
                         className={`
-                          w-full pl-10 pr-4 py-2.5 rounded-lg border bg-white dark:bg-surface-800 
-                          text-surface-900 dark:text-surface-100 placeholder-surface-400
-                          focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all
-                          ${errors.mrp ? 'border-red-500' : 'border-surface-300 dark:border-surface-700'}
+                          w-full pl-10 pr-4 py-2.5 rounded-lg border bg-white dark:bg-zinc-950 
+                          text-surface-900 dark:text-zinc-100 placeholder-surface-400
+                          focus:ring-2 focus:ring-blue-500 dark:focus:ring-purple-500 focus:border-transparent transition-all
+                          ${errors.mrp ? 'border-red-500' : 'border-surface-300 dark:border-zinc-900'}
                         `}
                       />
                     </div>
@@ -615,7 +615,7 @@ function ProductModal({ product, onSave, onClose }) {
 
                   {/* Tax Rate */}
                   <div>
-                    <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+                    <label className="block text-sm font-medium text-surface-700 dark:text-zinc-300 mb-2">
                       GST Rate (%)
                       <span className="text-xs font-normal text-surface-500 ml-2">(For reporting only)</span>
                     </label>
@@ -623,7 +623,7 @@ function ProductModal({ product, onSave, onClose }) {
                       name="pricing.taxRate"
                       value={formData.pricing.taxRate}
                       onChange={handleInputChange}
-                      className="w-full px-4 py-2.5 rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-4 py-2.5 rounded-lg border border-surface-300 dark:border-zinc-900 bg-white dark:bg-zinc-950 text-surface-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-purple-500 focus:border-transparent"
                     >
                       <option value="0">0% (Exempt)</option>
                       <option value="5">5%</option>
@@ -668,9 +668,9 @@ function ProductModal({ product, onSave, onClose }) {
                   {formData.branchStocks.map((stock, index) => {
                     const branch = branches.find(b => b._id === stock.branchId || b._id === stock.branch?._id);
                     return (
-                      <div key={stock.branchId || index} className="bg-surface-50 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 rounded-lg p-3 sm:p-4">
+                      <div key={stock.branchId || index} className="bg-surface-50 dark:bg-zinc-950 border border-surface-200 dark:border-zinc-900 rounded-lg p-3 sm:p-4">
                         <div className="flex items-center justify-between mb-3 sm:mb-4">
-                          <h4 className="text-sm sm:text-base font-medium text-surface-900 dark:text-surface-100 flex items-center">
+                          <h4 className="text-sm sm:text-base font-medium text-surface-900 dark:text-zinc-100 flex items-center">
                             <TruckIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-2 text-blue-600 shrink-0" />
                             <span className="truncate">{branch?.name || 'Unknown Branch'}</span>
                           </h4>
@@ -678,7 +678,7 @@ function ProductModal({ product, onSave, onClose }) {
                         
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                           <div>
-                            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+                            <label className="block text-sm font-medium text-surface-700 dark:text-zinc-300 mb-2">
                               Current Quantity
                             </label>
                             <input
@@ -686,12 +686,12 @@ function ProductModal({ product, onSave, onClose }) {
                               value={stock.quantity || 0}
                               onChange={(e) => handleBranchStockChange(stock.branchId || stock.branch?._id, 'quantity', e.target.value)}
                               min="0"
-                              className="w-full px-4 py-2.5 rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-900 text-surface-900 dark:text-surface-100 focus:ring-2 focus:ring-blue-500"
+                              className="w-full px-4 py-2.5 rounded-lg border border-surface-300 dark:border-zinc-900 bg-white dark:bg-black text-surface-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-purple-500"
                             />
                           </div>
                           
                           <div>
-                            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+                            <label className="block text-sm font-medium text-surface-700 dark:text-zinc-300 mb-2">
                               Reorder Level
                             </label>
                             <input
@@ -699,12 +699,12 @@ function ProductModal({ product, onSave, onClose }) {
                               value={stock.reorderLevel || 10}
                               onChange={(e) => handleBranchStockChange(stock.branchId || stock.branch?._id, 'reorderLevel', e.target.value)}
                               min="0"
-                              className="w-full px-4 py-2.5 rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-900 text-surface-900 dark:text-surface-100 focus:ring-2 focus:ring-blue-500"
+                              className="w-full px-4 py-2.5 rounded-lg border border-surface-300 dark:border-zinc-900 bg-white dark:bg-black text-surface-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-purple-500"
                             />
                           </div>
                           
                           <div>
-                            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+                            <label className="block text-sm font-medium text-surface-700 dark:text-zinc-300 mb-2">
                               Max Stock Level
                             </label>
                             <input
@@ -712,7 +712,7 @@ function ProductModal({ product, onSave, onClose }) {
                               value={stock.maxStockLevel || 1000}
                               onChange={(e) => handleBranchStockChange(stock.branchId || stock.branch?._id, 'maxStockLevel', e.target.value)}
                               min="0"
-                              className="w-full px-4 py-2.5 rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-900 text-surface-900 dark:text-surface-100 focus:ring-2 focus:ring-blue-500"
+                              className="w-full px-4 py-2.5 rounded-lg border border-surface-300 dark:border-zinc-900 bg-white dark:bg-black text-surface-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-purple-500"
                             />
                           </div>
                         </div>
@@ -729,14 +729,14 @@ function ProductModal({ product, onSave, onClose }) {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                   {/* GST Rate */}
                   <div>
-                    <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+                    <label className="block text-sm font-medium text-surface-700 dark:text-zinc-300 mb-2">
                       GST Rate (%)
                     </label>
                     <select
                       name="taxSettings.gstRate"
                       value={formData.taxSettings.gstRate}
                       onChange={handleInputChange}
-                      className="w-full px-4 py-2.5 rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-4 py-2.5 rounded-lg border border-surface-300 dark:border-zinc-900 bg-white dark:bg-zinc-950 text-surface-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-purple-500"
                     >
                       <option value="0">0% (Exempt)</option>
                       <option value="5">5%</option>
@@ -748,7 +748,7 @@ function ProductModal({ product, onSave, onClose }) {
 
                   {/* HSN Code */}
                   <div>
-                    <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+                    <label className="block text-sm font-medium text-surface-700 dark:text-zinc-300 mb-2">
                       HSN Code
                     </label>
                     <input
@@ -757,7 +757,7 @@ function ProductModal({ product, onSave, onClose }) {
                       value={formData.taxSettings.hsnCode}
                       onChange={handleInputChange}
                       placeholder="e.g., 0401"
-                      className="w-full px-4 py-2.5 rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 placeholder-surface-400 focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-4 py-2.5 rounded-lg border border-surface-300 dark:border-zinc-900 bg-white dark:bg-zinc-950 text-surface-900 dark:text-zinc-100 placeholder-surface-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-purple-500"
                     />
                   </div>
 
@@ -769,9 +769,9 @@ function ProductModal({ product, onSave, onClose }) {
                         name="taxSettings.taxable"
                         checked={formData.taxSettings.taxable}
                         onChange={handleInputChange}
-                        className="w-5 h-5 rounded border-surface-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                        className="w-5 h-5 rounded border-surface-300 text-blue-600 focus:ring-2 focus:ring-blue-500 dark:focus:ring-purple-500"
                       />
-                      <span className="text-sm font-medium text-surface-700 dark:text-surface-300 group-hover:text-surface-900 dark:group-hover:text-surface-100">
+                      <span className="text-sm font-medium text-surface-700 dark:text-zinc-300 group-hover:text-surface-900 dark:group-hover:text-surface-100">
                         This product is taxable
                       </span>
                     </label>
@@ -805,12 +805,12 @@ function ProductModal({ product, onSave, onClose }) {
           </div>
 
           {/* Footer Actions */}
-          <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 p-4 sm:p-6 border-t border-surface-200 dark:border-surface-800 bg-surface-50 dark:bg-surface-800/50">
+          <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 p-4 sm:p-6 border-t border-surface-200 dark:border-zinc-900 bg-surface-50 dark:bg-zinc-950/50">
             <button
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="px-4 sm:px-6 py-2.5 border border-surface-300 dark:border-surface-600 rounded-lg text-sm font-medium text-surface-700 dark:text-surface-200 bg-white dark:bg-surface-800 hover:bg-surface-50 dark:hover:bg-surface-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-all w-full sm:w-auto"
+              className="px-4 sm:px-6 py-2.5 border border-surface-300 dark:border-zinc-900 rounded-lg text-sm font-medium text-surface-700 dark:text-zinc-300 bg-white dark:bg-zinc-950 hover:bg-surface-50 dark:hover:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-purple-500 disabled:opacity-50 transition-all w-full sm:w-auto"
             >
               Cancel
             </button>
@@ -818,7 +818,7 @@ function ProductModal({ product, onSave, onClose }) {
             <button
               type="submit"
               disabled={loading}
-              className="inline-flex items-center justify-center px-4 sm:px-6 py-2.5 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all w-full sm:w-auto"
+              className="inline-flex items-center justify-center px-4 sm:px-6 py-2.5 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all w-full sm:w-auto"
             >
               {loading ? (
                 <>

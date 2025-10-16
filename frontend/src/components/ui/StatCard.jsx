@@ -69,14 +69,14 @@ const StatCard = ({
       <div className="p-5">
         <div className="flex items-center justify-between">
           <div className="flex-1">
-            <p className="text-sm font-medium text-surface-600 dark:text-surface-400 truncate">
+            <p className="text-sm font-medium text-surface-600 dark:text-zinc-500 truncate">
               {title}
             </p>
             <div className="mt-1 flex items-baseline">
               {loading ? (
-                <div className="animate-pulse bg-surface-200 dark:bg-surface-700 h-8 w-24 rounded"></div>
+                <div className="animate-pulse bg-zinc-800 dark:bg-zinc-900 h-8 w-24 rounded"></div>
               ) : (
-                <p className="text-2xl font-semibold text-surface-900 dark:text-surface-100">
+                <p className="text-2xl font-semibold text-surface-900 dark:text-zinc-100">
                   {formatValue(value)}
                 </p>
               )}

@@ -110,6 +110,15 @@ class DashboardController {
             ]
           }
         },
+        // Lookup branch information for low stock branches
+        {
+          $lookup: {
+            from: 'branches',
+            localField: 'lowStockBranches.branch',
+            foreignField: '_id',
+            as: 'branchDetails'
+          }
+        },
         { $limit: 10 },
         {
           $project: {
@@ -119,6 +128,7 @@ class DashboardController {
             quantity: 1,
             price: '$pricing.sellingPrice',
             lowStockBranches: 1,
+            branchDetails: 1,
             // Extract stock quantity (from branch or main quantity)
             stock: {
               $cond: {
@@ -133,6 +143,14 @@ class DashboardController {
                 if: { $gt: [{ $size: '$lowStockBranches' }, 0] },
                 then: { $arrayElemAt: ['$lowStockBranches.reorderLevel', 0] },
                 else: 10
+              }
+            },
+            // Extract branch name for display
+            branchName: {
+              $cond: {
+                if: { $gt: [{ $size: '$branchDetails' }, 0] },
+                then: { $arrayElemAt: ['$branchDetails.name', 0] },
+                else: 'Unknown Branch'
               }
             }
           }

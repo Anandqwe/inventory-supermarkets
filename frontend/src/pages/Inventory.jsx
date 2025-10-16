@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'react-toastify';
 import { 
   CubeIcon, 
   TruckIcon, 
@@ -36,7 +37,6 @@ import { Modal } from '../components/ui/Modal';
 import { DataTable } from '../components/ui/DataTable';
 import { StatCard } from '../components/ui/StatCard';
 import { LoadingSpinner } from '../components/LoadingSpinner';
-import Toast from '../components/Toast';
 import { PageHeader } from '../components/shell/PageHeader';
 import { inventoryAPI, purchaseAPI, masterDataAPI, productsAPI } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -77,12 +77,17 @@ function Inventory() {
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showPurchaseOrderModal, setShowPurchaseOrderModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
-  const [toast, setToast] = useState(null);
   const [selectedBranch, setSelectedBranch] = useState(userBranchId || 'all');
-  const [dateRange, setDateRange] = useState({
-    startDate: '',
-    endDate: ''
-  });
+  const [exportLoading, setExportLoading] = useState(false);
+  const [alertTypeFilter, setAlertTypeFilter] = useState('all');
+  
+  // Adjustments tab state
+  const [adjustmentSearch, setAdjustmentSearch] = useState('');
+  const [adjustmentStatusFilter, setAdjustmentStatusFilter] = useState('all');
+  const [adjustmentTypeFilter, setAdjustmentTypeFilter] = useState('all');
+  const [adjustmentPagination, setAdjustmentPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  const [selectedAdjustment, setSelectedAdjustment] = useState(null);
+  const [showAdjustmentDetailsModal, setShowAdjustmentDetailsModal] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -106,14 +111,11 @@ function Inventory() {
     if (selectedBranch && selectedBranch !== 'all') {
       params.branch = selectedBranch;
     }
-    if (dateRange.startDate) {
-      params.startDate = dateRange.startDate;
-    }
-    if (dateRange.endDate) {
-      params.endDate = dateRange.endDate;
+    if (alertTypeFilter && alertTypeFilter !== 'all') {
+      params.alertType = alertTypeFilter;
     }
     return params;
-  }, [selectedBranch, dateRange]);
+  }, [selectedBranch, alertTypeFilter]);
 
   // Queries
   const { data: lowStockData, isLoading: lowStockLoading } = useQuery({
@@ -158,13 +160,16 @@ function Inventory() {
   const createAdjustmentMutation = useMutation({
     mutationFn: inventoryAPI.createAdjustment,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['adjustments'] });
+      // Invalidate all adjustments queries regardless of filter params
+      queryClient.invalidateQueries({ queryKey: ['adjustments'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['low-stock-alerts'] });
       setShowAdjustmentModal(false);
-      setToast({ type: 'success', message: 'Stock adjustment created successfully' });
+      toast.success('Stock adjustment created successfully');
     },
     onError: (error) => {
-      setToast({ type: 'error', message: error.message });
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to create adjustment';
+      toast.error(errorMessage);
+      console.error('Adjustment creation error:', error);
     }
   });
 
@@ -174,10 +179,12 @@ function Inventory() {
       queryClient.invalidateQueries({ queryKey: ['transfers'] });
       queryClient.invalidateQueries({ queryKey: ['low-stock-alerts'] });
       setShowTransferModal(false);
-      setToast({ type: 'success', message: 'Stock transfer created successfully' });
+      toast.success('Stock transfer created successfully');
     },
     onError: (error) => {
-      setToast({ type: 'error', message: error.message });
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to create transfer';
+      toast.error(errorMessage);
+      console.error('Transfer creation error:', error);
     }
   });
 
@@ -186,10 +193,12 @@ function Inventory() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
       setShowPurchaseOrderModal(false);
-      setToast({ type: 'success', message: 'Purchase order created successfully' });
+      toast.success('Purchase order created successfully');
     },
     onError: (error) => {
-      setToast({ type: 'error', message: error.message });
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to create purchase order';
+      toast.error(errorMessage);
+      console.error('Purchase order creation error:', error);
     }
   });
 
@@ -242,6 +251,56 @@ function Inventory() {
       }
     ];
   }, [lowStockData, reorderData, adjustmentsData, transfersData]);
+
+  // Filter low stock items by alert type
+  const filteredLowStockItems = useMemo(() => {
+    if (!lowStockData?.data?.products) return [];
+    
+    const items = lowStockData.data.products;
+    
+    if (alertTypeFilter === 'all') {
+      return items;
+    } else if (alertTypeFilter === 'critical') {
+      return items.filter(item => item.urgency === 'critical');
+    } else if (alertTypeFilter === 'low-stock') {
+      return items.filter(item => item.urgency !== 'critical');
+    } else if (alertTypeFilter === 'reorder') {
+      // Items that need reorder (this could be all low stock items or items below certain level)
+      return items.filter(item => item.stockQuantity <= item.reorderLevel);
+    }
+    
+    return items;
+  }, [lowStockData, alertTypeFilter]);
+
+  // Filter adjustments by search, status, and type
+  const filteredAdjustments = useMemo(() => {
+    if (!adjustmentsData?.data) return [];
+    
+    let filtered = adjustmentsData.data;
+    
+    // Filter by search term
+    if (adjustmentSearch.trim()) {
+      const searchLower = adjustmentSearch.toLowerCase();
+      filtered = filtered.filter(adj => 
+        adj.adjustmentNumber?.toLowerCase().includes(searchLower) ||
+        adj.product?.name?.toLowerCase().includes(searchLower) ||
+        adj.product?.sku?.toLowerCase().includes(searchLower) ||
+        adj.reason?.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    // Filter by status
+    if (adjustmentStatusFilter !== 'all') {
+      filtered = filtered.filter(adj => adj.status === adjustmentStatusFilter);
+    }
+    
+    // Filter by type
+    if (adjustmentTypeFilter !== 'all') {
+      filtered = filtered.filter(adj => adj.type === adjustmentTypeFilter);
+    }
+    
+    return filtered;
+  }, [adjustmentsData, adjustmentSearch, adjustmentStatusFilter, adjustmentTypeFilter]);
 
   // Low Stock Alerts Component
   const LowStockAlerts = () => (
@@ -379,6 +438,9 @@ function Inventory() {
     {
       accessorKey: 'adjustmentNumber',
       header: 'Adjustment #',
+      cell: ({ getValue }) => (
+        <span className="font-mono text-sm">{getValue()}</span>
+      )
     },
     {
       accessorKey: 'product.name',
@@ -391,11 +453,18 @@ function Inventory() {
       )
     },
     {
+      accessorKey: 'branch',
+      header: 'Branch',
+      cell: ({ getValue }) => (
+        <span className="text-sm">{getValue()?.name || 'N/A'}</span>
+      )
+    },
+    {
       accessorKey: 'type',
       header: 'Type',
       cell: ({ getValue }) => (
         <Badge variant={getValue() === 'increase' ? 'success' : 'destructive'}>
-          {getValue()}
+          {getValue() === 'increase' ? '➕ Add' : '➖ Remove'}
         </Badge>
       )
     },
@@ -403,7 +472,7 @@ function Inventory() {
       accessorKey: 'quantity',
       header: 'Quantity',
       cell: ({ row }) => (
-        <span className={row.original.type === 'increase' ? 'text-green-600' : 'text-red-600'}>
+        <span className={`font-semibold ${row.original.type === 'increase' ? 'text-green-600' : 'text-red-600'}`}>
           {row.original.type === 'increase' ? '+' : '-'}{row.original.quantity}
         </span>
       )
@@ -411,6 +480,9 @@ function Inventory() {
     {
       accessorKey: 'reason',
       header: 'Reason',
+      cell: ({ getValue }) => (
+        <span className="text-sm capitalize">{getValue()?.replace(/-/g, ' ')}</span>
+      )
     },
     {
       accessorKey: 'status',
@@ -428,7 +500,32 @@ function Inventory() {
     {
       accessorKey: 'createdAt',
       header: 'Date',
-      cell: ({ getValue }) => new Date(getValue()).toLocaleDateString()
+      cell: ({ getValue }) => (
+        <div className="text-sm">
+          <div>{new Date(getValue()).toLocaleDateString()}</div>
+          <div className="text-xs text-slate-500">{new Date(getValue()).toLocaleTimeString()}</div>
+        </div>
+      )
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setSelectedAdjustment(row.original);
+              setShowAdjustmentDetailsModal(true);
+            }}
+            className="h-8 w-8 p-0"
+            title="View Details"
+          >
+            <EyeIcon className="h-4 w-4" />
+          </Button>
+        </div>
+      )
     }
   ];
 
@@ -439,12 +536,14 @@ function Inventory() {
       header: 'Transfer #',
     },
     {
-      accessorKey: 'fromBranch.name',
+      accessorKey: 'fromBranch',
       header: 'From',
+      cell: ({ getValue }) => getValue()?.name || 'N/A'
     },
     {
-      accessorKey: 'toBranch.name',
+      accessorKey: 'toBranch',
       header: 'To',
+      cell: ({ getValue }) => getValue()?.name || 'N/A'
     },
     {
       accessorKey: 'totalItems',
@@ -639,71 +738,77 @@ function Inventory() {
       case 'alerts':
         return (
           <div className="space-y-6">
-            {/* Filters Bar - For Admin/Regional Manager */}
-            {(user?.role === 'Admin' || user?.role === 'Regional Manager') && (
-              <Card className="p-4">
-                <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-end gap-3 sm:gap-4">
-                  <div className="flex-1 min-w-full sm:min-w-[180px] lg:min-w-[200px]">
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                      Branch
+            {/* Filters Card - Matching Products page style */}
+            <Card className="p-4 sm:p-5 border-0 shadow-sm bg-gradient-to-r from-white to-slate-50 dark:from-surface-900 dark:to-zinc-900 sticky top-0 z-10">
+              <div className="flex flex-col gap-4">
+                {/* Header with Title and Filter Toggle */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FunnelIcon className="h-5 w-5 text-primary-600 dark:text-primary-400" />
+                    <h3 className="text-sm font-semibold text-zinc-950 dark:text-zinc-100">
+                      Search & Filters
+                    </h3>
+                  </div>
+                </div>
+
+                {/* Filters Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {/* Branch Filter (Admin/Regional Manager Only) */}
+                  {(user?.role === 'Admin' || user?.role === 'Regional Manager') && (
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-600 uppercase tracking-wide">
+                        Branch
+                      </label>
+                      <select
+                        value={selectedBranch}
+                        onChange={(e) => setSelectedBranch(e.target.value)}
+                        className="h-10 px-3 border-2 border-zinc-400 dark:border-zinc-900 rounded-lg bg-white dark:bg-zinc-950 text-sm text-zinc-950 dark:text-zinc-100 focus:border-purple-500 dark:focus:border-purple-400 outline-none transition-colors cursor-pointer hover:border-zinc-500 dark:hover:border-zinc-800"
+                      >
+                        <option value="all">All Branches</option>
+                        {branchesData?.data?.map((branch) => (
+                          <option key={branch._id} value={branch._id}>
+                            {branch.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  
+                  {/* Alert Type Filter */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-600 uppercase tracking-wide">
+                      Alert Type
                     </label>
                     <select
-                      value={selectedBranch}
-                      onChange={(e) => setSelectedBranch(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      value={alertTypeFilter}
+                      onChange={(e) => setAlertTypeFilter(e.target.value)}
+                      className="h-10 px-3 border-2 border-zinc-400 dark:border-zinc-900 rounded-lg bg-white dark:bg-zinc-950 text-sm text-zinc-950 dark:text-zinc-100 focus:border-purple-500 dark:focus:border-purple-400 outline-none transition-colors cursor-pointer hover:border-zinc-500 dark:hover:border-zinc-800"
                     >
-                      <option value="all">All Branches</option>
-                      {branchesData?.data?.map((branch) => (
-                        <option key={branch._id} value={branch._id}>
-                          {branch.name}
-                        </option>
-                      ))}
+                      <option value="all">All Alerts</option>
+                      <option value="critical">🔴 Critical (Out of Stock)</option>
+                      <option value="low-stock">🟠 Low Stock</option>
+                      <option value="reorder">🔵 Reorder Required</option>
                     </select>
                   </div>
-                  
-                  <div className="flex-1 min-w-full sm:min-w-[160px] lg:min-w-[180px]">
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                      Start Date
-                    </label>
-                    <Input
-                      type="date"
-                      value={dateRange.startDate}
-                      onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
-                      max={dateRange.endDate || undefined}
-                      className="w-full"
-                    />
-                  </div>
-                  
-                  <div className="flex-1 min-w-full sm:min-w-[160px] lg:min-w-[180px]">
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                      End Date
-                    </label>
-                    <Input
-                      type="date"
-                      value={dateRange.endDate}
-                      onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
-                      min={dateRange.startDate || undefined}
-                      className="w-full"
-                    />
-                  </div>
-                  
-                  <div className="flex sm:flex-shrink-0 w-full sm:w-auto">
+
+                  {/* Clear Button */}
+                  <div className="flex items-end">
                     <Button
                       variant="outline"
                       size="sm"
-                      className="w-full sm:w-auto"
                       onClick={() => {
                         setSelectedBranch('all');
-                        setDateRange({ startDate: '', endDate: '' });
+                        setAlertTypeFilter('all');
                       }}
+                      className="w-full h-10"
                     >
-                      <XCircleIcon className="h-4 w-4 mr-1" />
-                      Clear
+                      <XCircleIcon className="h-4 w-4 mr-2" />
+                      Clear Filters
                     </Button>
                   </div>
                 </div>
-              </Card>
-            )}
+              </div>
+            </Card>
 
             {/* Alerts Header with Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -774,9 +879,9 @@ function Inventory() {
 
                 {lowStockLoading ? (
                   <LoadingSpinner />
-                ) : lowStockData?.data?.products?.length > 0 ? (
+                ) : filteredLowStockItems?.length > 0 ? (
                   <div className="space-y-3 max-h-[600px] overflow-y-auto">
-                    {lowStockData.data.products.map((item) => (
+                    {filteredLowStockItems.map((item) => (
                       <Card key={item._id} className={`p-4 ${
                         item.urgency === 'critical' 
                           ? 'border-l-4 border-l-red-500 bg-red-50/50 dark:bg-red-900/10' 
@@ -986,6 +1091,87 @@ function Inventory() {
               </Card>
             </div>
 
+            {/* Filters Card */}
+            <Card className="p-4 sm:p-5 border-0 shadow-sm bg-gradient-to-r from-white to-slate-50 dark:from-surface-900 dark:to-zinc-900">
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center gap-2">
+                  <FunnelIcon className="h-5 w-5 text-primary-600 dark:text-primary-400" />
+                  <h3 className="text-sm font-semibold text-zinc-950 dark:text-zinc-100">
+                    Search & Filters
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {/* Search */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-600 uppercase tracking-wide">
+                      Search
+                    </label>
+                    <div className="relative">
+                      <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-surface-400" />
+                      <input
+                        type="text"
+                        value={adjustmentSearch}
+                        onChange={(e) => setAdjustmentSearch(e.target.value)}
+                        placeholder="Adjustment #, Product..."
+                        className="w-full h-10 pl-10 pr-3 border-2 border-zinc-400 dark:border-zinc-900 rounded-lg bg-white dark:bg-zinc-950 text-sm text-zinc-950 dark:text-zinc-100 focus:border-purple-500 dark:focus:border-purple-400 outline-none transition-colors"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Status Filter */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-600 uppercase tracking-wide">
+                      Status
+                    </label>
+                    <select
+                      value={adjustmentStatusFilter}
+                      onChange={(e) => setAdjustmentStatusFilter(e.target.value)}
+                      className="h-10 px-3 border-2 border-zinc-400 dark:border-zinc-900 rounded-lg bg-white dark:bg-zinc-950 text-sm text-zinc-950 dark:text-zinc-100 focus:border-purple-500 dark:focus:border-purple-400 outline-none transition-colors cursor-pointer"
+                    >
+                      <option value="all">All Status</option>
+                      <option value="pending">⏳ Pending</option>
+                      <option value="approved">✅ Approved</option>
+                      <option value="rejected">❌ Rejected</option>
+                    </select>
+                  </div>
+
+                  {/* Type Filter */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-600 uppercase tracking-wide">
+                      Type
+                    </label>
+                    <select
+                      value={adjustmentTypeFilter}
+                      onChange={(e) => setAdjustmentTypeFilter(e.target.value)}
+                      className="h-10 px-3 border-2 border-zinc-400 dark:border-zinc-900 rounded-lg bg-white dark:bg-zinc-950 text-sm text-zinc-950 dark:text-zinc-100 focus:border-purple-500 dark:focus:border-purple-400 outline-none transition-colors cursor-pointer"
+                    >
+                      <option value="all">All Types</option>
+                      <option value="increase">➕ Increase</option>
+                      <option value="decrease">➖ Decrease</option>
+                    </select>
+                  </div>
+
+                  {/* Clear Button */}
+                  <div className="flex items-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setAdjustmentSearch('');
+                        setAdjustmentStatusFilter('all');
+                        setAdjustmentTypeFilter('all');
+                      }}
+                      className="w-full h-10"
+                    >
+                      <XCircleIcon className="h-4 w-4 mr-2" />
+                      Clear
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
             {/* Adjustments Table Card */}
             <Card className="p-4 md:p-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 md:gap-4 mb-4 md:mb-6">
@@ -998,7 +1184,7 @@ function Inventory() {
                       Stock Adjustments History
                     </h3>
                     <p className="text-xs md:text-sm text-slate-600 dark:text-slate-400">
-                      Track and manage inventory adjustments
+                      {filteredAdjustments.length} of {adjustmentsData?.data?.length || 0} adjustments
                     </p>
                   </div>
                 </div>
@@ -1010,7 +1196,8 @@ function Inventory() {
                     className="flex-1 sm:flex-initial"
                     onClick={() => queryClient.invalidateQueries({ queryKey: ['adjustments'] })}
                   >
-                    <ArrowPathIcon className="h-4 w-4" />
+                    <ArrowPathIcon className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Refresh</span>
                   </Button>
                   {canCreateAdjustments && (
                     <Button 
@@ -1030,17 +1217,15 @@ function Inventory() {
                 <div className="py-12">
                   <LoadingSpinner />
                 </div>
-              ) : adjustmentsData?.data?.length > 0 ? (
+              ) : filteredAdjustments.length > 0 ? (
                 <div className="overflow-x-auto -mx-4 md:-mx-6">
                   <div className="inline-block min-w-full align-middle px-4 md:px-6">
                     <DataTable
-                      data={adjustmentsData.data}
+                      data={filteredAdjustments}
                       columns={adjustmentsColumns}
-                      searchKey="adjustmentNumber"
-                      pagination={{
-                        pageIndex: 0,
-                        pageSize: 10
-                      }}
+                      pagination={adjustmentPagination}
+                      onPaginationChange={setAdjustmentPagination}
+                      totalRows={filteredAdjustments.length}
                     />
                   </div>
                 </div>
@@ -1454,6 +1639,140 @@ function Inventory() {
     }
   };
 
+  const handleExportInventory = async () => {
+    try {
+      setExportLoading(true);
+      
+      // Helper function to convert array of objects to CSV
+      const convertToCSV = (data) => {
+        if (!data || data.length === 0) return '';
+        
+        const keys = Object.keys(data[0]);
+        const headers = keys.join(',');
+        const rows = data.map(obj =>
+          keys.map(key => {
+            const value = obj[key];
+            // Escape commas and quotes in values
+            if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
+              return `"${value.replace(/"/g, '""')}"`;
+            }
+            return value;
+          }).join(',')
+        );
+        
+        return [headers, ...rows].join('\n');
+      };
+      
+      // Determine what data to export based on active tab
+      if (activeTab === 'adjustments' && adjustmentsData?.data?.length > 0) {
+        // Export adjustments as CSV
+        const csvData = adjustmentsData.data.map(adj => ({
+          'Date': new Date(adj.createdAt).toLocaleDateString(),
+          'Product': adj.product?.name || 'N/A',
+          'SKU': adj.product?.sku || 'N/A',
+          'Type': adj.type || '',
+          'Quantity': adj.quantity || 0,
+          'Reason': adj.reason || '',
+          'Branch': adj.branch?.name || 'N/A'
+        }));
+        
+        const csv = convertToCSV(csvData);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = window.URL.createObjectURL(blob);
+        link.href = url;
+        link.download = `inventory-adjustments-${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        toast.success('Adjustments exported successfully');
+      } else if (activeTab === 'transfers' && transfersData?.data?.length > 0) {
+        // Export transfers as CSV
+        const csvData = transfersData.data.map(transfer => ({
+          'Date': new Date(transfer.createdAt).toLocaleDateString(),
+          'From Branch': transfer.fromBranch?.name || 'N/A',
+          'To Branch': transfer.toBranch?.name || 'N/A',
+          'Status': transfer.status || '',
+          'Total Items': transfer.items?.length || 0,
+          'Created By': transfer.createdBy?.fullName || 'N/A'
+        }));
+        
+        const csv = convertToCSV(csvData);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = window.URL.createObjectURL(blob);
+        link.href = url;
+        link.download = `inventory-transfers-${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        toast.success('Transfers exported successfully');
+      } else if (activeTab === 'purchase-orders' && purchaseOrdersData?.data?.length > 0) {
+        // Export purchase orders as CSV
+        const csvData = purchaseOrdersData.data.map(po => ({
+          'PO Number': po.poNumber || '',
+          'Date': new Date(po.createdAt).toLocaleDateString(),
+          'Supplier': po.supplier?.name || 'N/A',
+          'Branch': po.branch?.name || 'N/A',
+          'Total Items': po.items?.length || 0,
+          'Total Amount': po.total || 0,
+          'Status': po.status || '',
+          'Expected Delivery': po.expectedDelivery ? new Date(po.expectedDelivery).toLocaleDateString() : 'N/A'
+        }));
+        
+        const csv = convertToCSV(csvData);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = window.URL.createObjectURL(blob);
+        link.href = url;
+        link.download = `inventory-purchase-orders-${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        toast.success('Purchase Orders exported successfully');
+      } else if (activeTab === 'alerts' || activeTab === 'overview') {
+        // Export Low Stock Items as CSV
+        if (!lowStockData?.data?.products || lowStockData.data.products.length === 0) {
+          toast.info('No low stock items to export');
+          return;
+        }
+
+        const csvData = lowStockData.data.products.map(product => ({
+          'Product Name': product.name || '',
+          'SKU': product.sku || '',
+          'Barcode': product.barcode || '',
+          'Category': product.category?.name || '',
+          'Current Quantity': product.stockByBranch?.reduce((sum, s) => sum + (s.quantity || 0), 0) || 0,
+          'Reorder Level': product.stockByBranch?.[0]?.reorderLevel || 0,
+          'Selling Price': product.pricing?.sellingPrice || 0,
+          'Branch': product.stockByBranch?.[0]?.branch?.name || 'N/A'
+        }));
+        
+        const csv = convertToCSV(csvData);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = window.URL.createObjectURL(blob);
+        link.href = url;
+        link.download = `low-stock-items-${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        toast.success('Low stock items exported successfully');
+      } else {
+        toast.info('No data available to export');
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error(error.response?.data?.message || 'Failed to export inventory');
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -1461,9 +1780,13 @@ function Inventory() {
         description="Manage stock levels, transfers, and purchase orders"
       >
         <div className="flex items-center gap-3">
-          <Button variant="outline">
-            <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
-            Export
+          <Button 
+            variant="outline"
+            onClick={handleExportInventory}
+            disabled={exportLoading}
+          >
+            <ArrowDownTrayIcon className={`h-4 w-4 mr-2 ${exportLoading ? 'animate-spin' : ''}`} />
+            {exportLoading ? 'Exporting...' : 'Export'}
           </Button>
           <Button variant="primary">
             <ArrowPathIcon className="h-4 w-4 mr-2" />
@@ -1535,125 +1858,434 @@ function Inventory() {
         />
       )}
 
-      {/* Toast */}
-      {toast && (
-        <Toast
-          type={toast.type}
-          message={toast.message}
-          onClose={() => setToast(null)}
-        />
-      )}
+      {/* Adjustment Details Modal */}
+      <AdjustmentDetailsModal
+        isOpen={showAdjustmentDetailsModal}
+        onClose={() => {
+          setShowAdjustmentDetailsModal(false);
+          setSelectedAdjustment(null);
+        }}
+        adjustment={selectedAdjustment}
+      />
     </div>
   );
 }
 
 // Stock Adjustment Modal Component
 function StockAdjustmentModal({ isOpen, onClose, onSubmit, isLoading }) {
+  const { user } = useAuth();
+  const userBranchId = useMemo(() => getBranchIdFromUser(user), [user]);
   const [formData, setFormData] = useState({
-    product: '',
-    type: 'increase',
+    product: null,
     quantity: '',
     reason: '',
-    notes: ''
+    notes: '',
+    branch: userBranchId || ''
   });
+  const [productSearch, setProductSearch] = useState('');
+  const [showProductDropdown, setShowProductDropdown] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [submitError, setSubmitError] = useState('');
+
+  // Fetch all products WITHOUT branch filter to show all available products
+  const { data: productsData, isLoading: productsLoading, error: productsError } = useQuery({
+    queryKey: ['products-for-adjustment'],
+    queryFn: async () => {
+      // Fetch all products without branch filter to allow selection from all inventory
+      try {
+        const response = await productsAPI.getAll({ 
+          limit: 500,  // Increased limit to get more products
+          page: 1
+        });
+        console.log('API Response:', response);
+        return response;
+      } catch (error) {
+        console.error('Products API Error:', error);
+        throw error;
+      }
+    },
+    enabled: isOpen,
+    staleTime: 5 * 60 * 1000 // 5 minutes
+  });
+
+  // Fetch all branches
+  const { data: branchesData } = useQuery({
+    queryKey: ['branches-for-adjustment'],
+    queryFn: () => masterDataAPI.getBranches(),
+    enabled: isOpen
+  });
+
+  // Determine type based on reason
+  const getAdjustmentType = (reasonValue) => {
+    const increaseReasons = ['return', 'transfer-in', 'correction-add', 'found'];
+    return increaseReasons.includes(reasonValue) ? 'increase' : 'decrease';
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSubmit(formData);
+    setSubmitError('');
+    setErrors({});
+
+    // Validation
+    const newErrors = {};
+    if (!formData.product?._id) newErrors.product = 'Please select a product';
+    if (!formData.quantity || formData.quantity < 1) newErrors.quantity = 'Please enter a valid quantity';
+    if (!formData.reason) newErrors.reason = 'Please select a reason';
+    if (!formData.branch) newErrors.branch = 'Please select a branch';
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    const adjustmentType = getAdjustmentType(formData.reason);
+
+    // Format data to match backend API expectation
+    const submitData = {
+      branch: formData.branch,
+      type: adjustmentType,
+      reason: formData.reason,
+      notes: formData.notes,
+      items: [
+        {
+          product: formData.product._id,
+          adjustedQuantity: parseInt(formData.quantity),
+          productName: formData.product.name,
+          sku: formData.product.sku,
+          unit: formData.product.unit?.symbol || 'pcs'
+        }
+      ]
+    };
+
+    onSubmit(submitData);
   };
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: '' }));
+    }
   };
 
+  const handleProductSelect = (product) => {
+    handleChange('product', product);
+    setProductSearch('');
+    setShowProductDropdown(false);
+  };
+
+  const handleClose = () => {
+    setFormData({
+      product: null,
+      quantity: '',
+      reason: '',
+      notes: '',
+      branch: userBranchId || ''
+    });
+    setProductSearch('');
+    setShowProductDropdown(false);
+    setErrors({});
+    setSubmitError('');
+    onClose();
+  };
+
+  // Adjustment reasons - organized by type with better descriptions
+  const adjustmentReasons = [
+    { value: 'damaged', label: '🔴 Damaged goods - Remove from inventory' },
+    { value: 'expired', label: '⏰ Expired products - Remove from inventory' },
+    { value: 'theft', label: '⚠️ Theft/Loss - Remove from inventory' },
+    { value: 'receiving', label: '📦 Receiving discrepancy - Adjust to correct count' },
+    { value: 'counting', label: '🔍 Stock count correction - Physical stock verification' },
+    { value: 'return', label: '↩️ Customer return - Add back to inventory' },
+    { value: 'transfer-in', label: '➡️ Transfer received - Add from another branch' },
+    { value: 'correction-add', label: '✅ Stock correction (Add) - Increase inventory' },
+    { value: 'found', label: '🎁 Found stock - Add to inventory' },
+    { value: 'other', label: '📝 Other - Specify in notes' }
+  ];
+
+  // Filter products based on search - done locally
+  const filteredProducts = useMemo(() => {
+    if (!productsData) {
+      console.log('productsData is null/undefined');
+      return [];
+    }
+    
+    console.log('Full productsData structure:', productsData);
+    
+    // The API response structure is { success, message, data: {...}, timestamp }
+    // We need to extract the actual products array from the nested data object
+    let allProducts = [];
+    
+    if (Array.isArray(productsData)) {
+      allProducts = productsData;
+    } else if (Array.isArray(productsData?.data)) {
+      // If productsData.data is already an array
+      allProducts = productsData.data;
+    } else if (productsData?.data && typeof productsData.data === 'object') {
+      // If productsData.data is an object with nested structure
+      // Check common patterns: data.data, data.products, data.items
+      if (Array.isArray(productsData.data.data)) {
+        allProducts = productsData.data.data;
+      } else if (Array.isArray(productsData.data.products)) {
+        allProducts = productsData.data.products;
+      } else if (Array.isArray(productsData.data.items)) {
+        allProducts = productsData.data.items;
+      } else {
+        // If data is an object, try to extract values as array
+        const values = Object.values(productsData.data).filter(v => Array.isArray(v));
+        if (values.length > 0) {
+          allProducts = values[0];
+        }
+      }
+    }
+    
+    console.log('Extracted allProducts count:', allProducts.length, 'Sample:', allProducts[0]);
+    
+    // If no search term, return all products
+    if (!productSearch.trim()) {
+      console.log('No search, returning all products:', allProducts.length);
+      return allProducts;
+    }
+    
+    // Filter by search term
+    const searchLower = productSearch.toLowerCase().trim();
+    const filtered = allProducts.filter(product => {
+      const name = product.name?.toLowerCase() || '';
+      const sku = product.sku?.toLowerCase() || '';
+      const barcode = product.barcode?.toLowerCase() || '';
+      
+      return name.includes(searchLower) || sku.includes(searchLower) || barcode.includes(searchLower);
+    });
+    
+    console.log('Filtered products:', filtered.length, 'search term:', searchLower);
+    return filtered;
+  }, [productsData, productSearch]);
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Stock Adjustment">
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Product
-            </label>
-            <Input
-              type="text"
-              value={formData.product}
-              onChange={(e) => handleChange('product', e.target.value)}
-              placeholder="Search product..."
-              required
-            />
+    <Modal isOpen={isOpen} onClose={handleClose} title="Stock Adjustment">
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {submitError && (
+          <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <p className="text-sm text-red-800 dark:text-red-200">{submitError}</p>
           </div>
+        )}
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Type
-            </label>
-            <select
-              value={formData.type}
-              onChange={(e) => handleChange('type', e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700"
-              required
-            >
-              <option value="increase">Increase</option>
-              <option value="decrease">Decrease</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Quantity
-            </label>
-            <Input
-              type="number"
-              value={formData.quantity}
-              onChange={(e) => handleChange('quantity', e.target.value)}
-              placeholder="Enter quantity"
-              min="1"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Reason
-            </label>
-            <select
-              value={formData.reason}
-              onChange={(e) => handleChange('reason', e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700"
-              required
-            >
-              <option value="">Select reason...</option>
-              <option value="damaged">Damaged goods</option>
-              <option value="expired">Expired products</option>
-              <option value="theft">Theft/Loss</option>
-              <option value="receiving">Receiving discrepancy</option>
-              <option value="counting">Stock count correction</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
-        </div>
-
+        {/* Branch Selection */}
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Notes
+          <label className="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">
+            Branch <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={formData.branch}
+            onChange={(e) => handleChange('branch', e.target.value)}
+            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-slate-100 transition-colors ${
+              errors.branch 
+                ? 'border-red-500 dark:border-red-500 focus:ring-red-500' 
+                : 'border-slate-300 dark:border-slate-600'
+            }`}
+          >
+            <option value="">Select a branch...</option>
+            {branchesData?.data?.map((branch) => (
+              <option key={branch._id} value={branch._id}>
+                {branch.name}
+              </option>
+            ))}
+          </select>
+          {errors.branch && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.branch}</p>}
+        </div>
+
+        {/* Product Selection with Search */}
+        <div className="relative">
+          <label className="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">
+            Product <span className="text-red-500">*</span>
+          </label>
+          <div className="relative">
+            <div
+              className={`w-full px-3 py-2 border rounded-lg focus-within:outline-none focus-within:ring-2 focus-within:ring-blue-500 dark:bg-slate-700 dark:text-slate-100 transition-colors flex items-center justify-between ${
+                errors.product 
+                  ? 'border-red-500 dark:border-red-500 focus-within:ring-red-500' 
+                  : 'border-slate-300 dark:border-slate-600'
+              }`}
+            >
+              <div className="flex-1">
+                {formData.product ? (
+                  <div className="flex items-center gap-2">
+                    <CubeIcon className="h-4 w-4 text-slate-500" />
+                    <div>
+                      <p className="font-medium text-slate-900 dark:text-slate-100">{formData.product.name}</p>
+                      <p className="text-xs text-slate-500">SKU: {formData.product.sku}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    placeholder="Search by name, SKU, or barcode..."
+                    value={productSearch}
+                    onChange={(e) => {
+                      setProductSearch(e.target.value);
+                      setShowProductDropdown(true);
+                    }}
+                    onFocus={() => setShowProductDropdown(true)}
+                    className="w-full bg-transparent focus:outline-none placeholder-slate-400"
+                  />
+                )}
+              </div>
+              <MagnifyingGlassIcon className="h-5 w-5 text-slate-400 flex-shrink-0" />
+            </div>
+
+            {/* Product Dropdown */}
+            {showProductDropdown && (
+              <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                {formData.product && (
+                  <button
+                    type="button"
+                    onClick={() => handleProductSelect(null)}
+                    className="w-full text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600 border-b border-slate-200 dark:border-slate-600"
+                  >
+                    ✕ Clear selection
+                  </button>
+                )}
+                
+                {productsLoading ? (
+                  <div className="px-3 py-3 text-sm text-slate-500 text-center">
+                    <p>Loading products...</p>
+                  </div>
+                ) : filteredProducts.length > 0 ? (
+                  filteredProducts.map((product) => (
+                    <button
+                      key={product._id}
+                      type="button"
+                      onClick={() => handleProductSelect(product)}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 dark:hover:bg-blue-900/30 flex items-center justify-between border-b border-slate-100 dark:border-slate-600 last:border-0 transition-colors"
+                    >
+                      <div>
+                        <p className="font-medium text-slate-900 dark:text-slate-100">{product.name}</p>
+                        <p className="text-xs text-slate-500">SKU: {product.sku}</p>
+                      </div>
+                      {product.stocks && product.stocks.length > 0 && (
+                        <Badge variant="secondary" className="ml-2 flex-shrink-0">
+                          Stock: {product.stocks[0]?.quantity || 0}
+                        </Badge>
+                      )}
+                    </button>
+                  ))
+                ) : productSearch.trim().length > 0 ? (
+                  <div className="px-3 py-3 text-sm text-slate-500 text-center">
+                    <p>No products found matching "{productSearch}"</p>
+                  </div>
+                ) : (
+                  <div className="px-3 py-3 text-sm text-slate-500 text-center">
+                    <p>Start typing to search products...</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          {errors.product && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.product}</p>}
+        </div>
+
+        {/* Quantity */}
+        <div>
+          <label className="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">
+            Quantity <span className="text-red-500">*</span>
+          </label>
+          <Input
+            type="number"
+            value={formData.quantity}
+            onChange={(e) => handleChange('quantity', e.target.value)}
+            placeholder="Enter quantity"
+            min="1"
+            className={errors.quantity ? 'border-red-500' : ''}
+          />
+          {errors.quantity && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.quantity}</p>}
+        </div>
+
+        {/* Reason - determines type automatically */}
+        <div>
+          <label className="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">
+            Reason <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={formData.reason}
+            onChange={(e) => handleChange('reason', e.target.value)}
+            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-slate-100 transition-colors ${
+              errors.reason 
+                ? 'border-red-500 dark:border-red-500 focus:ring-red-500' 
+                : 'border-slate-300 dark:border-slate-600'
+            }`}
+          >
+            <option value="">Select a reason...</option>
+            {adjustmentReasons.map((reason) => (
+              <option key={reason.value} value={reason.value}>
+                {reason.label}
+              </option>
+            ))}
+          </select>
+          {errors.reason && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.reason}</p>}
+          
+          {formData.reason && (
+            <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">
+              Type: <span className="font-medium">
+                {getAdjustmentType(formData.reason) === 'increase' ? '➕ ADD to inventory' : '➖ REMOVE from inventory'}
+              </span>
+            </p>
+          )}
+        </div>
+
+        {/* Notes */}
+        <div>
+          <label className="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">
+            Notes (Optional)
           </label>
           <textarea
             value={formData.notes}
             onChange={(e) => handleChange('notes', e.target.value)}
-            placeholder="Additional notes..."
-            rows={3}
-            className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700"
+            placeholder="Add any additional details..."
+            rows={2}
+            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-slate-100 resize-none"
           />
         </div>
 
-        <div className="flex justify-end gap-3">
-          <Button type="button" variant="outline" onClick={onClose}>
+        {/* Summary */}
+        {formData.product && formData.reason && (
+          <div className={`p-3 rounded-lg border ${
+            getAdjustmentType(formData.reason) === 'increase'
+              ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+              : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+          }`}>
+            <p className={`text-sm font-medium ${
+              getAdjustmentType(formData.reason) === 'increase'
+                ? 'text-green-900 dark:text-green-100'
+                : 'text-red-900 dark:text-red-100'
+            }`}>
+              {getAdjustmentType(formData.reason) === 'increase' ? '➕ Adding' : '➖ Removing'} {formData.quantity || '0'} units of <span className="font-semibold">{formData.product.name}</span>
+            </p>
+            <p className={`text-xs mt-1 ${
+              getAdjustmentType(formData.reason) === 'increase'
+                ? 'text-green-700 dark:text-green-200'
+                : 'text-red-700 dark:text-red-200'
+            }`}>
+              Reason: {adjustmentReasons.find(r => r.value === formData.reason)?.label}
+            </p>
+          </div>
+        )}
+
+        {/* Buttons */}
+        <div className="flex justify-end gap-3 pt-2">
+          <Button type="button" variant="outline" onClick={handleClose} disabled={isLoading}>
             Cancel
           </Button>
           <Button type="submit" variant="primary" disabled={isLoading}>
-            {isLoading ? <LoadingSpinner size="sm" /> : 'Create Adjustment'}
+            {isLoading ? (
+              <>
+                <LoadingSpinner size="sm" />
+                <span className="ml-2">Creating...</span>
+              </>
+            ) : (
+              <>
+                <PlusIcon className="h-4 w-4 mr-2" />
+                Create Adjustment
+              </>
+            )}
           </Button>
         </div>
       </form>
@@ -1666,81 +2298,514 @@ function StockTransferModal({ isOpen, onClose, onSubmit, isLoading, branches }) 
   const [formData, setFormData] = useState({
     fromBranch: '',
     toBranch: '',
+    expectedDate: '',
+    priority: 'normal',
     items: [],
     notes: ''
   });
+  
+  const [showProductSearch, setShowProductSearch] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
+  const [errors, setErrors] = useState({});
+
+  // Fetch products with stock info for the selected source branch
+  const { data: productsData, isLoading: productsLoading, error: productsError } = useQuery({
+    queryKey: ['products-for-transfer', formData.fromBranch],
+    queryFn: async () => {
+      if (!formData.fromBranch) return null;
+      try {
+        const response = await productsAPI.getAll({ 
+          limit: 500,
+          page: 1
+        });
+        console.log('Products API response for transfer:', response);
+        return response;
+      } catch (error) {
+        console.error('Error fetching products for transfer:', error);
+        throw error;
+      }
+    },
+    enabled: isOpen && !!formData.fromBranch,
+    retry: 1
+  });
+
+  // Filter products based on search and branch
+  const filteredProducts = useMemo(() => {
+    if (!productsData) {
+      console.log('No productsData available');
+      return [];
+    }
+    
+    // Extract products array from various possible response structures
+    let allProducts = [];
+    if (Array.isArray(productsData)) {
+      allProducts = productsData;
+    } else if (Array.isArray(productsData.data)) {
+      allProducts = productsData.data;
+    } else if (productsData.data && Array.isArray(productsData.data.data)) {
+      allProducts = productsData.data.data;
+    } else if (productsData.data && Array.isArray(productsData.data.products)) {
+      allProducts = productsData.data.products;
+    }
+    
+    console.log('Extracted products:', allProducts.length);
+    
+    // Filter by branch - only show products that have stock at the selected branch
+    let branchProducts = allProducts.filter(product => {
+      if (!product.stockByBranch && !product.stocks) return false;
+      
+      const stockArray = product.stockByBranch || product.stocks || [];
+      const branchStock = stockArray.find(s => {
+        const stockBranchId = typeof s.branch === 'object' ? s.branch._id : s.branch;
+        return stockBranchId === formData.fromBranch;
+      });
+      
+      return branchStock && branchStock.quantity > 0;
+    });
+    
+    console.log('Products with stock at branch:', branchProducts.length);
+    
+    // Filter by search term
+    if (!productSearch.trim()) return branchProducts;
+    
+    const searchLower = productSearch.toLowerCase();
+    return branchProducts.filter(p => 
+      p.name?.toLowerCase().includes(searchLower) ||
+      p.sku?.toLowerCase().includes(searchLower)
+    );
+  }, [productsData, productSearch, formData.fromBranch]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSubmit(formData);
+    setErrors({});
+
+    // Validation
+    const newErrors = {};
+    if (!formData.fromBranch) newErrors.fromBranch = 'Please select source branch';
+    if (!formData.toBranch) newErrors.toBranch = 'Please select destination branch';
+    if (formData.fromBranch === formData.toBranch) {
+      newErrors.toBranch = 'Cannot transfer to the same branch';
+    }
+    if (formData.items.length === 0) newErrors.items = 'Please add at least one item';
+    if (!formData.expectedDate) newErrors.expectedDate = 'Please select expected date';
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    // Format data for API - match backend expectations
+    const submitData = {
+      fromBranch: formData.fromBranch,
+      toBranch: formData.toBranch,
+      expectedDeliveryDate: formData.expectedDate,
+      reason: 'restock', // Required by backend model - map priority to reason
+      notes: formData.notes || '',
+      items: formData.items.map(item => ({
+        product: item.productId,
+        quantity: parseInt(item.quantity),
+        unitCost: 0
+      }))
+    };
+
+    console.log('Submitting transfer:', submitData);
+    onSubmit(submitData);
   };
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: '' }));
+    }
+    
+    // Clear items if source branch changes
+    if (field === 'fromBranch' && value !== formData.fromBranch) {
+      setFormData(prev => ({ ...prev, items: [] }));
+    }
   };
 
+  const addProduct = (product) => {
+    // Check if already added
+    if (formData.items.some(item => item.productId === product._id)) {
+      toast.info('Product already added');
+      return;
+    }
+
+    // Get stock info for this product at source branch
+    const stockInfo = product.stockByBranch?.find(s => s.branch === formData.fromBranch) || 
+                     product.stocks?.find(s => s.branch === formData.fromBranch);
+    const availableQty = stockInfo?.quantity || 0;
+
+    if (availableQty === 0) {
+      toast.error('No stock available at source branch');
+      return;
+    }
+
+    const newItem = {
+      productId: product._id,
+      name: product.name,
+      sku: product.sku,
+      availableQuantity: availableQty,
+      quantity: Math.min(availableQty, 1)
+    };
+
+    setFormData(prev => ({ ...prev, items: [...prev.items, newItem] }));
+    setShowProductSearch(false);
+    setProductSearch('');
+    if (errors.items) {
+      setErrors(prev => ({ ...prev, items: '' }));
+    }
+  };
+
+  const updateItemQuantity = (index, quantity) => {
+    const qty = parseInt(quantity) || 0;
+    const item = formData.items[index];
+    
+    if (qty > item.availableQuantity) {
+      toast.error(`Only ${item.availableQuantity} units available`);
+      return;
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      items: prev.items.map((item, i) => 
+        i === index ? { ...item, quantity: qty } : item
+      )
+    }));
+  };
+
+  const removeItem = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleClose = () => {
+    setFormData({
+      fromBranch: '',
+      toBranch: '',
+      expectedDate: '',
+      priority: 'normal',
+      items: [],
+      notes: ''
+    });
+    setProductSearch('');
+    setShowProductSearch(false);
+    setErrors({});
+    onClose();
+  };
+
+  const totalItems = formData.items.reduce((sum, item) => sum + item.quantity, 0);
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Stock Transfer">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Create Stock Transfer" size="large">
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-2 gap-4">
+        {/* Branch Selection */}
+        <Card className="p-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">
+                From Branch (Source) <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={formData.fromBranch}
+                onChange={(e) => handleChange('fromBranch', e.target.value)}
+                className={`w-full px-3 py-2 border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-slate-700 dark:text-slate-100 ${
+                  errors.fromBranch ? 'border-red-500' : 'border-slate-300 dark:border-slate-600'
+                }`}
+              >
+                <option value="">Select source branch...</option>
+                {branches.map((branch) => (
+                  <option key={branch._id} value={branch._id}>
+                    {branch.name}
+                  </option>
+                ))}
+              </select>
+              {errors.fromBranch && <p className="mt-1 text-xs text-red-600">{errors.fromBranch}</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">
+                To Branch (Destination) <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={formData.toBranch}
+                onChange={(e) => handleChange('toBranch', e.target.value)}
+                className={`w-full px-3 py-2 border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-slate-700 dark:text-slate-100 ${
+                  errors.toBranch ? 'border-red-500' : 'border-slate-300 dark:border-slate-600'
+                }`}
+                disabled={!formData.fromBranch}
+              >
+                <option value="">Select destination branch...</option>
+                {branches
+                  .filter(b => b._id !== formData.fromBranch)
+                  .map((branch) => (
+                    <option key={branch._id} value={branch._id}>
+                      {branch.name}
+                    </option>
+                  ))}
+              </select>
+              {errors.toBranch && <p className="mt-1 text-xs text-red-600">{errors.toBranch}</p>}
+            </div>
+          </div>
+        </Card>
+
+        {/* Transfer Details */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              From Branch
+            <label className="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">
+              Expected Delivery Date <span className="text-red-500">*</span>
             </label>
-            <select
-              value={formData.fromBranch}
-              onChange={(e) => handleChange('fromBranch', e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700"
-              required
-            >
-              <option value="">Select branch...</option>
-              {branches.map((branch) => (
-                <option key={branch._id} value={branch._id}>
-                  {branch.name}
-                </option>
-              ))}
-            </select>
+            <Input
+              type="date"
+              value={formData.expectedDate}
+              onChange={(e) => handleChange('expectedDate', e.target.value)}
+              min={new Date().toISOString().split('T')[0]}
+              className={errors.expectedDate ? 'border-red-500' : ''}
+            />
+            {errors.expectedDate && <p className="mt-1 text-xs text-red-600">{errors.expectedDate}</p>}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              To Branch
+            <label className="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">
+              Priority Level
             </label>
             <select
-              value={formData.toBranch}
-              onChange={(e) => handleChange('toBranch', e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700"
-              required
+              value={formData.priority}
+              onChange={(e) => handleChange('priority', e.target.value)}
+              className="w-full px-3 py-2 border-2 border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-slate-700 dark:text-slate-100"
             >
-              <option value="">Select branch...</option>
-              {branches.map((branch) => (
-                <option key={branch._id} value={branch._id}>
-                  {branch.name}
-                </option>
-              ))}
+              <option value="low">🟢 Low - Standard delivery</option>
+              <option value="normal">🟡 Normal - Regular priority</option>
+              <option value="high">🟠 High - Expedited</option>
+              <option value="urgent">🔴 Urgent - Immediate</option>
             </select>
           </div>
         </div>
 
+        {/* Products Section */}
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                Transfer Items
+              </h3>
+              <p className="text-xs text-slate-600 dark:text-slate-400">
+                {formData.fromBranch ? 'Add products to transfer' : 'Select source branch first'}
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowProductSearch(!showProductSearch)}
+              disabled={!formData.fromBranch}
+            >
+              <PlusIcon className="h-4 w-4 mr-2" />
+              Add Item
+            </Button>
+          </div>
+
+          {errors.items && <p className="mb-3 text-sm text-red-600">{errors.items}</p>}
+
+          {/* Product Search */}
+          {showProductSearch && formData.fromBranch && (
+            <div className="mb-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-600">
+              <div className="relative mb-3">
+                <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  placeholder="Search products by name or SKU..."
+                  className="w-full pl-10 pr-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-sm"
+                  autoFocus
+                />
+              </div>
+
+              <div className="max-h-64 overflow-y-auto space-y-2">
+                {productsLoading ? (
+                  <div className="text-center py-4">
+                    <LoadingSpinner size="sm" />
+                    <p className="text-xs text-slate-500 mt-2">Loading products...</p>
+                  </div>
+                ) : productsError ? (
+                  <div className="text-center py-4 text-red-600">
+                    <p className="text-sm">Error loading products</p>
+                    <p className="text-xs mt-1">{productsError.message}</p>
+                  </div>
+                ) : filteredProducts.length > 0 ? (
+                  filteredProducts.map(product => {
+                    const stockInfo = product.stockByBranch?.find(s => s.branch === formData.fromBranch) || 
+                                     product.stocks?.find(s => s.branch === formData.fromBranch);
+                    const availableQty = stockInfo?.quantity || 0;
+                    const alreadyAdded = formData.items.some(item => item.productId === product._id);
+
+                    return (
+                      <Card
+                        key={product._id}
+                        className={`p-3 cursor-pointer transition-all ${
+                          alreadyAdded 
+                            ? 'bg-slate-100 dark:bg-slate-700 opacity-50' 
+                            : 'hover:shadow-md hover:border-purple-300'
+                        }`}
+                        onClick={() => !alreadyAdded && addProduct(product)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <p className="font-medium text-sm text-slate-900 dark:text-slate-100">
+                              {product.name}
+                            </p>
+                            <div className="flex items-center gap-3 mt-1 text-xs text-slate-600 dark:text-slate-400">
+                              <span className="font-mono">{product.sku}</span>
+                              <span className={availableQty > 0 ? 'text-green-600' : 'text-red-600'}>
+                                Available: {availableQty}
+                              </span>
+                            </div>
+                          </div>
+                          {alreadyAdded ? (
+                            <Badge variant="secondary">Added</Badge>
+                          ) : availableQty === 0 ? (
+                            <Badge variant="destructive">Out of Stock</Badge>
+                          ) : (
+                            <Button type="button" variant="ghost" size="sm">
+                              <PlusIcon className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </Card>
+                    );
+                  })
+                ) : (
+                  <div className="text-center py-4 text-slate-500 text-sm">
+                    {productSearch ? 'No products found' : 'No products available at this branch'}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Items List */}
+          <div className="space-y-3">
+            {formData.items.map((item, index) => (
+              <Card key={index} className="p-4 bg-slate-50 dark:bg-slate-800/50 border-l-4 border-l-purple-500">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                  <div className="md:col-span-5">
+                    <p className="font-semibold text-slate-900 dark:text-slate-100">{item.name}</p>
+                    <p className="text-xs text-slate-500 font-mono mt-1">{item.sku}</p>
+                    <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                      Available: {item.availableQuantity} units
+                    </p>
+                  </div>
+
+                  <div className="md:col-span-3">
+                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                      Transfer Quantity
+                    </label>
+                    <Input
+                      type="number"
+                      value={item.quantity}
+                      onChange={(e) => updateItemQuantity(index, e.target.value)}
+                      min="1"
+                      max={item.availableQuantity}
+                      className="text-sm font-semibold"
+                    />
+                  </div>
+
+                  <div className="md:col-span-3">
+                    <div className="text-center">
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Remaining</p>
+                      <p className="text-lg font-bold text-slate-900 dark:text-slate-100">
+                        {item.availableQuantity - item.quantity}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="md:col-span-1 flex justify-end">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeItem(index)}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <TrashIcon className="h-5 w-5" />
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            ))}
+
+            {formData.items.length === 0 && (
+              <div className="text-center py-12 bg-slate-50 dark:bg-slate-800/50 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-600">
+                <TruckIcon className="h-12 w-12 text-slate-400 mx-auto mb-3" />
+                <p className="text-slate-600 dark:text-slate-400 font-medium mb-1">No items added</p>
+                <p className="text-sm text-slate-500">
+                  {formData.fromBranch 
+                    ? 'Click "Add Item" to select products for transfer'
+                    : 'Select source branch to begin'}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Summary */}
+          {formData.items.length > 0 && (
+            <div className="mt-4 p-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-lg border-2 border-purple-200 dark:border-purple-700">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">Total Items</p>
+                  <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                    {totalItems}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-slate-600 dark:text-slate-400">Product Types</p>
+                  <p className="text-xl font-bold text-slate-900 dark:text-slate-100">
+                    {formData.items.length}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </Card>
+
+        {/* Notes */}
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Notes
+          <label className="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">
+            Transfer Notes
           </label>
           <textarea
             value={formData.notes}
             onChange={(e) => handleChange('notes', e.target.value)}
-            placeholder="Transfer notes..."
+            placeholder="Add any special instructions or notes for this transfer..."
             rows={3}
-            className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700"
+            className="w-full px-3 py-2 border-2 border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-slate-700 dark:text-slate-100"
           />
         </div>
 
-        <div className="flex justify-end gap-3">
-          <Button type="button" variant="outline" onClick={onClose}>
+        {/* Action Buttons */}
+        <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+          <Button type="button" variant="outline" onClick={handleClose}>
             Cancel
           </Button>
-          <Button type="submit" variant="primary" disabled={isLoading}>
-            {isLoading ? <LoadingSpinner size="sm" /> : 'Create Transfer'}
+          <Button 
+            type="submit" 
+            variant="primary" 
+            disabled={isLoading || formData.items.length === 0}
+          >
+            {isLoading ? (
+              <div className="flex items-center gap-2">
+                <LoadingSpinner size="sm" />
+                <span>Creating...</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <TruckIcon className="h-5 w-5" />
+                <span>Create Transfer</span>
+              </div>
+            )}
           </Button>
         </div>
       </form>
@@ -2283,6 +3348,240 @@ function PurchaseOrderModal({ isOpen, onClose, onSubmit, isLoading, suppliers, r
           </Button>
         </div>
       </form>
+    </Modal>
+  );
+}
+
+// Adjustment Details Modal Component
+function AdjustmentDetailsModal({ isOpen, onClose, adjustment }) {
+  if (!adjustment) return null;
+
+  const getAdjustmentTypeIcon = (type) => {
+    return type === 'increase' ? '➕' : '➖';
+  };
+
+  const getStatusColor = (status) => {
+    const colors = {
+      pending: 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800 text-orange-900 dark:text-orange-100',
+      approved: 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-900 dark:text-green-100',
+      rejected: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-900 dark:text-red-100'
+    };
+    return colors[status] || colors.pending;
+  };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return {
+      date: date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+      time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    };
+  };
+
+  const createdDate = formatDate(adjustment.createdAt);
+  const updatedDate = adjustment.updatedAt ? formatDate(adjustment.updatedAt) : null;
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Adjustment Details">
+      <div className="space-y-6">
+        {/* Header Section */}
+        <div className="flex items-start justify-between pb-4 border-b border-slate-200 dark:border-slate-700">
+          <div>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              {adjustment.adjustmentNumber || 'N/A'}
+            </h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+              {createdDate.date} at {createdDate.time}
+            </p>
+          </div>
+          <Badge variant={
+            adjustment.status === 'approved' ? 'success' :
+            adjustment.status === 'rejected' ? 'destructive' : 'warning'
+          }>
+            {adjustment.status?.toUpperCase()}
+          </Badge>
+        </div>
+
+        {/* Status Banner */}
+        <div className={`p-4 rounded-lg border ${getStatusColor(adjustment.status)}`}>
+          <div className="flex items-center gap-3">
+            <div className="text-2xl">
+              {adjustment.status === 'approved' && '✅'}
+              {adjustment.status === 'rejected' && '❌'}
+              {adjustment.status === 'pending' && '⏳'}
+            </div>
+            <div>
+              <p className="font-semibold">
+                {adjustment.status === 'approved' && 'Adjustment Approved'}
+                {adjustment.status === 'rejected' && 'Adjustment Rejected'}
+                {adjustment.status === 'pending' && 'Pending Approval'}
+              </p>
+              <p className="text-sm opacity-80 mt-0.5">
+                {adjustment.status === 'approved' && 'This adjustment has been applied to inventory'}
+                {adjustment.status === 'rejected' && 'This adjustment was not applied'}
+                {adjustment.status === 'pending' && 'Waiting for manager approval'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Product Information */}
+        <div className="space-y-3">
+          <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wide">
+            Product Information
+          </h4>
+          <Card className="p-4 bg-slate-50 dark:bg-slate-800/50">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Product Name</p>
+                <p className="font-medium text-slate-900 dark:text-slate-100">
+                  {adjustment.product?.name || 'N/A'}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">SKU</p>
+                <p className="font-mono text-sm text-slate-900 dark:text-slate-100">
+                  {adjustment.product?.sku || 'N/A'}
+                </p>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Adjustment Details */}
+        <div className="space-y-3">
+          <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wide">
+            Adjustment Details
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Card className={`p-4 ${
+              adjustment.type === 'increase' 
+                ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800' 
+                : 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800'
+            }`}>
+              <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Type</p>
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">{getAdjustmentTypeIcon(adjustment.type)}</span>
+                <span className={`font-semibold text-lg ${
+                  adjustment.type === 'increase' ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'
+                }`}>
+                  {adjustment.type === 'increase' ? 'Increase' : 'Decrease'}
+                </span>
+              </div>
+            </Card>
+
+            <Card className="p-4 bg-slate-50 dark:bg-slate-800/50">
+              <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Quantity</p>
+              <p className={`text-2xl font-bold ${
+                adjustment.type === 'increase' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+              }`}>
+                {adjustment.type === 'increase' ? '+' : '-'}{adjustment.quantity || 0}
+              </p>
+            </Card>
+
+            <Card className="p-4 bg-slate-50 dark:bg-slate-800/50">
+              <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Branch</p>
+              <p className="font-medium text-slate-900 dark:text-slate-100">
+                {adjustment.branch?.name || 'N/A'}
+              </p>
+            </Card>
+
+            <Card className="p-4 bg-slate-50 dark:bg-slate-800/50">
+              <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Reason</p>
+              <p className="font-medium text-slate-900 dark:text-slate-100 capitalize">
+                {adjustment.reason?.replace(/-/g, ' ') || 'N/A'}
+              </p>
+            </Card>
+          </div>
+        </div>
+
+        {/* Notes */}
+        {adjustment.notes && (
+          <div className="space-y-3">
+            <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wide">
+              Notes
+            </h4>
+            <Card className="p-4 bg-slate-50 dark:bg-slate-800/50">
+              <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+                {adjustment.notes}
+              </p>
+            </Card>
+          </div>
+        )}
+
+        {/* User Information */}
+        <div className="space-y-3">
+          <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wide">
+            User Information
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Card className="p-4 bg-slate-50 dark:bg-slate-800/50">
+              <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Created By</p>
+              <div className="flex items-center gap-2">
+                <UserIcon className="h-4 w-4 text-slate-500" />
+                <p className="font-medium text-slate-900 dark:text-slate-100">
+                  {adjustment.createdBy?.fullName || adjustment.createdBy?.username || 'N/A'}
+                </p>
+              </div>
+            </Card>
+
+            {adjustment.approvedBy && (
+              <Card className="p-4 bg-slate-50 dark:bg-slate-800/50">
+                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">
+                  {adjustment.status === 'approved' ? 'Approved By' : 'Reviewed By'}
+                </p>
+                <div className="flex items-center gap-2">
+                  <UserIcon className="h-4 w-4 text-slate-500" />
+                  <p className="font-medium text-slate-900 dark:text-slate-100">
+                    {adjustment.approvedBy?.fullName || adjustment.approvedBy?.username || 'N/A'}
+                  </p>
+                </div>
+              </Card>
+            )}
+          </div>
+        </div>
+
+        {/* Timeline */}
+        <div className="space-y-3">
+          <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wide">
+            Timeline
+          </h4>
+          <div className="space-y-3">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-2 h-2 mt-2 rounded-full bg-blue-500"></div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Created</p>
+                <p className="text-xs text-slate-600 dark:text-slate-400">
+                  {createdDate.date} at {createdDate.time}
+                </p>
+              </div>
+            </div>
+            {updatedDate && (
+              <div className="flex items-start gap-3">
+                <div className={`flex-shrink-0 w-2 h-2 mt-2 rounded-full ${
+                  adjustment.status === 'approved' ? 'bg-green-500' : 
+                  adjustment.status === 'rejected' ? 'bg-red-500' : 'bg-orange-500'
+                }`}></div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                    {adjustment.status === 'approved' ? 'Approved' : 
+                     adjustment.status === 'rejected' ? 'Rejected' : 'Updated'}
+                  </p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">
+                    {updatedDate.date} at {updatedDate.time}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      </div>
     </Modal>
   );
 }

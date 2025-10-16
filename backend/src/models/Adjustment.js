@@ -57,7 +57,7 @@ const adjustmentSchema = new mongoose.Schema({
 
   reason: {
     type: String,
-    enum: ['damage', 'theft', 'expiry', 'found', 'count_error', 'other'],
+    enum: ['damaged', 'expired', 'theft', 'receiving', 'counting', 'return', 'transfer-in', 'correction-add', 'found', 'other'],
     required: true
   },
 

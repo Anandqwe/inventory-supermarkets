@@ -19,7 +19,7 @@ const Toast = () => {
       pauseOnHover
       theme={theme}
       className="mt-16"
-      toastClassName={`${theme === 'dark' ? 'dark:bg-amoled-card dark:text-amoled-primary' : ''}`}
+      toastClassName={`${theme === 'dark' ? 'dark:bg-zinc-950 dark:text-zinc-100' : ''}`}
     />
   );
 };

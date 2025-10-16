@@ -27,13 +27,13 @@ export default {
           700: '#334155', 
           800: '#1e293b', 
           900: '#0f172a',
-          // AMOLED Pure Black Theme Colors
-          950: '#000000',    // Pure black
-          960: '#0a0a0a',    // Very dark gray
-          970: '#121212',    // Dark gray for cards
-          980: '#1a1a1a',    // Darker gray for elevated surfaces
-          985: '#262626',    // Medium dark gray for borders
-          990: '#404040',    // Medium gray for stronger borders
+          // Shadcn-inspired Dark Mode Colors (Slate + Indigo blend)
+          950: '#030712',    // Pure dark (almost black)
+          960: '#0f172a',    // Very dark slate
+          970: '#1e293b',    // Dark slate for cards
+          980: '#334155',    // Medium dark slate for elevated
+          985: '#475569',    // Darker slate for borders
+          990: '#64748b',    // Medium slate for stronger borders
         }
       },
       backgroundColor: {

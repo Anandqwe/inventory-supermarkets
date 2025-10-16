@@ -34,16 +34,24 @@ const purchaseRoutes = require('./src/routes/purchaseRoutes');
 const financialRoutes = require('./src/routes/financialRoutes');
 const securityRoutes = require('./src/routes/securityRoutes');
 const emailRoutes = require('./src/routes/emailRoutes');
+// const systemSettingsRoutes = require('./src/routes/systemSettingsRoutes');
 
 // Import database connection
 const mongoose = require('mongoose');
 
+// Import auto-seed utility
+const { autoSeed } = require('./src/utils/autoSeed');
+
 // Initialize Express app
 const app = express();
 
-// Connect to database
+// Connect to database and auto-seed if needed
 mongoose.connect(process.env.MONGODB_URI)
-  .then(() => logger.info('✅ Connected to MongoDB Atlas'))
+  .then(async () => {
+    logger.info('✅ Connected to MongoDB Atlas');
+    // Auto-seed database if empty (can be disabled with AUTO_SEED=false)
+    await autoSeed();
+  })
   .catch((err) => logger.error('❌ MongoDB connection failed', { error: err.message }));
 
 // Security middleware
@@ -170,6 +178,7 @@ app.use('/api/purchases', purchaseRoutes);
 app.use('/api/financial', financialRoutes);
 app.use('/api/security', securityRoutes);
 app.use('/api/email', emailRoutes);
+// app.use('/api/system-settings', systemSettingsRoutes);
 
 // Welcome route
 app.get('/', (req, res) => {

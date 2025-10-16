@@ -26,11 +26,11 @@ const {
 /**
  * @route   POST /api/master-data/categories
  * @desc    Create a new category
- * @access  Private (requires 'manage_categories' permission)
+ * @access  Private (requires 'categories.create' permission)
  */
 router.post('/categories',
   authenticateToken,
-  requirePermission('manage_categories'),
+  requirePermission('categories.create'),
   categoryValidation.create,
   MasterDataController.createCategory
 );
@@ -38,23 +38,23 @@ router.post('/categories',
 /**
  * @route   GET /api/master-data/categories
  * @desc    Get all categories with optional filtering and pagination
- * @access  Private (requires 'view_categories' permission)
+ * @access  Private (requires 'categories.read' permission)
  * @query   page, limit, search, isActive, parentCategory, includeHierarchy
  */
 router.get('/categories',
   authenticateToken,
-  requirePermission('view_categories'),
+  requirePermission('categories.read'),
   MasterDataController.getCategories
 );
 
 /**
  * @route   PUT /api/master-data/categories/:id
  * @desc    Update a category
- * @access  Private (requires 'manage_categories' permission)
+ * @access  Private (requires 'categories.update' permission)
  */
 router.put('/categories/:id',
   authenticateToken,
-  requirePermission('manage_categories'),
+  requirePermission('categories.update'),
   categoryValidation.update,
   MasterDataController.updateCategory
 );
@@ -62,11 +62,11 @@ router.put('/categories/:id',
 /**
  * @route   DELETE /api/master-data/categories/:id
  * @desc    Soft delete a category
- * @access  Private (requires 'manage_categories' permission)
+ * @access  Private (requires 'categories.delete' permission)
  */
 router.delete('/categories/:id',
   authenticateToken,
-  requirePermission('manage_categories'),
+  requirePermission('categories.delete'),
   MasterDataController.deleteCategory
 );
 
@@ -75,11 +75,11 @@ router.delete('/categories/:id',
 /**
  * @route   POST /api/master-data/brands
  * @desc    Create a new brand
- * @access  Private (requires 'manage_brands' permission)
+ * @access  Private (requires 'brands.create' permission)
  */
 router.post('/brands',
   authenticateToken,
-  requirePermission('manage_brands'),
+  requirePermission('brands.create'),
   brandValidation.create,
   MasterDataController.createBrand
 );
@@ -87,23 +87,23 @@ router.post('/brands',
 /**
  * @route   GET /api/master-data/brands
  * @desc    Get all brands with optional filtering and pagination
- * @access  Private (requires 'view_brands' permission)
+ * @access  Private (requires 'brands.read' permission)
  * @query   page, limit, search, isActive, sortBy, sortOrder
  */
 router.get('/brands',
   authenticateToken,
-  requirePermission('view_brands'),
+  requirePermission('brands.read'),
   MasterDataController.getBrands
 );
 
 /**
  * @route   PUT /api/master-data/brands/:id
  * @desc    Update a brand
- * @access  Private (requires 'manage_brands' permission)
+ * @access  Private (requires 'brands.update' permission)
  */
 router.put('/brands/:id',
   authenticateToken,
-  requirePermission('manage_brands'),
+  requirePermission('brands.update'),
   brandValidation.update,
   MasterDataController.updateBrand
 );
@@ -111,11 +111,11 @@ router.put('/brands/:id',
 /**
  * @route   DELETE /api/master-data/brands/:id
  * @desc    Soft delete a brand
- * @access  Private (requires 'manage_brands' permission)
+ * @access  Private (requires 'brands.delete' permission)
  */
 router.delete('/brands/:id',
   authenticateToken,
-  requirePermission('manage_brands'),
+  requirePermission('brands.delete'),
   MasterDataController.deleteBrand
 );
 
@@ -124,11 +124,11 @@ router.delete('/brands/:id',
 /**
  * @route   POST /api/master-data/units
  * @desc    Create a new unit
- * @access  Private (requires 'manage_units' permission)
+ * @access  Private (requires 'units.create' permission)
  */
 router.post('/units',
   authenticateToken,
-  requirePermission('manage_units'),
+  requirePermission('units.create'),
   unitValidation.create,
   MasterDataController.createUnit
 );
@@ -136,23 +136,23 @@ router.post('/units',
 /**
  * @route   GET /api/master-data/units
  * @desc    Get all units with optional filtering and pagination
- * @access  Private (requires 'view_units' permission)
+ * @access  Private (requires 'units.read' permission)
  * @query   page, limit, search, isActive, unitType, sortBy, sortOrder
  */
 router.get('/units',
   authenticateToken,
-  requirePermission('view_units'),
+  requirePermission('units.read'),
   MasterDataController.getUnits
 );
 
 /**
  * @route   PUT /api/master-data/units/:id
  * @desc    Update a unit
- * @access  Private (requires 'manage_units' permission)
+ * @access  Private (requires 'units.update' permission)
  */
 router.put('/units/:id',
   authenticateToken,
-  requirePermission('manage_units'),
+  requirePermission('units.update'),
   unitValidation.update,
   MasterDataController.updateUnit
 );
@@ -160,11 +160,11 @@ router.put('/units/:id',
 /**
  * @route   DELETE /api/master-data/units/:id
  * @desc    Soft delete a unit
- * @access  Private (requires 'manage_units' permission)
+ * @access  Private (requires 'units.delete' permission)
  */
 router.delete('/units/:id',
   authenticateToken,
-  requirePermission('manage_units'),
+  requirePermission('units.delete'),
   MasterDataController.deleteUnit
 );
 
@@ -173,11 +173,11 @@ router.delete('/units/:id',
 /**
  * @route   POST /api/master-data/suppliers
  * @desc    Create a new supplier
- * @access  Private (requires 'manage_suppliers' permission)
+ * @access  Private (requires 'suppliers.create' permission)
  */
 router.post('/suppliers',
   authenticateToken,
-  requirePermission('manage_suppliers'),
+  requirePermission('suppliers.create'),
   supplierValidation.create,
   MasterDataController.createSupplier
 );
@@ -185,23 +185,23 @@ router.post('/suppliers',
 /**
  * @route   GET /api/master-data/suppliers
  * @desc    Get all suppliers with optional filtering and pagination
- * @access  Private (requires 'view_suppliers' permission)
+ * @access  Private (requires 'suppliers.read' permission)
  * @query   page, limit, search, isActive, category, sortBy, sortOrder
  */
 router.get('/suppliers',
   authenticateToken,
-  requirePermission('view_suppliers'),
+  requirePermission('suppliers.read'),
   MasterDataController.getSuppliers
 );
 
 /**
  * @route   PUT /api/master-data/suppliers/:id
  * @desc    Update a supplier
- * @access  Private (requires 'manage_suppliers' permission)
+ * @access  Private (requires 'suppliers.update' permission)
  */
 router.put('/suppliers/:id',
   authenticateToken,
-  requirePermission('manage_suppliers'),
+  requirePermission('suppliers.update'),
   supplierValidation.update,
   MasterDataController.updateSupplier
 );
@@ -209,11 +209,11 @@ router.put('/suppliers/:id',
 /**
  * @route   DELETE /api/master-data/suppliers/:id
  * @desc    Soft delete a supplier
- * @access  Private (requires 'manage_suppliers' permission)
+ * @access  Private (requires 'suppliers.delete' permission)
  */
 router.delete('/suppliers/:id',
   authenticateToken,
-  requirePermission('manage_suppliers'),
+  requirePermission('suppliers.delete'),
   MasterDataController.deleteSupplier
 );
 
@@ -233,12 +233,12 @@ router.post('/branches',
 /**
  * @route   GET /api/master-data/branches
  * @desc    Get all branches with optional filtering and pagination
- * @access  Private (requires 'view_branches' permission)
+ * @access  Private (requires 'branches.read' permission)
  * @query   page, limit, search, isActive, sortBy, sortOrder
  */
 router.get('/branches',
   authenticateToken,
-  requirePermission('view_branches'),
+  requirePermission('branches.read'),
   MasterDataController.getBranches
 );
 
@@ -268,11 +268,11 @@ router.delete('/branches/:id',
 /**
  * @route   GET /api/master-data/categories/tree
  * @desc    Get category hierarchy tree
- * @access  Private (requires 'view_categories' permission)
+ * @access  Private (requires 'categories.read' permission)
  */
 router.get('/categories/tree',
   authenticateToken,
-  requirePermission('view_categories'),
+  requirePermission('categories.read'),
   (req, res, next) => {
     req.query.includeHierarchy = 'true';
     next();
@@ -343,11 +343,11 @@ router.get('/summary',
 
       // Check permissions
       const hasPermissions = {
-        categories: req.user.permissions.includes('view_categories'),
-        brands: req.user.permissions.includes('view_brands'),
-        units: req.user.permissions.includes('view_units'),
-        suppliers: req.user.permissions.includes('view_suppliers'),
-        branches: req.user.permissions.includes('view_branches')
+        categories: req.user.permissions.includes('categories.read'),
+        brands: req.user.permissions.includes('brands.read'),
+        units: req.user.permissions.includes('units.read'),
+        suppliers: req.user.permissions.includes('suppliers.read'),
+        branches: req.user.permissions.includes('branches.read')
       };
 
       const summary = {};

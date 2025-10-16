@@ -10,18 +10,35 @@ const toIdString = (value) => {
     return null;
   }
 
+  // Handle string values
   if (typeof value === 'string') {
     const trimmed = value.trim();
     return trimmed.length ? trimmed : null;
   }
 
-  if (value instanceof Object) {
-    if (value._id) {
+  // Handle ObjectId instances - convert directly to string
+  if (value.constructor && (value.constructor.name === 'ObjectId' || value instanceof Object && value._bsontype === 'ObjectId')) {
+    const str = value.toString();
+    return str && str !== '[object Object]' ? str : null;
+  }
+
+  // Handle plain objects
+  if (typeof value === 'object' && value !== null) {
+    // Extract _id if it exists and it's NOT an ObjectId (to avoid infinite recursion)
+    if (value._id && value._id !== value) {
       return toIdString(value._id);
     }
-
+    
+    // Try toString only if it's a useful method
     if (typeof value.toString === 'function') {
-      return toIdString(value.toString());
+      try {
+        const str = value.toString();
+        if (str && typeof str === 'string' && str !== '[object Object]' && str !== '[object]') {
+          return str.trim() || null;
+        }
+      } catch (e) {
+        // Ignore errors from toString()
+      }
     }
   }
 

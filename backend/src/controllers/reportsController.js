@@ -172,7 +172,13 @@ class ReportsController {
       }
     };
 
-    if (branchId) filter.branch = branchId;
+    // Apply branch filter from middleware (for Store Manager, Inventory Manager, Cashier)
+    if (req.branchFilter) {
+      filter.branch = req.branchFilter.branch;
+    } else if (branchId) {
+      filter.branch = branchId;
+    }
+    
     if (paymentMethod) filter.paymentMethod = paymentMethod;
     if (cashierId) filter.createdBy = cashierId;
 
@@ -385,7 +391,12 @@ class ReportsController {
       }
     };
 
-    if (branchId) filter.branch = branchId;
+    // Apply branch filter from middleware (for Store Manager, Inventory Manager, Cashier)
+    if (req.branchFilter) {
+      filter.branch = req.branchFilter.branch;
+    } else if (branchId) {
+      filter.branch = branchId;
+    }
 
     const sales = await Sale.find(filter)
       .populate('items.product', 'name sku category brand costPrice');
@@ -552,6 +563,19 @@ class ReportsController {
     
     if (categoryId) filter.category = categoryId;
     if (brandId) filter.brand = brandId;
+
+    // Apply branch filter for inventory report
+    let filterBranchId = null;
+    if (req.branchFilter && req.branchFilter.branch) {
+      filterBranchId = req.branchFilter.branch;
+    } else if (branchId) {
+      filterBranchId = branchId;
+    }
+
+    // If branch is specified, filter products by that branch's stock
+    if (filterBranchId) {
+      filter['stockByBranch.branch'] = filterBranchId;
+    }
 
     let products = await Product.find(filter)
       .populate('category', 'name')
@@ -732,7 +756,12 @@ class ReportsController {
       }
     };
 
-    if (branchId) filter.branch = branchId;
+    // Apply branch filter from middleware (for Store Manager, Inventory Manager, Cashier)
+    if (req.branchFilter) {
+      filter.branch = req.branchFilter.branch;
+    } else if (branchId) {
+      filter.branch = branchId;
+    }
 
     const sales = await Sale.find(filter)
       .populate({
@@ -840,7 +869,12 @@ class ReportsController {
       }
     };
 
-    if (branchId) filter.branch = branchId;
+    // Apply branch filter from middleware (for Store Manager, Inventory Manager, Cashier)
+    if (req.branchFilter) {
+      filter.branch = req.branchFilter.branch;
+    } else if (branchId) {
+      filter.branch = branchId;
+    }
 
     const sales = await Sale.find(filter)
       .populate('customer', 'name email phone')

@@ -71,6 +71,16 @@ function Dashboard() {
   const [dateRange, setDateRange] = useState('7days');
   const [refreshInterval, setRefreshInterval] = useState(30000); // 30 seconds
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [isDark, setIsDark] = useState(document.documentElement.classList.contains('dark'));
+
+  // Watch for theme changes
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
   // API fetch functions with React Query
   const fetchDashboardOverview = async (period = '7days') => {
@@ -304,29 +314,36 @@ function Dashboard() {
         labels: {
           usePointStyle: true,
           padding: 20,
-          font: { size: 12 }
+          font: { size: 12 },
+          color: isDark ? '#d4d4d4' : '#374151'
         },
       },
       tooltip: {
         mode: 'index',
         intersect: false,
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-        titleColor: '#fff',
-        bodyColor: '#fff',
-        borderColor: '#374151',
+        backgroundColor: isDark ? 'rgba(0, 0, 0, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+        titleColor: isDark ? '#ffffff' : '#1f2937',
+        bodyColor: isDark ? '#e5e5e5' : '#374151',
+        borderColor: isDark ? '#262626' : '#e5e7eb',
         borderWidth: 1,
       },
     },
     scales: {
       x: {
         grid: { display: false },
-        ticks: { font: { size: 11 } }
+        ticks: { 
+          font: { size: 11 },
+          color: isDark ? '#a3a3a3' : '#6b7280'
+        }
       },
       y: {
         beginAtZero: true,
-        grid: { color: 'rgba(156, 163, 175, 0.1)' },
+        grid: { 
+          color: isDark ? 'rgba(38, 38, 38, 0.3)' : 'rgba(229, 231, 235, 0.5)'
+        },
         ticks: { 
           font: { size: 11 },
+          color: isDark ? '#a3a3a3' : '#6b7280',
           callback: (value) => `₹${value.toLocaleString()}`
         }
       },
@@ -368,22 +385,28 @@ function Dashboard() {
         {
           label: 'Revenue (₹)',
           data: data.map(item => item.revenue || 0),
-          borderColor: '#3B82F6',
-          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          borderColor: '#c084fc',
+          backgroundColor: 'rgba(192, 132, 252, 0.2)',
           tension: 0.4,
           fill: true,
-          pointRadius: 4,
-          pointHoverRadius: 6,
+          pointRadius: 5,
+          pointHoverRadius: 7,
+          pointBackgroundColor: '#c084fc',
+          pointBorderColor: '#000000',
+          pointBorderWidth: 2,
         },
         {
           label: 'Sales Count',
           data: data.map(item => item.sales || 0),
-          borderColor: '#10B981',
-          backgroundColor: 'rgba(16, 185, 129, 0.1)',
+          borderColor: '#38bdf8',
+          backgroundColor: 'rgba(56, 189, 248, 0.2)',
           tension: 0.4,
           fill: false,
-          pointRadius: 4,
-          pointHoverRadius: 6,
+          pointRadius: 5,
+          pointHoverRadius: 7,
+          pointBackgroundColor: '#38bdf8',
+          pointBorderColor: '#000000',
+          pointBorderWidth: 2,
           yAxisID: 'y1',
         },
       ],
@@ -402,8 +425,8 @@ function Dashboard() {
         {
           data: data.charts.topCategories.map(cat => cat.totalRevenue || 0),
           backgroundColor: [
-            '#8B5CF6', '#10B981', '#F59E0B', '#EF4444', '#06B6D4',
-            '#EC4899', '#84CC16', '#F97316', '#6366F1', '#14B8A6'
+            '#c084fc', '#38bdf8', '#34d399', '#fbbf24', '#f87171',
+            '#ec4899', '#86efac', '#fb923c', '#8b5cf6', '#06b6d4'
           ],
           borderWidth: 0,
           hoverBorderWidth: 2,
@@ -511,39 +534,54 @@ function Dashboard() {
           </div>
         </div>
 
-        {/* Quick Actions */}
-        <div className="bg-surface-50 dark:bg-surface-900/50 rounded-xl p-3 md:p-4 border border-surface-200 dark:border-surface-700">
-          <div className="flex flex-col gap-3 md:gap-4">
-            <div>
-              <h3 className="text-sm md:text-base font-semibold text-surface-900 dark:text-surface-100">
-                Quick Actions
-              </h3>
-              <p className="text-xs md:text-sm text-surface-500 dark:text-surface-400">
-                Common tasks and operations
-              </p>
-            </div>
-            
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-              {[
-                { label: 'New Sale', icon: PlusIcon, action: () => navigate('/sales'), color: 'blue' },
-                { label: 'Add Product', icon: CubeIcon, action: () => navigate('/products'), color: 'green' },
-                { label: 'View Reports', icon: ChartBarIcon, action: () => navigate('/reports'), color: 'purple' },
-                { label: 'Stock Check', icon: TruckIcon, action: () => navigate('/products'), color: 'amber' },
-                { label: 'Sales History', icon: DocumentTextIcon, action: () => navigate('/sales'), color: 'cyan' },
-                { label: 'Analytics', icon: ChartBarIcon, action: () => navigate('/reports'), color: 'pink' },
-              ].map((action, index) => (
-                <Button
-                  key={index}
-                  variant="outline"
-                  size="sm"
-                  onClick={action.action}
-                  className="flex items-center justify-center gap-1.5 md:gap-2 hover:shadow-sm transition-all text-xs md:text-sm h-auto py-2 md:py-2.5"
-                >
-                  <action.icon className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
-                  <span className="truncate">{action.label}</span>
-                </Button>
-              ))}
-            </div>
+        {/* Quick Actions - Enhanced Cards */}
+        <div>
+          <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4">
+            Quick Actions
+          </h3>
+          <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            {[
+              { label: 'New Sale', icon: PlusIcon, action: () => navigate('/sales'), gradient: 'from-purple-500 to-purple-600', icon_color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-950/40' },
+              { label: 'Add Product', icon: CubeIcon, action: () => navigate('/products'), gradient: 'from-blue-500 to-blue-600', icon_color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-950/40' },
+              { label: 'View Reports', icon: ChartBarIcon, action: () => navigate('/reports'), gradient: 'from-violet-500 to-violet-600', icon_color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-50 dark:bg-violet-950/40' },
+              { label: 'Stock Check', icon: TruckIcon, action: () => navigate('/products'), gradient: 'from-indigo-500 to-indigo-600', icon_color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-950/40' },
+              { label: 'Sales History', icon: DocumentTextIcon, action: () => navigate('/sales'), gradient: 'from-cyan-500 to-cyan-600', icon_color: 'text-cyan-600 dark:text-cyan-400', bg: 'bg-cyan-50 dark:bg-cyan-950/40' },
+              { label: 'Analytics', icon: ChartBarIcon, action: () => navigate('/reports'), gradient: 'from-fuchsia-500 to-fuchsia-600', icon_color: 'text-fuchsia-600 dark:text-fuchsia-400', bg: 'bg-fuchsia-50 dark:bg-fuchsia-950/40' },
+            ].map((action, index) => (
+              <button
+                key={index}
+                onClick={action.action}
+                className={cn(
+                  "relative group overflow-hidden rounded-lg p-4 transition-all duration-300 hover:shadow-lg",
+                  action.bg,
+                  "border border-surface-200 dark:border-surface-700 hover:border-surface-300 dark:hover:border-surface-600"
+                )}
+              >
+                {/* Gradient background on hover */}
+                <div className={cn(
+                  "absolute inset-0 bg-gradient-to-r opacity-0 group-hover:opacity-10 transition-opacity duration-300",
+                  action.gradient
+                )} />
+                
+                <div className="relative flex flex-col items-center gap-2.5">
+                  <div className={cn(
+                    "p-2.5 rounded-lg group-hover:shadow-md transition-all duration-300",
+                    action.bg
+                  )}>
+                    <action.icon className={cn(
+                      "h-5 w-5 transition-transform group-hover:scale-110",
+                      action.icon_color
+                    )} />
+                  </div>
+                  <span className="text-sm font-medium text-surface-900 dark:text-surface-100 text-center">
+                    {action.label}
+                  </span>
+                </div>
+
+                {/* Subtle shine effect */}
+                <div className="absolute top-0 left-0 h-full w-1 bg-gradient-to-b from-white to-transparent opacity-0 group-hover:opacity-20 transition-opacity duration-300" />
+              </button>
+            ))}
           </div>
         </div>
       </div>
@@ -555,44 +593,44 @@ function Dashboard() {
           const colorClasses = {
             emerald: {
               gradient: 'from-emerald-500 to-emerald-600',
-              icon: 'text-emerald-600',
-              bg: 'bg-emerald-50 dark:bg-emerald-950/30',
+              icon: 'text-emerald-600 dark:text-emerald-300',
+              bg: 'bg-emerald-50 dark:bg-emerald-950/50',
               ring: 'ring-emerald-200 dark:ring-emerald-800'
             },
             blue: {
               gradient: 'from-blue-500 to-blue-600',
-              icon: 'text-blue-600',
-              bg: 'bg-blue-50 dark:bg-blue-950/30',
+              icon: 'text-blue-600 dark:text-blue-300',
+              bg: 'bg-blue-50 dark:bg-blue-950/50',
               ring: 'ring-blue-200 dark:ring-blue-800'
             },
             purple: {
               gradient: 'from-purple-500 to-purple-600',
-              icon: 'text-purple-600',
-              bg: 'bg-purple-50 dark:bg-purple-950/30',
+              icon: 'text-purple-600 dark:text-purple-300',
+              bg: 'bg-purple-50 dark:bg-purple-950/50',
               ring: 'ring-purple-200 dark:ring-purple-800'
             },
             amber: {
               gradient: 'from-amber-500 to-amber-600',
-              icon: 'text-amber-600',
-              bg: 'bg-amber-50 dark:bg-amber-950/30',
+              icon: 'text-amber-600 dark:text-amber-300',
+              bg: 'bg-amber-50 dark:bg-amber-950/50',
               ring: 'ring-amber-200 dark:ring-amber-800'
             },
             cyan: {
               gradient: 'from-cyan-500 to-cyan-600',
-              icon: 'text-cyan-600',
-              bg: 'bg-cyan-50 dark:bg-cyan-950/30',
+              icon: 'text-cyan-600 dark:text-cyan-300',
+              bg: 'bg-cyan-50 dark:bg-cyan-950/50',
               ring: 'ring-cyan-200 dark:ring-cyan-800'
             },
             red: {
               gradient: 'from-red-500 to-red-600',
-              icon: 'text-red-600',
-              bg: 'bg-red-50 dark:bg-red-950/30',
+              icon: 'text-red-600 dark:text-red-300',
+              bg: 'bg-red-50 dark:bg-red-950/50',
               ring: 'ring-red-200 dark:ring-red-800'
             },
             green: {
               gradient: 'from-green-500 to-green-600',
-              icon: 'text-green-600',
-              bg: 'bg-green-50 dark:bg-green-950/30',
+              icon: 'text-green-600 dark:text-green-300',
+              bg: 'bg-green-50 dark:bg-green-950/50',
               ring: 'ring-green-200 dark:ring-green-800'
             }
           };
@@ -605,12 +643,12 @@ function Dashboard() {
               onClick={stat.onClick}
               className={cn(
                 "group relative overflow-hidden rounded-xl",
-                "bg-white dark:bg-surface-800",
-                "border border-surface-200 dark:border-surface-700",
+                "bg-white dark:bg-zinc-950",
+                "border border-surface-200 dark:border-zinc-800",
                 "p-5 cursor-pointer",
                 "transition-all duration-300",
                 "hover:shadow-2xl hover:-translate-y-1",
-                "hover:border-surface-300 dark:hover:border-surface-600"
+                "hover:border-surface-300 dark:hover:border-zinc-700"
               )}
             >
               {/* Gradient Bar at Top */}
@@ -625,7 +663,8 @@ function Dashboard() {
                 <div className="flex items-center justify-between">
                   <div className={cn(
                     "p-2 rounded-lg",
-                    colors.bg
+                    colors.bg,
+                    "dark:border dark:border-surface-600"
                   )}>
                     <stat.icon className={cn("h-5 w-5", colors.icon)} />
                   </div>
@@ -647,7 +686,7 @@ function Dashboard() {
                 </div>
 
                 {/* Trend Info */}
-                <div className="flex items-center justify-between pt-2 border-t border-surface-100 dark:border-surface-700">
+                <div className="flex items-center justify-between pt-2 border-t border-surface-800 dark:border-surface-700">
                   <div className="flex items-center gap-1.5">
                     {stat.trendType === 'increase' && (
                       <>
@@ -704,7 +743,7 @@ function Dashboard() {
         {/* Sales Trend Chart */}
         <Card className="p-4 md:p-6">
           <div className="flex items-center justify-between mb-3 md:mb-4">
-            <h3 className="text-base md:text-lg font-semibold text-surface-900 dark:text-surface-100">
+            <h3 className="text-base md:text-lg font-semibold text-surface-900 dark:text-zinc-100">
               Sales Trend
             </h3>
             {isSalesChartLoading && (
@@ -741,7 +780,7 @@ function Dashboard() {
         {/* Category Distribution */}
         <Card className="p-4 md:p-6">
           <div className="flex items-center justify-between mb-3 md:mb-4">
-            <h3 className="text-base md:text-lg font-semibold text-surface-900 dark:text-surface-100">
+            <h3 className="text-base md:text-lg font-semibold text-surface-900 dark:text-zinc-100">
               Top Categories
             </h3>
           </div>
@@ -766,7 +805,7 @@ function Dashboard() {
                           size: 13,
                           weight: '500'
                         },
-                        color: '#374151',
+                        color: isDark ? '#e5e5e5' : '#374151',
                         generateLabels: (chart) => {
                           const data = chart.data;
                           if (data.labels.length && data.datasets.length) {
@@ -782,7 +821,8 @@ function Dashboard() {
                                 strokeStyle: data.datasets[0].backgroundColor[index],
                                 lineWidth: 0,
                                 hidden: false,
-                                index: index
+                                index: index,
+                                fontColor: isDark ? '#e5e5e5' : '#374151'
                               };
                             });
                           }
@@ -836,15 +876,15 @@ function Dashboard() {
       {/* Activity Sections Grid - Responsive */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6">
         {/* Recent Sales Activity */}
-        <Card className="p-4 md:p-6">
+        <Card className="p-4 md:p-6 dark:bg-zinc-950 dark:border-zinc-800">
           <div className="flex items-center justify-between mb-3 md:mb-4">
-            <h3 className="text-base md:text-lg font-semibold text-surface-900 dark:text-surface-100">
+            <h3 className="text-base md:text-lg font-semibold text-surface-900 dark:text-zinc-100">
               Recent Sales
             </h3>
             <Button 
               variant="ghost" 
               size="sm"
-              onClick={() => navigate('/sales')}
+              onClick={() => navigate('/sales?tab=history')}
               className="text-xs md:text-sm"
             >
               <span className="hidden sm:inline">View All</span>
@@ -856,7 +896,7 @@ function Dashboard() {
             {data.alerts?.recentSales?.slice(0, 5).map((sale, index) => (
               <div key={sale._id || index} className="flex items-center justify-between p-2 md:p-3 bg-surface-50 dark:bg-surface-800 rounded-lg">
                 <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
-                  <div className="p-1.5 md:p-2 bg-blue-100 dark:bg-blue-900 rounded-full flex-shrink-0">
+                  <div className="p-1.5 md:p-2 bg-blue-100 dark:bg-blue-950/40 rounded-full flex-shrink-0">
                     <ShoppingCartIcon className="h-3.5 w-3.5 md:h-4 md:w-4 text-blue-600 dark:text-blue-400" />
                   </div>
                   <div className="min-w-0 flex-1">
@@ -888,15 +928,15 @@ function Dashboard() {
         </Card>
 
         {/* Low Stock Alerts */}
-        <Card className="p-4 md:p-6">
+        <Card className="p-4 md:p-6 dark:bg-zinc-950 dark:border-zinc-800">
           <div className="flex items-center justify-between mb-3 md:mb-4">
-            <h3 className="text-base md:text-lg font-semibold text-surface-900 dark:text-surface-100">
+            <h3 className="text-base md:text-lg font-semibold text-surface-900 dark:text-zinc-100">
               Low Stock Alerts
             </h3>
             <Button 
               variant="ghost" 
               size="sm"
-              onClick={() => navigate('/products')}
+              onClick={() => navigate('/products?stock=low-stock')}
               className="text-xs md:text-sm"
             >
               <span className="hidden sm:inline">View All</span>
@@ -906,9 +946,9 @@ function Dashboard() {
           
           <div className="space-y-2 md:space-y-3">
             {data.alerts?.lowStockItems?.slice(0, 5).map((product, index) => (
-              <div key={product._id || index} className="flex items-center justify-between p-2 md:p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+              <div key={product._id || index} className="flex items-center justify-between p-2 md:p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-900">
                 <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
-                  <div className="p-1.5 md:p-2 bg-amber-100 dark:bg-amber-900 rounded-full flex-shrink-0">
+                  <div className="p-1.5 md:p-2 bg-amber-100 dark:bg-amber-950/40 rounded-full flex-shrink-0">
                     <ExclamationTriangleIcon className="h-3.5 w-3.5 md:h-4 md:w-4 text-amber-600 dark:text-amber-400" />
                   </div>
                   <div className="min-w-0 flex-1">
@@ -916,7 +956,7 @@ function Dashboard() {
                       {product.name}
                     </div>
                     <div className="text-xs text-surface-500 dark:text-surface-400 truncate">
-                      SKU: {product.sku}
+                      SKU: {product.sku} • {product.branchName || 'All Branches'}
                     </div>
                   </div>
                 </div>

@@ -3,7 +3,7 @@ import { cva } from 'class-variance-authority';
 import { cn } from '../../utils/cn';
 
 const skeletonVariants = cva(
-  "animate-pulse bg-surface-200 dark:bg-surface-700 rounded",
+  "animate-pulse bg-slate-200 dark:bg-zinc-800 rounded",
   {
     variants: {
       variant: {
@@ -39,7 +39,7 @@ Skeleton.displayName = "Skeleton";
 
 // Skeleton patterns for common layouts
 const SkeletonCard = ({ className }) => (
-  <div className={cn("p-5 bg-white dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700", className)}>
+  <div className={cn("p-5 bg-white dark:bg-zinc-950 rounded-lg border border-surface-200 dark:border-zinc-900", className)}>
     <Skeleton variant="title" className="mb-3 w-3/4" />
     <Skeleton variant="text" className="mb-2 w-full" />
     <Skeleton variant="text" className="mb-4 w-2/3" />
@@ -48,9 +48,9 @@ const SkeletonCard = ({ className }) => (
 );
 
 const SkeletonTable = ({ rows = 5, columns = 4 }) => (
-  <div className="overflow-hidden bg-white dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700">
+  <div className="overflow-hidden bg-white dark:bg-zinc-950 rounded-lg border border-surface-200 dark:border-zinc-900">
     {/* Header */}
-    <div className="p-4 border-b border-surface-200 dark:border-surface-700">
+    <div className="p-4 border-b border-surface-200 dark:border-zinc-900">
       <div className="flex space-x-4">
         {Array.from({ length: columns }).map((_, i) => (
           <Skeleton key={i} variant="text" className="flex-1" />
@@ -60,7 +60,7 @@ const SkeletonTable = ({ rows = 5, columns = 4 }) => (
     
     {/* Rows */}
     {Array.from({ length: rows }).map((_, rowIndex) => (
-      <div key={rowIndex} className="p-4 border-b border-surface-200 dark:border-surface-700 last:border-b-0">
+      <div key={rowIndex} className="p-4 border-b border-surface-200 dark:border-zinc-900 last:border-b-0">
         <div className="flex space-x-4">
           {Array.from({ length: columns }).map((_, colIndex) => (
             <Skeleton key={colIndex} variant="text" className="flex-1" />

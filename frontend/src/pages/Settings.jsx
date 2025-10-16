@@ -54,8 +54,11 @@ function Settings() {
   // Check if user has admin/manager permissions (case-insensitive)
   // Roles: Admin, Regional Manager, Store Manager, Inventory Manager, Cashier, Viewer
   const userRole = user?.role?.toLowerCase();
-  const canManageUsers = userRole === 'admin' || userRole?.includes('manager');
   const isAdmin = userRole === 'admin';
+  const isRegionalManager = userRole === 'regional manager';
+  const canManageUsers = isAdmin || isRegionalManager; // Only Admin and Regional Manager can manage users
+  const canViewBranches = isAdmin || isRegionalManager; // Regional Manager can view branches
+  const canManageBranches = isAdmin; // Only Admin can create/edit/delete branches
 
   // Queries
   const { data: userProfile, isLoading: profileLoading, refetch: refetchProfile } = useQuery({
@@ -184,11 +187,29 @@ function Settings() {
     }
   });
 
+  const createUserMutation = useMutation({
+    mutationFn: (data) => {
+      console.log('Creating user with data:', data);
+      return authAPI.register(data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['users-all']);
+      setShowUserModal(false);
+      toast.success('User created successfully');
+      console.log('User created successfully');
+    },
+    onError: (error) => {
+      console.error('User creation error:', error);
+      console.error('Error response:', error.response?.data);
+      toast.error(error.response?.data?.message || 'Failed to create user');
+    }
+  });
+
   // Tab configuration
   const tabs = [
     { id: 'profile', label: 'My Profile', icon: UserIcon, show: true },
     { id: 'system', label: 'System Settings', icon: SettingsIcon, show: isAdmin },
-    { id: 'branches', label: 'Branches', icon: Building2, show: canManageUsers },
+    { id: 'branches', label: 'Branches', icon: Building2, show: canViewBranches },
     { id: 'users', label: 'User Management', icon: Shield, show: canManageUsers }
   ].filter(tab => tab.show);
 
@@ -217,13 +238,19 @@ function Settings() {
 
     const handleSubmit = (e) => {
       e.preventDefault();
-      // Only send fields that can be updated (exclude email)
+      // Build update data - include email only if admin
       const updateData = {
         firstName: formData.firstName,
         lastName: formData.lastName,
         phone: formData.phone,
         address: formData.address
       };
+      
+      // Admins can update their email
+      if (isAdmin) {
+        updateData.email = formData.email;
+      }
+      
       updateProfileMutation.mutate(updateData);
     };
 
@@ -307,12 +334,15 @@ function Settings() {
                 <Input
                   type="email"
                   value={formData.email}
+                  onChange={(e) => handleChange('email', e.target.value)}
                   placeholder="Enter email"
-                  disabled
-                  className="bg-slate-100 dark:bg-slate-800 cursor-not-allowed"
+                  disabled={!isAdmin}
+                  className={!isAdmin ? "bg-slate-100 dark:bg-slate-800 cursor-not-allowed" : ""}
                 />
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Email cannot be changed. Contact an administrator if needed.
+                  {isAdmin 
+                    ? "As an administrator, you can change your email address." 
+                    : "Email cannot be changed. Contact an administrator if needed."}
                 </p>
               </div>
 
@@ -428,23 +458,32 @@ function Settings() {
   };
 
 
+  // System settings uses localStorage (no backend API needed)
+
   // System Settings Tab
   const SystemTab = () => {
-    const [formData, setFormData] = useState({
-      companyName: 'Mumbai Supermart',
-      companyAddress: '123 Business Street, Mumbai, Maharashtra 400001',
-      companyPhone: '+91 22 1234 5678',
-      companyEmail: 'info@mumbaisupermart.com',
-      companyWebsite: 'www.mumbaisupermart.com',
-      taxId: 'GST123456789',
-      currency: 'INR',
-      defaultGstRate: 18,
-      lowStockThreshold: 10,
-      receiptFooter: 'Thank you for shopping with us! Visit again!',
-      emailNotifications: true,
-      lowStockAlerts: true,
-      autoBackup: true,
-      backupFrequency: 'daily'
+    const [formData, setFormData] = useState(() => {
+      // Load from localStorage or use defaults
+      const saved = localStorage.getItem('systemSettings');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          console.error('Failed to parse system settings:', e);
+        }
+      }
+      return {
+        companyName: 'Mumbai Supermart',
+        companyAddress: '123 Business Street, Mumbai, Maharashtra 400001',
+        companyPhone: '+91 22 1234 5678',
+        companyEmail: 'info@mumbaisupermart.com',
+        companyWebsite: 'www.mumbaisupermart.com',
+        taxId: 'GST123456789',
+        currency: 'INR',
+        defaultGstRate: 18,
+        lowStockThreshold: 10,
+        receiptFooter: 'Thank you for shopping with us! Visit again!'
+      };
     });
 
     const [saving, setSaving] = useState(false);
@@ -457,11 +496,20 @@ function Settings() {
       e.preventDefault();
       setSaving(true);
       
-      // Simulate API call (replace with actual API when backend is ready)
-      setTimeout(() => {
+      try {
+        // Save to localStorage
+        localStorage.setItem('systemSettings', JSON.stringify(formData));
+        
+        // Simulate a small delay for better UX
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
         toast.success('System settings saved successfully');
+      } catch (error) {
+        console.error('Failed to save settings:', error);
+        toast.error('Failed to save system settings');
+      } finally {
         setSaving(false);
-      }, 1000);
+      }
     };
 
     return (
@@ -635,93 +683,6 @@ function Settings() {
               </div>
             </div>
           </Card>
-
-          {/* Notification Settings */}
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-6">
-              Notification Settings
-            </h3>
-
-            <div className="space-y-4">
-              <label className="flex items-center justify-between p-4 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
-                <div>
-                  <div className="font-medium text-slate-900 dark:text-slate-100">Email Notifications</div>
-                  <div className="text-sm text-slate-500 dark:text-slate-400">
-                    Receive general system notifications via email
-                  </div>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={formData.emailNotifications}
-                  onChange={(e) => handleChange('emailNotifications', e.target.checked)}
-                  className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-slate-300 rounded"
-                />
-              </label>
-
-              <label className="flex items-center justify-between p-4 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
-                <div>
-                  <div className="font-medium text-slate-900 dark:text-slate-100">Low Stock Alerts</div>
-                  <div className="text-sm text-slate-500 dark:text-slate-400">
-                    Get notified when products are running low
-                  </div>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={formData.lowStockAlerts}
-                  onChange={(e) => handleChange('lowStockAlerts', e.target.checked)}
-                  className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-slate-300 rounded"
-                />
-              </label>
-            </div>
-          </Card>
-
-          {/* Backup Settings */}
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-6">
-              Backup & Data Management
-            </h3>
-
-            <div className="space-y-6">
-              <label className="flex items-center justify-between p-4 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
-                <div>
-                  <div className="font-medium text-slate-900 dark:text-slate-100">Automatic Backups</div>
-                  <div className="text-sm text-slate-500 dark:text-slate-400">
-                    Enable scheduled automatic database backups
-                  </div>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={formData.autoBackup}
-                  onChange={(e) => handleChange('autoBackup', e.target.checked)}
-                  className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-slate-300 rounded"
-                />
-              </label>
-
-              {formData.autoBackup && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                    Backup Frequency
-                  </label>
-                  <select
-                    value={formData.backupFrequency}
-                    onChange={(e) => handleChange('backupFrequency', e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-800 dark:text-slate-100"
-                  >
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                  </select>
-                </div>
-              )}
-
-              <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
-                <Button type="button" variant="outline" className="w-full">
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Create Backup Now
-                </Button>
-              </div>
-            </div>
-          </Card>
         </form>
       </div>
     );
@@ -758,28 +719,34 @@ function Settings() {
                 Branch Management
               </h3>
               <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                Manage store locations across different cities
+                {canManageBranches 
+                  ? 'Manage store locations across different cities'
+                  : 'View store locations across different cities'}
               </p>
             </div>
-            <Button
-              variant="primary"
-              onClick={() => {
-                setSelectedBranch(null);
-                setShowBranchModal(true);
-              }}
-              className="flex items-center gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Add Branch
-            </Button>
+            {canManageBranches && (
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setSelectedBranch(null);
+                  setShowBranchModal(true);
+                }}
+                className="flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Add Branch
+              </Button>
+            )}
           </div>
 
           {branches.length === 0 ? (
             <EmptyState
               title="No branches found"
-              description="Create your first branch to start managing multiple store locations"
+              description={canManageBranches 
+                ? "Create your first branch to start managing multiple store locations"
+                : "No branch locations are currently configured"}
               icon={Building2}
-              action={
+              action={canManageBranches ? (
                 <Button
                   onClick={() => {
                     setSelectedBranch(null);
@@ -789,7 +756,7 @@ function Settings() {
                   <Plus className="h-4 w-4 mr-2" />
                   Add First Branch
                 </Button>
-              }
+              ) : null}
             />
           ) : (
             <div className="overflow-x-auto">
@@ -808,9 +775,11 @@ function Settings() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                       Status
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                      Actions
-                    </th>
+                    {canManageBranches && (
+                      <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-slate-900 divide-y divide-slate-200 dark:divide-slate-700">
@@ -849,28 +818,30 @@ function Settings() {
                           {branch.isActive ? 'Active' : 'Inactive'}
                         </Badge>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(branch)}
-                            className="text-blue-600 hover:text-blue-900"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          {isAdmin && (
+                      {canManageBranches && (
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <div className="flex items-center justify-end gap-2">
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleDelete(branch._id)}
-                              className="text-red-600 hover:text-red-900"
+                              onClick={() => handleEdit(branch)}
+                              className="text-blue-600 hover:text-blue-900"
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Edit className="h-4 w-4" />
                             </Button>
-                          )}
-                        </div>
-                      </td>
+                            {isAdmin && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDelete(branch._id)}
+                                className="text-red-600 hover:text-red-900"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -954,9 +925,11 @@ function Settings() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                       Last Login
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                      Actions
-                    </th>
+                    {canManageUsers && (
+                      <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-slate-900 divide-y divide-slate-200 dark:divide-slate-700">
@@ -1003,20 +976,26 @@ function Settings() {
                           ? new Date(user.lastLogin).toLocaleDateString() 
                           : 'Never'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex items-center justify-end gap-2">
-                          {isAdmin && user._id !== userProfile?.data?._id && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleToggleStatus(user._id)}
-                              className={user.isActive ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'}
-                            >
-                              {user.isActive ? 'Deactivate' : 'Activate'}
-                            </Button>
-                          )}
-                        </div>
-                      </td>
+                      {canManageUsers && (
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <div className="flex items-center justify-end gap-2">
+                            {isAdmin && user._id !== userProfile?.data?._id ? (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleToggleStatus(user._id)}
+                                className={user.isActive ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'}
+                              >
+                                {user.isActive ? 'Deactivate' : 'Activate'}
+                              </Button>
+                            ) : !isAdmin ? (
+                              <span className="text-xs text-slate-400 dark:text-slate-500 italic">
+                                View only
+                              </span>
+                            ) : null}
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -1113,11 +1092,21 @@ function Settings() {
         }}
         isLoading={createBranchMutation.isPending || updateBranchMutation.isPending}
       />
+
+      <UserModal
+        isOpen={showUserModal}
+        onClose={() => {
+          setShowUserModal(false);
+          setSelectedUser(null);
+        }}
+        onSubmit={(data) => createUserMutation.mutate(data)}
+        isLoading={createUserMutation.isPending}
+      />
     </div>
   );
 }
 
-
+// ... (rest of the code remains the same)
 // Password Change Modal
 function PasswordChangeModal({ isOpen, onClose }) {
   const [formData, setFormData] = useState({
@@ -1243,6 +1232,158 @@ function PasswordChangeModal({ isOpen, onClose }) {
               </>
             ) : (
               'Change Password'
+            )}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+// User Modal
+function UserModal({ isOpen, onClose, onSubmit, isLoading }) {
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    password: '',
+    phone: '',
+    role: 'Cashier',
+    branch: ''
+  });
+
+  useEffect(() => {
+    if (!isOpen) {
+      setFormData({
+        firstName: '',
+        lastName: '',
+        email: '',
+        password: '',
+        phone: '',
+        role: 'Cashier',
+        branch: ''
+      });
+    }
+  }, [isOpen]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    
+    if (!formData.firstName || !formData.lastName || !formData.email || !formData.password) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    if (formData.password.length < 8) {
+      toast.error('Password must be at least 8 characters long');
+      return;
+    }
+
+    onSubmit(formData);
+  };
+
+  const handleChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Add New User">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              First Name <span className="text-red-500">*</span>
+            </label>
+            <Input
+              value={formData.firstName}
+              onChange={(e) => handleChange('firstName', e.target.value)}
+              placeholder="Enter first name"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Last Name <span className="text-red-500">*</span>
+            </label>
+            <Input
+              value={formData.lastName}
+              onChange={(e) => handleChange('lastName', e.target.value)}
+              placeholder="Enter last name"
+              required
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            Email <span className="text-red-500">*</span>
+          </label>
+          <Input
+            type="email"
+            value={formData.email}
+            onChange={(e) => handleChange('email', e.target.value)}
+            placeholder="user@example.com"
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            Password <span className="text-red-500">*</span>
+          </label>
+          <Input
+            type="password"
+            value={formData.password}
+            onChange={(e) => handleChange('password', e.target.value)}
+            placeholder="Minimum 8 characters"
+            required
+            minLength={8}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Role <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={formData.role}
+              onChange={(e) => handleChange('role', e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-800 dark:text-slate-100"
+              required
+            >
+              <option value="Cashier">Cashier</option>
+              <option value="Inventory Manager">Inventory Manager</option>
+              <option value="Store Manager">Store Manager</option>
+              <option value="Regional Manager">Regional Manager</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Phone
+            </label>
+            <Input
+              value={formData.phone}
+              onChange={(e) => handleChange('phone', e.target.value)}
+              placeholder="+91 XXXXXXXXXX"
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+          <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
+            Cancel
+          </Button>
+          <Button type="submit" variant="primary" disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <LoadingSpinner size="sm" />
+                Creating...
+              </>
+            ) : (
+              'Create User'
             )}
           </Button>
         </div>
