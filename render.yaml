@@ -1,0 +1,24 @@
+services:
+  # Backend API Service
+  - type: web
+    name: inventory-backend
+    runtime: node
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      # Add other environment variables in Render Dashboard
+      # MONGODB_URI - from secret
+      # JWT_SECRET - from secret
+      # JWT_REFRESH_SECRET - from secret
+      # FRONTEND_URL - from secret
+      # SMTP_USER - from secret
+      # SMTP_PASS - from secret
+    autoDeploy: true

@@ -72,7 +72,7 @@ Before starting, ensure you have:
 
 ### Required Accounts (Free)
 - [ ] **GitHub** - [github.com](https://github.com)
-- [ ] **Railway** - [railway.app](https://railway.app) ← Backend hosting
+- [ ] **Render** - [render.com](https://render.com) ← Backend hosting (FREE)
 - [ ] **Vercel** - [vercel.com](https://vercel.com) ← Frontend hosting
 
 ### Required Credentials
@@ -90,7 +90,7 @@ Before starting, ensure you have:
 ```
 Step 1: Push to GitHub (2 min)
    ↓
-Step 2: Deploy Backend to Railway (5 min)
+Step 2: Deploy Backend to Render (8 min)
    ↓
 Step 3: Deploy Frontend to Vercel (5 min)
    ↓
@@ -132,16 +132,16 @@ mongodb+srv://username:password@cluster.mongodb.net/database
 
 ## 🎬 Ready to Deploy?
 
-### Option A: Quick Deploy (Recommended)
+### Option A: Render Quick Deploy (Recommended)
 ```bash
 # Open this file and follow along:
-QUICK_DEPLOY.md
+RENDER_QUICK_START.md
 ```
 
-### Option B: Detailed Guide
+### Option B: Render Detailed Guide
 ```bash
 # Open this file for step-by-step instructions:
-DEPLOYMENT_GUIDE.md
+RENDER_DEPLOYMENT.md
 ```
 
 ### Option C: Environment Variables Reference
